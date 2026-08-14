@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_formatting_panel.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
-import '../../../../helpers/haptic_test_helper.dart';
 
-Widget buildEditorHarness({
+/// Pumps a bare [NoteToolbar] with the given nodes and initial selection.
+/// Returns the document, composer, and editor for assertions and commands.
+({Editor editor, MutableDocument document, MutableDocumentComposer composer})
+    buildToolbarHarness({
   required List<DocumentNode> nodes,
   DocumentSelection? selection,
-  bool positionAtBottom = false,
 }) {
   final document = MutableDocument(nodes: nodes);
   final composer = MutableDocumentComposer(initialSelection: selection);
@@ -19,35 +17,39 @@ Widget buildEditorHarness({
     document: document,
     composer: composer,
   );
-
-  return MaterialApp(
-    home: Scaffold(
-      body: positionAtBottom
-          ? Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: buildFormattingPanel(editor, composer),
-                ),
-              ],
-            )
-          : buildFormattingPanel(editor, composer),
-    ),
-  );
+  return (editor: editor, document: document, composer: composer);
 }
 
-DocumentSelection caretSelection(String nodeId) {
-  return const DocumentSelection.collapsed(
+Future<void> pumpToolbar(
+  WidgetTester tester, {
+  required List<DocumentNode> nodes,
+  DocumentSelection? selection,
+  bool disableAnimations = false,
+}) async {
+  final harness = buildToolbarHarness(nodes: nodes, selection: selection);
+  Widget child = NoteToolbar(
+    editor: harness.editor,
+    composer: harness.composer,
+  );
+  if (disableAnimations) {
+    child = MediaQuery(
+      data: const MediaQueryData(disableAnimations: true),
+      child: child,
+    );
+  }
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: child)));
+  await tester.pumpAndSettle();
+}
+
+DocumentSelection caretSelection(String nodeId, [int offset = 0]) {
+  return DocumentSelection.collapsed(
     position: DocumentPosition(
-      nodeId: 'node-1',
-      nodePosition: TextNodePosition(offset: 0),
+      nodeId: nodeId,
+      nodePosition: TextNodePosition(offset: offset),
     ),
   );
 }
 
-/// Finds the toolbar button that contains the given [IconData].
 Finder iconButtonWithIcon(IconData icon) {
   return find.ancestor(
     of: find.byIcon(icon),
@@ -55,945 +57,367 @@ Finder iconButtonWithIcon(IconData icon) {
   );
 }
 
-Finder toolbarButtonWithSvgAsset(String asset) {
-  return find.byWidgetPredicate(
-    (widget) => widget is ToolbarButton && widget.svgAsset == asset,
-  );
-}
-
-Widget buildFormattingPanel(Editor editor, MutableDocumentComposer composer) {
-  return NoteFormattingPanel(
-    editor: editor,
-    composer: composer,
-    selection: composer.selection,
-    onClose: () {},
-    onReturnToTyping: () {},
-  );
-}
-
-Future<void> openListMenu(WidgetTester tester) async {
-  await tester.pumpAndSettle();
-  expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
-  expect(find.bySemanticsLabel('Lista com marcadores'), findsOneWidget);
-  expect(find.bySemanticsLabel('Lista numerada'), findsOneWidget);
-  expect(find.bySemanticsLabel('Checklist'), findsOneWidget);
-}
-
-Future<void> selectListOption(WidgetTester tester, String label) async {
-  await openListMenu(tester);
-  final semanticLabel = switch (label) {
-    'Bullet List' => 'Lista com marcadores',
-    'Numbered List' => 'Lista numerada',
-    'Checklist' => 'Checklist',
-    _ => throw ArgumentError.value(label, 'label'),
-  };
-  await tester.tap(find.bySemanticsLabel(semanticLabel));
-  await tester.pumpAndSettle();
-}
-
-Widget buildConversionHarness({
-  required List<DocumentNode> nodes,
-  DocumentSelection? selection,
-}) {
-  final document = MutableDocument(nodes: nodes);
-  final composer = MutableDocumentComposer(initialSelection: selection);
-  final editor = createDefaultDocumentEditor(
-    document: document,
-    composer: composer,
-  );
-
-  return MaterialApp(
-    home: Scaffold(
-      body: Column(
-        children: [
-          Expanded(
-            child: SuperEditor(
-              editor: editor,
-              componentBuilders: [
-                ...defaultComponentBuilders,
-                CustomTaskComponentBuilder(),
-              ],
-            ),
-          ),
-          buildFormattingPanel(editor, composer),
-        ],
-      ),
-    ),
-  );
-}
-
 void main() {
-  testWidgets('requests the formatting panel without expanding itself', (
-    tester,
-  ) async {
-    final document = MutableDocument(
-      nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-    );
-    final composer = MutableDocumentComposer();
-    final editor = createDefaultDocumentEditor(
-      document: document,
-      composer: composer,
-    );
-    var requests = 0;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: NoteToolbar(
-            editor: editor,
-            composer: composer,
-            onOpenFormatting: () => requests++,
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.bySemanticsLabel('Abrir formatação'));
-    await tester.pump();
-
-    expect(requests, 1);
-    expect(find.byType(NoteToolbar), findsOneWidget);
-    expect(find.byType(NoteFormattingPanel), findsNothing);
-  });
-
-  group('List menu trigger state', () {
-    testWidgets('shows list controls in the formatting panel', (tester) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-
-      expect(find.bySemanticsLabel('Lista com marcadores'), findsOneWidget);
-      expect(find.bySemanticsLabel('Lista numerada'), findsOneWidget);
-      expect(find.bySemanticsLabel('Checklist'), findsOneWidget);
-    });
-
-    testWidgets('is inactive when cursor is on a ParagraphNode', (
+  group('normal block-format controls', () {
+    testWidgets('shows block controls for a paragraph and hides inline', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
+      await pumpToolbar(
+        tester,
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+        selection: caretSelection('node-1'),
       );
-      await tester.pumpAndSettle();
 
-      expect(
-        (tester.widget(iconButtonWithIcon(Icons.format_list_bulleted))
-                as dynamic)
-            .isActive,
-        isFalse,
-      );
+      expect(find.bySemanticsLabel('Título 1'), findsOneWidget);
+      expect(find.bySemanticsLabel('Título 2'), findsOneWidget);
+      expect(find.bySemanticsLabel('Título 3'), findsOneWidget);
+      expect(find.bySemanticsLabel('Citação'), findsOneWidget);
+      expect(find.bySemanticsLabel('Inserir divisor'), findsOneWidget);
+      expect(find.bySemanticsLabel('Negrito'), findsNothing);
     });
 
-    testWidgets('is active when cursor is on a TaskNode', (tester) async {
+    testWidgets('converts a paragraph to H1', (tester) async {
+      final harness = buildToolbarHarness(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Heading'))],
+        selection: caretSelection('node-1'),
+      );
       await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [
-            TaskNode(
-              id: 'node-1',
-              text: AttributedText('Buy milk'),
-              isComplete: false,
-            ),
-          ],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
+        MaterialApp(
+          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
         ),
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.bySemanticsLabel('Título 1'));
+      await tester.pumpAndSettle();
+
+      final node = harness.document.getNodeById('node-1') as ParagraphNode;
+      expect(node.getMetadataValue('blockType'), header1Attribution);
+    });
+
+    testWidgets('converts a paragraph to H2', (tester) async {
+      final harness = buildToolbarHarness(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Heading'))],
+        selection: caretSelection('node-1'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Título 2'));
+      await tester.pumpAndSettle();
+
+      final node = harness.document.getNodeById('node-1') as ParagraphNode;
+      expect(node.getMetadataValue('blockType'), header2Attribution);
+    });
+
+    testWidgets('converts a paragraph to H3 and to a blockquote', (
+      tester,
+    ) async {
+      final harness = buildToolbarHarness(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Heading'))],
+        selection: caretSelection('node-1'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Título 3'));
+      await tester.pumpAndSettle();
       expect(
-        (tester.widget(toolbarButtonWithSvgAsset('assets/icons/checkbox.svg'))
-                as dynamic)
-            .isActive,
+        (harness.document.getNodeById('node-1') as ParagraphNode).getMetadataValue('blockType'),
+        header3Attribution,
+      );
+
+      await tester.tap(find.bySemanticsLabel('Citação'));
+      await tester.pumpAndSettle();
+      expect(
+        (harness.document.getNodeById('node-1') as ParagraphNode).getMetadataValue('blockType'),
+        blockquoteAttribution,
+      );
+    });
+  });
+
+  group('contextual controls', () {
+    testWidgets('shows inline and list controls when text is selected', (
+      tester,
+    ) async {
+      await pumpToolbar(
+        tester,
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+        selection: DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 5),
+          ),
+        ),
+      );
+
+      expect(find.bySemanticsLabel('Negrito'), findsOneWidget);
+      expect(find.bySemanticsLabel('Itálico'), findsOneWidget);
+      expect(find.bySemanticsLabel('Tachado'), findsOneWidget);
+      expect(find.bySemanticsLabel('Lista com marcadores'), findsOneWidget);
+      expect(find.bySemanticsLabel('Lista numerada'), findsOneWidget);
+      expect(find.bySemanticsLabel('Task'), findsOneWidget);
+      expect(find.bySemanticsLabel('Título 1'), findsNothing);
+    });
+
+    testWidgets('shows inline controls for a collapsed caret on a list item', (
+      tester,
+    ) async {
+      await pumpToolbar(
+        tester,
+        nodes: [
+          ListItemNode.unordered(id: 'node-1', text: AttributedText('Item')),
+        ],
+        selection: caretSelection('node-1'),
+      );
+
+      expect(find.bySemanticsLabel('Negrito'), findsOneWidget);
+      expect(find.bySemanticsLabel('Aumentar recuo'), findsOneWidget);
+      expect(find.bySemanticsLabel('Diminuir recuo'), findsOneWidget);
+    });
+
+    testWidgets('disables inline actions without a text selection', (
+      tester,
+    ) async {
+      await pumpToolbar(
+        tester,
+        nodes: [
+          ListItemNode.unordered(id: 'node-1', text: AttributedText('Item')),
+        ],
+        selection: caretSelection('node-1'),
+      );
+
+      final bold = tester.widget<ToolbarButton>(
+        iconButtonWithIcon(Icons.format_bold),
+      );
+      expect(bold.onPressed, isNull);
+    });
+
+    testWidgets('disables indent and outdent for a paragraph selection', (
+      tester,
+    ) async {
+      await pumpToolbar(
+        tester,
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+        selection: DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 5),
+          ),
+        ),
+      );
+
+      final indent = tester.widget<ToolbarButton>(
+        iconButtonWithIcon(Icons.format_indent_increase),
+      );
+      final outdent = tester.widget<ToolbarButton>(
+        iconButtonWithIcon(Icons.format_indent_decrease),
+      );
+      expect(indent.onPressed, isNull);
+      expect(outdent.onPressed, isNull);
+    });
+
+    testWidgets('enables indent and outdent for a list item caret', (
+      tester,
+    ) async {
+      await pumpToolbar(
+        tester,
+        nodes: [
+          ListItemNode.unordered(id: 'node-1', text: AttributedText('Item')),
+        ],
+        selection: caretSelection('node-1'),
+      );
+
+      final indent = tester.widget<ToolbarButton>(
+        iconButtonWithIcon(Icons.format_indent_increase),
+      );
+      final outdent = tester.widget<ToolbarButton>(
+        iconButtonWithIcon(Icons.format_indent_decrease),
+      );
+      expect(indent.onPressed, isNotNull);
+      expect(outdent.onPressed, isNotNull);
+    });
+  });
+
+  group('command results', () {
+    Future<({Editor editor, MutableDocument document, MutableDocumentComposer composer})>
+        pumpCommand(
+      WidgetTester tester, {
+      required List<DocumentNode> nodes,
+      required DocumentSelection selection,
+    }) async {
+      final harness = buildToolbarHarness(nodes: nodes, selection: selection);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return harness;
+    }
+
+    testWidgets('applies bold to the selection', (tester) async {
+      final harness = await pumpCommand(
+        tester,
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+        selection: DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 5),
+          ),
+        ),
+      );
+
+      await tester.tap(find.bySemanticsLabel('Negrito'));
+      await tester.pumpAndSettle();
+
+      final text = (harness.document.getNodeById('node-1') as TextNode).text;
+      expect(text.hasAttributionAt(0, attribution: boldAttribution), isTrue);
+      expect(text.hasAttributionAt(4, attribution: boldAttribution), isTrue);
+    });
+
+    testWidgets('applies italic and strikethrough to the selection', (
+      tester,
+    ) async {
+      DocumentSelection makeSelection() => DocumentSelection(
+        base: DocumentPosition(
+          nodeId: 'node-1',
+          nodePosition: const TextNodePosition(offset: 0),
+        ),
+        extent: DocumentPosition(
+          nodeId: 'node-1',
+          nodePosition: const TextNodePosition(offset: 5),
+        ),
+      );
+      final harness = await pumpCommand(
+        tester,
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+        selection: makeSelection(),
+      );
+
+      await tester.tap(find.bySemanticsLabel('Itálico'));
+      await tester.pumpAndSettle();
+      var text = (harness.document.getNodeById('node-1') as TextNode).text;
+      expect(text.hasAttributionAt(2, attribution: italicsAttribution), isTrue);
+
+      harness.composer.setSelectionWithReason(makeSelection());
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Tachado'));
+      await tester.pumpAndSettle();
+      text = (harness.document.getNodeById('node-1') as TextNode).text;
+      expect(
+        text.hasAttributionAt(2, attribution: strikethroughAttribution),
         isTrue,
       );
     });
 
-    testWidgets('keeps the list options open after a tap outside', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
+    testWidgets('converts a paragraph to a bulleted list', (tester) async {
+      final harness = await pumpCommand(
+        tester,
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Item'))],
+        selection: caretSelection('node-1'),
       );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-
-      await tester.tapAt(const Offset(8, 8));
-      await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
-    });
-
-    testWidgets('does not own Escape dismissal', (tester) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
-    });
-
-    testWidgets('constrains the menu on a short viewport', (tester) async {
-      tester.view.physicalSize = const Size(240, 180);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      final document = MutableDocument(
-        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Text'))],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
+      harness.composer.setSelectionWithReason(
+        DocumentSelection(
+          base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
+            nodePosition: const TextNodePosition(offset: 0),
           ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: NoteFormattingPanel(
-              editor: editor,
-              composer: composer,
-              selection: composer.selection,
-              onClose: () {},
-              onReturnToTyping: () {},
-            ),
+          extent: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 4),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('applies the option to the selection captured when it opens', (
-      tester,
-    ) async {
-      final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('First')),
-          ParagraphNode(id: 'node-2', text: AttributedText('Second')),
-        ],
-      );
-      final firstSelection = const DocumentSelection.collapsed(
-        position: DocumentPosition(
-          nodeId: 'node-1',
-          nodePosition: TextNodePosition(offset: 0),
-        ),
-      );
-      final secondSelection = const DocumentSelection.collapsed(
-        position: DocumentPosition(
-          nodeId: 'node-2',
-          nodePosition: TextNodePosition(offset: 0),
-        ),
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: firstSelection,
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      composer.setSelectionWithReason(secondSelection);
-      await tester.pump();
       await tester.tap(find.bySemanticsLabel('Lista com marcadores'));
       await tester.pumpAndSettle();
 
-      expect(document.getNodeById('node-1'), isA<ListItemNode>());
-      expect(document.getNodeById('node-2'), isA<ParagraphNode>());
-    });
-  });
-
-  group('_convertToTask', () {
-    testWidgets('converts ParagraphNode to TaskNode', (tester) async {
-      final document = MutableDocument(
-        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Buy milk'))],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await selectListOption(tester, 'Checklist');
-
-      expect(document.first, isA<TaskNode>());
-      expect((document.first as TaskNode).text.toPlainText(), 'Buy milk');
+      final node = harness.document.getNodeById('node-1');
+      expect(node, isA<ListItemNode>());
+      expect((node as ListItemNode).type, ListItemType.unordered);
     });
 
-    testWidgets('converts ListItemNode to TaskNode', (tester) async {
-      final document = MutableDocument(
-        nodes: [
-          ListItemNode.unordered(
-            id: 'node-1',
-            text: AttributedText('Buy milk'),
-          ),
-        ],
+    testWidgets('converts a paragraph to a numbered list', (tester) async {
+      final harness = await pumpCommand(
+        tester,
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Item'))],
+        selection: caretSelection('node-1'),
       );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await selectListOption(tester, 'Checklist');
-
-      expect(document.first, isA<TaskNode>());
-      expect((document.first as TaskNode).text.toPlainText(), 'Buy milk');
-    });
-
-    testWidgets('converts selected ListItemNodes to TaskNodes', (tester) async {
-      final document = MutableDocument(
-        nodes: [
-          ListItemNode.unordered(
-            id: 'node-1',
-            text: AttributedText('Buy milk'),
-          ),
-          ListItemNode.unordered(
-            id: 'node-2',
-            text: AttributedText('Pay rent'),
-          ),
-          ListItemNode.unordered(
-            id: 'node-3',
-            text: AttributedText('Call mom'),
-          ),
-        ],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection(
+      harness.composer.setSelectionWithReason(
+        DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
+            nodePosition: const TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
-            nodeId: 'node-3',
-            nodePosition: TextNodePosition(offset: 8),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await selectListOption(tester, 'Checklist');
-
-      final nodes = [
-        document.getNodeById('node-1'),
-        document.getNodeById('node-2'),
-        document.getNodeById('node-3'),
-      ];
-
-      expect(nodes, everyElement(isA<TaskNode>()));
-      expect(nodes.map((node) => (node as TaskNode).text.toPlainText()), [
-        'Buy milk',
-        'Pay rent',
-        'Call mom',
-      ]);
-    });
-
-    testWidgets('converts TaskNode back to ParagraphNode', (tester) async {
-      final document = MutableDocument(
-        nodes: [
-          TaskNode(
-            id: 'node-1',
-            text: AttributedText('Buy milk'),
-            isComplete: false,
-          ),
-        ],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
+            nodePosition: const TextNodePosition(offset: 4),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await selectListOption(tester, 'Checklist');
+      await tester.tap(find.bySemanticsLabel('Lista numerada'));
+      await tester.pumpAndSettle();
 
-      expect(document.first, isA<ParagraphNode>());
-      expect((document.first as ParagraphNode).text.toPlainText(), 'Buy milk');
+      final node = harness.document.getNodeById('node-1');
+      expect(node, isA<ListItemNode>());
+      expect((node as ListItemNode).type, ListItemType.ordered);
     });
-  });
 
-  group('_convertToListItem', () {
-    testWidgets('converts TaskNode to unordered ListItemNode', (tester) async {
-      final document = MutableDocument(
-        nodes: [
-          TaskNode(
-            id: 'node-1',
-            text: AttributedText('Buy milk'),
-            isComplete: false,
-          ),
-        ],
+    testWidgets('converts a paragraph to a task', (tester) async {
+      final harness = await pumpCommand(
+        tester,
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Todo'))],
+        selection: caretSelection('node-1'),
       );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
+      harness.composer.setSelectionWithReason(
+        DocumentSelection(
+          base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
+            nodePosition: const TextNodePosition(offset: 0),
           ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await selectListOption(tester, 'Bullet List');
-
-      expect(document.first, isA<ListItemNode>());
-      final item = document.first as ListItemNode;
-      expect(item.text.toPlainText(), 'Buy milk');
-      expect(item.type, ListItemType.unordered);
-    });
-
-    testWidgets('converts TaskNode to ordered ListItemNode', (tester) async {
-      final document = MutableDocument(
-        nodes: [
-          TaskNode(
-            id: 'node-1',
-            text: AttributedText('Buy milk'),
-            isComplete: false,
-          ),
-        ],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
+          extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
+            nodePosition: const TextNodePosition(offset: 4),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await selectListOption(tester, 'Numbered List');
-
-      expect(document.first, isA<ListItemNode>());
-      final item = document.first as ListItemNode;
-      expect(item.text.toPlainText(), 'Buy milk');
-      expect(item.type, ListItemType.ordered);
-    });
-  });
-
-  group('_setBlockType', () {
-    Future<void> openFormatPopup(WidgetTester tester) async {
-      await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('Opções de formatação'), findsOneWidget);
-    }
-
-    // The format popup opens above the toolbar and is tall (heading previews
-    // use headline-sized fonts). The default 800×600 test surface is shorter
-    // than any real phone in portrait, so the popup's H1 item can end up
-    // above the viewport. Use a realistic mobile viewport for these tests.
-
-    testWidgets('converts ListItemNode to H1', (tester) async {
-      tester.view.physicalSize = const Size(800, 1000);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      final document = MutableDocument(
-        nodes: [
-          ListItemNode.unordered(
-            id: 'node-1',
-            text: AttributedText('Heading text'),
-          ),
-        ],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Stack(
-              children: [
-                Positioned.fill(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: defaultComponentBuilders,
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: buildFormattingPanel(editor, composer),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      await tester.tap(find.bySemanticsLabel('Task'));
       await tester.pumpAndSettle();
 
-      await openFormatPopup(tester);
-      await tester.tap(find.bySemanticsLabel('Título 1'));
-      await tester.pumpAndSettle();
-
-      expect(document.first, isA<ParagraphNode>());
-      final para = document.first as ParagraphNode;
-      expect(para.text.toPlainText(), 'Heading text');
-      expect(para.getMetadataValue('blockType'), header1Attribution);
+      final node = harness.document.getNodeById('node-1');
+      expect(node, isA<TaskNode>());
+      expect((node as TaskNode).text.toPlainText(), 'Todo');
     });
 
-    testWidgets('converts TaskNode to H2', (tester) async {
-      final document = MutableDocument(
-        nodes: [
-          TaskNode(
-            id: 'node-1',
-            text: AttributedText('Heading text'),
-            isComplete: false,
-          ),
-        ],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openFormatPopup(tester);
-      await tester.tap(find.bySemanticsLabel('Título 2'));
-      await tester.pumpAndSettle();
-
-      expect(document.first, isA<ParagraphNode>());
-      final para = document.first as ParagraphNode;
-      expect(para.text.toPlainText(), 'Heading text');
-      expect(para.getMetadataValue('blockType'), header2Attribution);
-    });
-
-    testWidgets('converts TaskNode to Blockquote', (tester) async {
-      final document = MutableDocument(
-        nodes: [
-          TaskNode(
-            id: 'node-1',
-            text: AttributedText('Quoted text'),
-            isComplete: false,
-          ),
-        ],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: [
-                      ...defaultComponentBuilders,
-                      CustomTaskComponentBuilder(),
-                    ],
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openFormatPopup(tester);
-      await tester.tap(find.bySemanticsLabel('Citação'));
-      await tester.pumpAndSettle();
-
-      expect(document.first, isA<ParagraphNode>());
-      final para = document.first as ParagraphNode;
-      expect(para.text.toPlainText(), 'Quoted text');
-      expect(para.getMetadataValue('blockType'), blockquoteAttribution);
-    });
-  });
-
-  group('List menu trigger active state', () {
-    testWidgets('is active on ordered list item', (tester) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [
-            ListItemNode.ordered(id: 'node-1', text: AttributedText('Ordered')),
-          ],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      final numberedBtn = iconButtonWithIcon(Icons.format_list_numbered);
-      expect(numberedBtn, findsOneWidget);
-      final btnWidget = tester.widget(numberedBtn);
-      expect((btnWidget as dynamic).isActive, isTrue);
-    });
-
-    testWidgets('is active on unordered list item', (tester) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [
-            ListItemNode.unordered(
-              id: 'node-1',
-              text: AttributedText('Unordered'),
-            ),
-          ],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      final bulletedBtn = iconButtonWithIcon(Icons.format_list_bulleted);
-      expect(bulletedBtn, findsOneWidget);
-      final btnWidget = tester.widget(bulletedBtn);
-      expect((btnWidget as dynamic).isActive, isTrue);
-    });
-  });
-
-  group('Indent / unindent', () {
-    testWidgets('indent button is enabled on a list item', (tester) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [
-            ListItemNode.unordered(id: 'node-1', text: AttributedText('Item')),
-          ],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
-      expect(indentBtn, findsOneWidget);
-      expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
-    });
-
-    testWidgets('indent button is enabled on a task', (tester) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [
-            TaskNode(
-              id: 'node-1',
-              text: AttributedText('Task'),
-              isComplete: false,
-            ),
-          ],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
-      expect(indentBtn, findsOneWidget);
-      expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
-    });
-
-    testWidgets('toolbar indent changes the selected task', (tester) async {
-      final document = MutableDocument(
+    testWidgets('indents and unindents a selected task', (tester) async {
+      final harness = await pumpCommand(
+        tester,
         nodes: [
           TaskNode(
             id: 'node-1',
@@ -1006,690 +430,111 @@ void main() {
             isComplete: false,
           ),
         ],
+        selection: caretSelection('node-2'),
       );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: 'node-2',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(body: buildFormattingPanel(editor, composer)),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      await tester.tap(iconButtonWithIcon(Icons.format_indent_increase));
-      await tester.pumpAndSettle();
-
-      expect((document.getNodeById('node-2') as TaskNode).indent, 1);
-    });
-
-    testWidgets('indent button is not present on a non-list item', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Para'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
-      expect(indentBtn, findsNothing);
-    });
-
-    testWidgets('unindent button is enabled on a list item', (tester) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [
-            ListItemNode.unordered(id: 'node-1', text: AttributedText('Item')),
-          ],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      final unindentBtn = iconButtonWithIcon(Icons.format_indent_decrease);
-      expect(unindentBtn, findsOneWidget);
-      expect((tester.widget(unindentBtn) as dynamic).onPressed, isNotNull);
-    });
-
-    testWidgets('unindent button is not present on a non-list item', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Para'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await openListMenu(tester);
-      final unindentBtn = iconButtonWithIcon(Icons.format_indent_decrease);
-      expect(unindentBtn, findsNothing);
-    });
-
-    testWidgets('indent works with multi-node selection of list items', (
-      tester,
-    ) async {
-      final document = MutableDocument(
-        nodes: [
-          ListItemNode.unordered(id: 'node-1', text: AttributedText('Item 1')),
-          ListItemNode.unordered(id: 'node-2', text: AttributedText('Item 2')),
-        ],
-      );
-      final composer = MutableDocumentComposer(
-        initialSelection: const DocumentSelection(
+      harness.composer.setSelectionWithReason(
+        DocumentSelection(
           base: DocumentPosition(
-            nodeId: 'node-1',
-            nodePosition: TextNodePosition(offset: 0),
+            nodeId: 'node-2',
+            nodePosition: const TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-2',
-            nodePosition: TextNodePosition(offset: 6),
-          ),
-        ),
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Column(
-              children: [
-                Expanded(
-                  child: SuperEditor(
-                    editor: editor,
-                    componentBuilders: defaultComponentBuilders,
-                  ),
-                ),
-                buildFormattingPanel(editor, composer),
-              ],
-            ),
+            nodePosition: const TextNodePosition(offset: 5),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await openListMenu(tester);
-      final indentBtn = iconButtonWithIcon(Icons.format_indent_increase);
-      expect(indentBtn, findsOneWidget);
-      expect((tester.widget(indentBtn) as dynamic).onPressed, isNotNull);
-
-      await tester.tap(indentBtn);
+      await tester.tap(find.bySemanticsLabel('Aumentar recuo'));
       await tester.pumpAndSettle();
+      expect((harness.document.getNodeById('node-2') as TaskNode).indent, 1);
 
-      final node1 = document.getNodeById('node-1') as ListItemNode;
-      expect(node1.indent, greaterThan(0));
+      await tester.tap(find.bySemanticsLabel('Diminuir recuo'));
+      await tester.pumpAndSettle();
+      expect((harness.document.getNodeById('node-2') as TaskNode).indent, 0);
     });
   });
 
-  group('Contextual Selection Toolbar', () {
-    testWidgets(
-      'updates task state after a document change without moving the cursor',
-      (tester) async {
-        final document = MutableDocument(
-          nodes: [
-            ParagraphNode(id: 'node-1', text: AttributedText('Task text')),
-          ],
-        );
-        final composer = MutableDocumentComposer(
-          initialSelection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        );
-        final editor = createDefaultDocumentEditor(
-          document: document,
-          composer: composer,
-        );
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(body: buildFormattingPanel(editor, composer)),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        await openListMenu(tester);
-        final listButton = iconButtonWithIcon(Icons.format_list_bulleted);
-        expect((tester.widget(listButton) as dynamic).isActive, isFalse);
-
-        editor.execute([ConvertParagraphToTaskRequest(nodeId: 'node-1')]);
-        await tester.pumpAndSettle();
-
-        final taskButton = toolbarButtonWithSvgAsset(
-          'assets/icons/checkbox.svg',
-        );
-        expect((tester.widget(taskButton) as dynamic).isActive, isTrue);
-      },
-    );
-
-    testWidgets('disables inline actions without a text selection', (
+  group('animated shell', () {
+    testWidgets('keeps the shell anchored while switching modes', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byIcon(Icons.format_bold), findsOneWidget);
-      expect(find.byIcon(Icons.format_italic), findsOneWidget);
-      expect(find.byIcon(Icons.format_strikethrough), findsOneWidget);
-      expect(
-        (tester.widget(iconButtonWithIcon(Icons.format_bold)) as dynamic)
-            .onPressed,
-        isNull,
-      );
-    });
-
-    testWidgets('shows bold/italic/strikethrough when text is selected', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection(
-            base: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-            extent: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 5),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byIcon(Icons.format_bold), findsOneWidget);
-      expect(find.byIcon(Icons.format_italic), findsOneWidget);
-      expect(find.byIcon(Icons.format_strikethrough), findsOneWidget);
-    });
-
-    testWidgets(
-      'repaints the active inline icon color after the selection changes',
-      (tester) async {
-        tester.view.physicalSize = const Size(800, 1000);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(() {
-          tester.view.resetPhysicalSize();
-          tester.view.resetDevicePixelRatio();
-        });
-
-        await tester.pumpWidget(
-          buildEditorHarness(
-            positionAtBottom: true,
-            nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-            selection: const DocumentSelection(
-              base: DocumentPosition(
-                nodeId: 'node-1',
-                nodePosition: TextNodePosition(offset: 0),
-              ),
-              extent: DocumentPosition(
-                nodeId: 'node-1',
-                nodePosition: TextNodePosition(offset: 5),
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        final before = tester.widget<Icon>(find.byIcon(Icons.format_bold));
-        final colorScheme = Theme.of(
-          tester.element(find.byType(NoteFormattingPanel)),
-        ).colorScheme;
-        expect(before.color, colorScheme.onSurface);
-
-        await tester.tap(iconButtonWithIcon(Icons.format_bold));
-        await tester.pumpAndSettle();
-
-        final after = tester.widget<Icon>(find.byIcon(Icons.format_bold));
-        expect(after.color, isNot(before.color));
-        expect(after.color!.toARGB32(), colorScheme.primary.toARGB32());
-      },
-    );
-
-    testWidgets(
-      'does not mark bold active when it starts after the selection',
-      (tester) async {
-        final spans = AttributedSpans()
-          ..addAttribution(newAttribution: boldAttribution, start: 5, end: 5);
-        await tester.pumpWidget(
-          buildEditorHarness(
-            nodes: [
-              ParagraphNode(
-                id: 'node-1',
-                text: AttributedText('Hello!', spans),
-              ),
-            ],
-            selection: const DocumentSelection(
-              base: DocumentPosition(
-                nodeId: 'node-1',
-                nodePosition: TextNodePosition(offset: 0),
-              ),
-              extent: DocumentPosition(
-                nodeId: 'node-1',
-                nodePosition: TextNodePosition(offset: 5),
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        final boldButton = iconButtonWithIcon(Icons.format_bold);
-        expect((tester.widget(boldButton) as dynamic).isActive, isFalse);
-      },
-    );
-
-    testWidgets('keeps the format overlay open after applying a style', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(800, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      await tester.pumpWidget(
-        buildEditorHarness(
-          positionAtBottom: true,
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection(
-            base: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-            extent: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 5),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(iconButtonWithIcon(Icons.format_bold));
-      await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('Opções de formatação'), findsOneWidget);
-      expect(
-        (tester.widget(iconButtonWithIcon(Icons.format_bold)) as dynamic)
-            .isActive,
-        isTrue,
-      );
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('Opções de formatação'), findsOneWidget);
-    });
-
-    testWidgets(
-      'keeps the formatting selection when the editor clears it while open',
-      (tester) async {
-        tester.view.physicalSize = const Size(800, 1000);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(() {
-          tester.view.resetPhysicalSize();
-          tester.view.resetDevicePixelRatio();
-        });
-
-        final document = MutableDocument(
-          nodes: [
-            ParagraphNode(id: 'node-1', text: AttributedText('Heading text')),
-          ],
-        );
-        final composer = MutableDocumentComposer(
-          initialSelection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        );
-        final editor = createDefaultDocumentEditor(
-          document: document,
-          composer: composer,
-        );
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: buildFormattingPanel(editor, composer),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        composer.clearSelection();
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.bySemanticsLabel('Título 1'));
-        await tester.pumpAndSettle();
-
-        expect(
-          (document.first as ParagraphNode).getMetadataValue('blockType'),
-          header1Attribution,
-        );
-        expect(document.length, 1);
-      },
-    );
-
-    testWidgets('format and list overlays fit their content', (tester) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final formatSize = tester.getSize(
-        find.byWidgetPredicate(
-          (widget) => widget.runtimeType.toString() == '_FormattingMenu',
-        ),
-      );
-      expect(formatSize.height, lessThanOrEqualTo(48));
-      expect(formatSize.width, lessThan(360));
-
-      final listSize = tester.getSize(
-        find.byWidgetPredicate(
-          (widget) => widget.runtimeType.toString() == '_ListFormatMenu',
-        ),
-      );
-      expect(listSize.height, lessThanOrEqualTo(48));
-      expect(listSize.width, lessThan(140));
-    });
-
-    testWidgets('creates a new block at the end', (tester) async {
-      tester.view.physicalSize = const Size(800, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-      final document = MutableDocument(
-        nodes: [
-          ParagraphNode(id: 'node-1', text: AttributedText('Existing text')),
-          TaskNode(
-            id: 'node-2',
-            text: AttributedText('Final task'),
-            isComplete: false,
-          ),
-        ],
-      );
-      final composer = MutableDocumentComposer();
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: NoteFormattingPanel(
-                    editor: editor,
-                    composer: composer,
-                    selection: null,
-                    onClose: () {},
-                    onReturnToTyping: () {},
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.bySemanticsLabel('Título 1'));
-      await tester.pumpAndSettle();
-
-      expect(composer.selection?.extent.nodeId, isNot('node-2'));
-      final newNode = document.last;
-      expect(newNode, isA<ParagraphNode>());
-      expect(newNode.id, isNot('node-2'));
-      expect(composer.selection?.extent.nodeId, newNode.id);
-      expect(document.getNodeById('node-2'), isA<TaskNode>());
-      expect(
-        (newNode as ParagraphNode).getMetadataValue('blockType'),
-        header1Attribution,
-      );
-    });
-
-    testWidgets(
-      'creates a new block when the formatting panel has no selection',
-      (tester) async {
-        final document = MutableDocument(
-          nodes: [
-            ParagraphNode(id: 'node-1', text: AttributedText('Existing text')),
-            TaskNode(
-              id: 'node-2',
-              text: AttributedText('Final task'),
-              isComplete: false,
-            ),
-          ],
-        );
-        final composer = MutableDocumentComposer(
-          initialSelection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        );
-        final editor = createDefaultDocumentEditor(
-          document: document,
-          composer: composer,
-        );
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: NoteFormattingPanel(
-                      editor: editor,
-                      composer: composer,
-                      selection: null,
-                      onClose: () {},
-                      onReturnToTyping: () {},
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.bySemanticsLabel('Título 1'));
-        await tester.pumpAndSettle();
-
-        expect(
-          (document.getNodeById('node-1') as ParagraphNode).getMetadataValue(
-            'blockType',
-          ),
-          isNot(header1Attribution),
-        );
-        expect(document.last.id, isNot('node-2'));
-        expect(document.last, isA<ParagraphNode>());
-        expect(
-          (document.last as ParagraphNode).getMetadataValue('blockType'),
-          header1Attribution,
-        );
-      },
-    );
-
-    testWidgets('requests closure from the formatting panel close button', (
-      tester,
-    ) async {
-      final document = MutableDocument(
+      final harness = buildToolbarHarness(
         nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+        selection: caretSelection('node-1'),
       );
-      final composer = MutableDocumentComposer();
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-      var closeRequests = 0;
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: NoteFormattingPanel(
-              editor: editor,
-              composer: composer,
-              selection: composer.selection,
-              onClose: () => closeRequests++,
-              onReturnToTyping: () {},
-            ),
-          ),
+          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Título 1'), findsOneWidget);
 
-      await tester.tap(find.bySemanticsLabel('Fechar formatação'));
-      await tester.pumpAndSettle();
-      expect(closeRequests, 1);
-    });
+      final shellBefore = tester.getTopLeft(
+        find.byKey(const ValueKey('note-toolbar-shell')),
+      );
 
-    testWidgets('keeps the formatting panel open after a tap outside', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
+      harness.composer.setSelectionWithReason(
+        DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 5),
           ),
         ),
       );
+      await tester.pump();
       await tester.pumpAndSettle();
 
-      await tester.tapAt(const Offset(8, 8));
-      await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('Painel de formatação'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('note-toolbar-shell'))),
+        shellBefore,
+      );
+      expect(find.bySemanticsLabel('Negrito'), findsOneWidget);
+      expect(find.bySemanticsLabel('Título 1'), findsNothing);
     });
 
-    testWidgets('requests return to typing from the keyboard action', (
+    testWidgets('with animations disabled exposes the contextual set', (
       tester,
     ) async {
-      final document = MutableDocument(
+      final harness = buildToolbarHarness(
         nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
+        selection: caretSelection('node-1'),
       );
-      final composer = MutableDocumentComposer();
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: composer,
-      );
-      var requests = 0;
-
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: NoteFormattingPanel(
-              editor: editor,
-              composer: composer,
-              selection: composer.selection,
-              onClose: () {},
-              onReturnToTyping: () => requests++,
+            body: MediaQuery(
+              data: const MediaQueryData(disableAnimations: true),
+              child: NoteToolbar(editor: harness.editor, composer: harness.composer),
             ),
           ),
         ),
       );
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Título 1'), findsOneWidget);
 
-      await tester.tap(find.bySemanticsLabel('Voltar a digitar'));
+      harness.composer.setSelectionWithReason(
+        DocumentSelection(
+          base: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 0),
+          ),
+          extent: DocumentPosition(
+            nodeId: 'node-1',
+            nodePosition: const TextNodePosition(offset: 5),
+          ),
+        ),
+      );
       await tester.pump();
 
-      expect(requests, 1);
-    });
-
-    testWidgets('format command emits one selection haptic', (tester) async {
-      final recorder = HapticTestRecorder()..install();
-      addTearDown(recorder.dispose);
-
-      await tester.pumpWidget(
-        buildEditorHarness(
-          nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-          selection: const DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: 'node-1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      recorder.calls.clear();
-      await tester.tap(find.bySemanticsLabel('Título 1'));
-      await tester.pumpAndSettle();
-
-      expect(recorder.count('HapticFeedbackType.selectionClick'), 1);
+      expect(find.bySemanticsLabel('Negrito'), findsOneWidget);
+      expect(find.bySemanticsLabel('Título 1'), findsNothing);
     });
   });
 }

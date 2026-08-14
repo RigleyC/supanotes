@@ -19,11 +19,8 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task
 import 'package:supanotes/features/notes/editor/presentation/widgets/hidden_task_trailing_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_config.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_formatting_panel.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
-
-enum NoteEditorPanel { formatting }
 
 class NoteEditor extends StatefulWidget {
   final String noteId;
@@ -55,9 +52,7 @@ class _NoteEditorState extends State<NoteEditor> {
   final _selectionLayerLinks = SelectionLayerLinks();
   final _softwareKeyboardController = SoftwareKeyboardController();
   final _isImeConnected = ValueNotifier<bool>(false);
-  late final KeyboardPanelController<NoteEditorPanel> _keyboardPanelController;
-  DocumentSelection? _formattingSelection;
-  bool _toolbarWasShown = false;
+  late final KeyboardPanelController<Object> _keyboardPanelController;
   EditorControls? _controls;
   Stylesheet? _cachedStylesheet;
   ColorScheme? _cachedColorScheme;
@@ -73,7 +68,7 @@ class _NoteEditorState extends State<NoteEditor> {
   @override
   void initState() {
     super.initState();
-    _keyboardPanelController = KeyboardPanelController(
+    _keyboardPanelController = KeyboardPanelController<Object>(
       _softwareKeyboardController,
     );
     _attachSession(widget.session);
@@ -83,13 +78,15 @@ class _NoteEditorState extends State<NoteEditor> {
     final controller = session.controller;
     if (identical(_attachedSession, session)) return;
     _controller?.removeListener(_onControllerReady);
+    _controller?.focusNode.removeListener(_syncToolbarVisibility);
     _controller?.onHasContentChanged = null;
     unawaited(_captureSubscription?.cancel());
     _attachedSession = session;
     _controller = controller;
+    _controller!.focusNode.addListener(_syncToolbarVisibility);
+    _scheduleInitialToolbarSync();
     _captureSubscription = session.captureLocalOperationsChanges.listen((_) {
       if (!mounted) return;
-      _toolbarWasShown = false;
       if (_isReadOnly) {
         _controls?.dispose();
         _controls = null;
@@ -241,35 +238,26 @@ class _NoteEditorState extends State<NoteEditor> {
     setState(() {});
   }
 
-  void _openFormattingPanel(DocumentSelection? selection) {
-    _formattingSelection = selection;
-    _keyboardPanelController.showKeyboardPanel(NoteEditorPanel.formatting);
+  void _syncToolbarVisibility() {
+    if (!_keyboardPanelController.hasDelegate) return;
+    final controller = _controller;
+    if (controller == null) return;
+    _keyboardPanelController.toolbarVisibility = controller.focusNode.hasFocus
+        ? KeyboardToolbarVisibility.visible
+        : KeyboardToolbarVisibility.hidden;
   }
 
-  void _closeFormattingPanel() {
-    _formattingSelection = null;
-    _keyboardPanelController.closeKeyboardAndPanel();
-  }
-
-  void _returnToTyping() {
-    _formattingSelection = null;
-    _controller?.focusNode.requestFocus();
-    _keyboardPanelController.showSoftwareKeyboard();
-  }
-
-  void _showToolbarWhenAttached() {
-    if (_toolbarWasShown) return;
+  void _scheduleInitialToolbarSync() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_keyboardPanelController.hasDelegate) return;
-      _keyboardPanelController.toolbarVisibility =
-          KeyboardToolbarVisibility.visible;
-      _toolbarWasShown = true;
+      if (!mounted) return;
+      _syncToolbarVisibility();
     });
   }
 
   @override
   void dispose() {
     _controller?.removeListener(_onControllerReady);
+    _controller?.focusNode.removeListener(_syncToolbarVisibility);
     _controller?.onHasContentChanged = null;
     unawaited(_captureSubscription?.cancel());
     _softwareKeyboardController.detach();
@@ -325,16 +313,11 @@ class _NoteEditorState extends State<NoteEditor> {
           );
         }
 
-        _showToolbarWhenAttached();
-
-        return KeyboardPanelScaffold<NoteEditorPanel>(
+        return KeyboardPanelScaffold<Object>(
           controller: _keyboardPanelController,
           isImeConnected: _isImeConnected,
-          contentBuilder: (context, openPanel) => PopScope(
-            canPop: openPanel == null,
-            onPopInvokedWithResult: (didPop, result) {
-              if (!didPop && openPanel != null) _closeFormattingPanel();
-            },
+          contentBuilder: (context, _) => PopScope(
+            canPop: true,
             child: Column(
               children: [
                 Expanded(
@@ -353,9 +336,6 @@ class _NoteEditorState extends State<NoteEditor> {
                           softwareKeyboardController:
                               _softwareKeyboardController,
                           isImeConnected: _isImeConnected,
-                          imePolicies: SuperEditorImePolicies(
-                            openKeyboardOnSelectionChange: openPanel == null,
-                          ),
                           documentLayoutKey: _docLayoutKey,
                           selectionLayerLinks: _selectionLayerLinks,
                           stylesheet: _cachedStylesheet!,
@@ -392,24 +372,13 @@ class _NoteEditorState extends State<NoteEditor> {
               ],
             ),
           ),
-          toolbarBuilder: (context, openPanel) => NoteToolbar(
+          toolbarBuilder: (context, _) => NoteToolbar(
             editor: controller.editor,
             composer: controller.composer,
-            onOpenFormatting: () =>
-                _openFormattingPanel(controller.composer.selection),
             onAttachFile: () => controller.pickAndAttachFile(imageOnly: false),
             onAttachImage: () => controller.pickAndAttachFile(imageOnly: true),
           ),
-          keyboardPanelBuilder: (context, openPanel) => switch (openPanel) {
-            NoteEditorPanel.formatting => NoteFormattingPanel(
-              editor: controller.editor,
-              composer: controller.composer,
-              selection: _formattingSelection,
-              onClose: _closeFormattingPanel,
-              onReturnToTyping: _returnToTyping,
-            ),
-            null => const SizedBox.shrink(),
-          },
+          keyboardPanelBuilder: (_, _) => const SizedBox.shrink(),
         );
       },
     );
