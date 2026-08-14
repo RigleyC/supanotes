@@ -177,9 +177,9 @@ Verification:
 The AppBar background gradient was removed because it painted a background
 over the document and did not change document opacity. The notes list and note
 editor now use a shared `ProgressiveFade` below their transparent AppBars.
-The mask fades the first 48 pixels of content through 20%, 40%, 60%, 80%, and
-90% opacity. It reaches 100% at 56 pixels, aligned with the toolbar end, so
-content does not become fully dark inside the primary fade region.
+The mask follows `kToolbarHeight` and fades the AppBar's 56-pixel content
+region through 20%, 40%, 60%, 80%, and 100% opacity. The top stays partially
+visible instead of becoming fully transparent.
 
 Focused verification:
 

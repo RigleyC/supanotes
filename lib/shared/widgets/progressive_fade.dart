@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 class ProgressiveFade extends StatelessWidget {
-  const ProgressiveFade({super.key, required this.child, this.height = 48});
+  const ProgressiveFade({
+    super.key,
+    required this.child,
+    this.height = kToolbarHeight,
+  });
 
   final Widget child;
   final double height;
@@ -11,7 +15,6 @@ class ProgressiveFade extends StatelessWidget {
     Color(0x66FFFFFF),
     Color(0x99FFFFFF),
     Color(0xCCFFFFFF),
-    Color(0xE6FFFFFF),
     Color(0xFFFFFFFF),
   ];
 
@@ -22,17 +25,7 @@ class ProgressiveFade extends StatelessWidget {
     final fadeEnd = boundsHeight == 0
         ? 1.0
         : (height / boundsHeight).clamp(0.0, 1.0);
-    final fullOpacityEnd = boundsHeight == 0
-        ? 1.0
-        : ((height + 8) / boundsHeight).clamp(0.0, 1.0);
-    return [
-      0,
-      fadeEnd * 0.25,
-      fadeEnd * 0.5,
-      fadeEnd * 0.75,
-      fadeEnd,
-      fullOpacityEnd,
-    ];
+    return [0, fadeEnd * 0.25, fadeEnd * 0.5, fadeEnd * 0.75, fadeEnd];
   }
 
   @override

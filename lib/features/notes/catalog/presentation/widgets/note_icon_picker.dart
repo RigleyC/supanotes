@@ -74,13 +74,14 @@ class NoteIconPickerRootPage extends StatelessWidget {
                 ),
               ),
             ),
-            if (hasIcon) const SizedBox(height: 8),
             if (hasIcon)
-              _PickerAction(
+            ...[
+              const SizedBox(height: 8),
+                _PickerAction(
                 icon: Icons.remove_circle_outline,
                 label: 'Remover ícone',
                 onTap: () => _select(null),
-              ),
+              ),]
           ],
         ),
       ),

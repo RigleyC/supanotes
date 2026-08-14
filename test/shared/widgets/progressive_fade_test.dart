@@ -19,7 +19,7 @@ void main() {
       find.byType(ProgressiveFade),
     );
     expect(shaderMask.blendMode, BlendMode.dstIn);
-    expect(progressiveFade.height, 48);
+    expect(progressiveFade.height, kToolbarHeight);
     expect(
       find.descendant(
         of: find.byType(ProgressiveFade),
@@ -30,22 +30,24 @@ void main() {
   });
 
   test('calculates the fade against the rendered bounds', () {
-    final stops = ProgressiveFade.stopsForBounds(height: 48, boundsHeight: 96);
+    final stops = ProgressiveFade.stopsForBounds(
+      height: kToolbarHeight,
+      boundsHeight: kToolbarHeight * 2,
+    );
+    expect(stops, hasLength(5));
     expect(stops[0], 0);
     expect(stops[1], 0.125);
     expect(stops[2], 0.25);
     expect(stops[3], 0.375);
     expect(stops[4], 0.5);
-    expect(stops[5], closeTo(56 / 96, 0.000001));
   });
 
-  test('reaches full opacity after the 48 pixel fade', () {
+  test('uses five progressive opacity levels across the app bar', () {
     expect(ProgressiveFade.maskColors, const [
       Color(0x33FFFFFF),
       Color(0x66FFFFFF),
       Color(0x99FFFFFF),
       Color(0xCCFFFFFF),
-      Color(0xE6FFFFFF),
       Color(0xFFFFFFFF),
     ]);
   });

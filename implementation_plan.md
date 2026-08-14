@@ -1,5 +1,16 @@
 # Implementation plan — local-first note persistence
 
+## Per-note preference synchronization
+
+Status: planned; implementation approved.
+
+Design: `docs/superpowers/specs/2026-08-14-per-note-preferences-sync-design.md`.
+Execution plan: `docs/superpowers/plans/2026-08-14-per-note-preferences-sync.md`.
+
+Scope: synchronize favorite, archived, hide-completed, and image collapse as
+per-user per-note state; retain the local dirty row for offline delivery; remove
+the shared-note collapse-images contract and all obsolete code.
+
 ## Windows debug launch: invalid canonical Delta snapshot
 
 Status: complete.
