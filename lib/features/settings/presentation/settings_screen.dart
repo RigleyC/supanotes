@@ -4,61 +4,50 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
-import 'package:supanotes/features/settings/presentation/widgets/settings_section_header.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final account = ref.watch(authControllerProvider).value;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Configurações')),
+      appBar: AppBar(centerTitle: true, title: const Text('Configurações')),
       body: ListView(
         padding: EdgeInsets.only(
-          top: PlatformInfo.isIOS26OrHigher() ? AppSpacing.ios26ToolbarHeight : 0.0,
+          top: PlatformInfo.isIOS26OrHigher()
+              ? AppSpacing.ios26ToolbarHeight
+              : 0.0,
           bottom: AppSpacing.lg,
         ),
         children: [
-          const SettingsSectionHeader(title: 'Conta'),
-          AppTile(
-            leading: const Icon(Icons.alternate_email),
-            title: 'Email',
-            subtitle: account?.email ?? '—',
-          ),
           AppTile(
             leading: const Icon(Icons.person_outline),
-            title: 'Nome',
-            subtitle: account?.name ?? '—',
+            title: account?.name ?? '—',
+          ),
+          AppTile(
+            leading: const Icon(Icons.alternate_email),
+            title: account?.email ?? '—',
+          ),
+          AppTile(
+            leading: const Icon(Icons.developer_mode_outlined),
+            title: 'Protocolo de Contexto (MCP)',
+            onTap: () => context.push(AppRoutes.mcp),
+            trailing: const Icon(Icons.chevron_right),
           ),
           AppTile(
             leading: const Icon(Icons.logout),
             title: 'Sair da conta',
             onTap: () => _confirmLogout(context, ref),
             enabled: account != null,
-          ),
-
-          const SettingsSectionHeader(title: 'Avançado'),
-          AppTile(
-            leading: const Icon(Icons.developer_mode_outlined),
-            title: 'Protocolo de Contexto (MCP)',
-            subtitle: 'Token de acesso e configuração.',
-            onTap: () => context.push(AppRoutes.mcp),
-            trailing: const Icon(Icons.chevron_right),
           ),
         ],
       ),
