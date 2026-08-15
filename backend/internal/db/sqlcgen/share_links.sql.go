@@ -74,9 +74,9 @@ WHERE sl.token_id = $1
 
 func (q *Queries) GetPublicNoteIDByShareToken(ctx context.Context, tokenID pgtype.UUID) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, getPublicNoteIDByShareToken, tokenID)
-	var noteID pgtype.UUID
-	err := row.Scan(&noteID)
-	return noteID, err
+	var note_id pgtype.UUID
+	err := row.Scan(&note_id)
+	return note_id, err
 }
 
 const upsertNoteShareLink = `-- name: UpsertNoteShareLink :one

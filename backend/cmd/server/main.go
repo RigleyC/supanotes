@@ -191,6 +191,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected.GET("/notes", notesH.List)
 	protected.GET("/notes/:id", notesH.Get)
 	protected.PATCH("/notes/:id", notesH.Update)
+	protected.PATCH("/notes/:id/preferences", notesH.UpdatePreferences)
 	protected.DELETE("/notes/:id", notesH.Delete)
 
 	// Shares

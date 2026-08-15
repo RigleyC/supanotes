@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -150,4 +151,143 @@ func runUpdateRequest(t *testing.T, handler *Handler, payload string) *httptest.
 		t.Fatalf("update: %v", err)
 	}
 	return recorder
+}
+
+func runUpdatePreferencesRequest(t *testing.T, handler *Handler, id string, userID string, payload string) *httptest.ResponseRecorder {
+	t.Helper()
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/notes/"+id+"/preferences",
+		strings.NewReader(payload),
+	)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	recorder := httptest.NewRecorder()
+	c := e.NewContext(req, recorder)
+	c.SetPath("/notes/:id/preferences")
+	c.SetParamNames("id")
+	c.SetParamValues(id)
+	web.SetUserID(c, userID)
+	if err := handler.UpdatePreferences(c); err != nil {
+		t.Fatalf("update preferences: %v", err)
+	}
+	return recorder
+}
+
+func decodePreferencesResponse(t *testing.T, body string) NotePreferencesResponse {
+	t.Helper()
+	var resp NotePreferencesResponse
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("decode preference response: %v", err)
+	}
+	return resp
+}
+
+func TestUpdatePreferencesAcceptedForOwner(t *testing.T) {
+	var received sqlcgen.UpsertUserNotePreferenceParams
+	repo := &mockRepo{
+		getNoteByIDFn: func(_ context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.GetNoteByIDRow, error) {
+			return sqlcgen.GetNoteByIDRow{ID: id, UserID: userID}, nil
+		},
+		upsertUserNotePreferenceFn: func(_ context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
+			received = arg
+			return sqlcgen.UserNotePreference{
+				UserID: arg.UserID, NoteID: arg.NoteID,
+				Favorite: arg.Favorite, Archived: arg.Archived,
+				HideCompleted: arg.HideCompleted, CollapseImages: arg.CollapseImages,
+				UpdatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			}, nil
+		},
+	}
+	recorder := runUpdatePreferencesRequest(
+		t,
+		NewHandler(NewService(repo, nil)),
+		"00000000-0000-0000-0000-000000000001",
+		"00000000-0000-0000-0000-000000000002",
+		`{"favorite":true,"archived":false,"hide_completed":true,"collapse_images":false}`,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if repo.updateNotesCalls != 0 {
+		t.Fatal("note update was invoked for a preference change")
+	}
+	if !received.Favorite || received.Archived || !received.HideCompleted || received.CollapseImages {
+		t.Fatalf("upsert params = %+v, want favorite/archived/hide_completed/collapse_images of true/false/true/false", received)
+	}
+
+	resp := decodePreferencesResponse(t, recorder.Body.String())
+	if !resp.Favorite || resp.Archived || !resp.HideCompleted || resp.CollapseImages {
+		t.Fatalf("response = %+v, want all four fields", resp)
+	}
+	if resp.UpdatedAt == "" {
+		t.Fatal("response is missing updated_at")
+	}
+}
+
+func TestUpdatePreferencesAcceptedForSharedReadOnly(t *testing.T) {
+	repo := &mockRepo{
+		getNoteByIDFn: func(_ context.Context, id pgtype.UUID, userID pgtype.UUID) (sqlcgen.GetNoteByIDRow, error) {
+			return sqlcgen.GetNoteByIDRow{ID: id, UserID: userID, Permission: "view"}, nil
+		},
+		upsertUserNotePreferenceFn: func(_ context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
+			return sqlcgen.UserNotePreference{
+				UserID: arg.UserID, NoteID: arg.NoteID,
+				Favorite: arg.Favorite, Archived: arg.Archived,
+				HideCompleted: arg.HideCompleted, CollapseImages: arg.CollapseImages,
+			}, nil
+		},
+	}
+	recorder := runUpdatePreferencesRequest(
+		t,
+		NewHandler(NewService(repo, nil)),
+		"00000000-0000-0000-0000-000000000001",
+		"00000000-0000-0000-0000-000000000003",
+		`{"favorite":false,"archived":true,"hide_completed":false,"collapse_images":true}`,
+	)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+}
+
+func TestUpdatePreferencesRejectsInaccessibleUser(t *testing.T) {
+	repo := &mockRepo{
+		getNoteByIDFn: func(_ context.Context, _ pgtype.UUID, _ pgtype.UUID) (sqlcgen.GetNoteByIDRow, error) {
+			return sqlcgen.GetNoteByIDRow{}, pgx.ErrNoRows
+		},
+	}
+	recorder := runUpdatePreferencesRequest(
+		t,
+		NewHandler(NewService(repo, nil)),
+		"00000000-0000-0000-0000-000000000001",
+		"00000000-0000-0000-0000-000000000004",
+		`{"favorite":true,"archived":false,"hide_completed":false,"collapse_images":false}`,
+	)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+	if repo.updatePreferencesCalls != 0 {
+		t.Fatal("preference upsert ran even though access was rejected")
+	}
+}
+
+func TestUpdatePreferencesRejectsMissingFields(t *testing.T) {
+	repo := &mockRepo{}
+	recorder := runUpdatePreferencesRequest(
+		t,
+		NewHandler(NewService(repo, nil)),
+		"00000000-0000-0000-0000-000000000001",
+		"00000000-0000-0000-0000-000000000002",
+		`{}`,
+	)
+
+	if recorder.Code == http.StatusOK {
+		t.Fatal("accepted empty preference payload; full row is required")
+	}
+	if repo.updatePreferencesCalls != 0 {
+		t.Fatal("preference upsert ran for a rejected payload")
+	}
 }

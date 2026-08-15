@@ -16,15 +16,28 @@ import (
 )
 
 type CreateNoteRequest struct {
-	Content        string `json:"content" validate:"required"`
-	CollapseImages bool   `json:"collapse_images"`
+	Content string `json:"content" validate:"required"`
 }
 
 type UpdateNoteRequest struct {
 	Content           *string         `json:"content"`
-	CollapseImages    *bool           `json:"collapse_images"`
 	NoteIcon          json.RawMessage `json:"note_icon"`
 	ExpectedUpdatedAt *time.Time      `json:"expected_updated_at"`
+}
+
+type UpdateNotePreferencesRequest struct {
+	Favorite       *bool `json:"favorite"`
+	Archived       *bool `json:"archived"`
+	HideCompleted  *bool `json:"hide_completed"`
+	CollapseImages *bool `json:"collapse_images"`
+}
+
+type NotePreferencesResponse struct {
+	Favorite       bool   `json:"favorite"`
+	Archived       bool   `json:"archived"`
+	HideCompleted  bool   `json:"hide_completed"`
+	CollapseImages bool   `json:"collapse_images"`
+	UpdatedAt      string `json:"updated_at"`
 }
 
 type NoteResponse struct {
@@ -33,6 +46,7 @@ type NoteResponse struct {
 	Excerpt        *string `json:"excerpt,omitempty"`
 	Favorite       bool    `json:"favorite"`
 	Archived       bool    `json:"archived"`
+	HideCompleted  bool    `json:"hide_completed"`
 	CollapseImages bool    `json:"collapse_images"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
@@ -63,7 +77,7 @@ func (h *Handler) Create(c echo.Context) error {
 		return err
 	}
 
-	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content, req.CollapseImages)
+	note, err := h.svc.CreateNote(c.Request().Context(), userID, req.Content)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "failed to create note")
@@ -164,7 +178,7 @@ func (h *Handler) Update(c echo.Context) error {
 	if err != nil {
 		return web.JSONError(c, http.StatusBadRequest, err.Error())
 	}
-	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, req.CollapseImages, noteIcon, req.ExpectedUpdatedAt)
+	note, err := h.svc.UpdateNote(c.Request().Context(), userID, id, req.Content, noteIcon, req.ExpectedUpdatedAt)
 	if err != nil {
 		if errors.Is(err, ErrNoteConflict) {
 			return web.JSONError(c, http.StatusConflict, "note changed remotely")
@@ -177,6 +191,51 @@ func (h *Handler) Update(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, mapToNoteResponse(noteToResponseFields(note)))
+}
+
+func (h *Handler) UpdatePreferences(c echo.Context) error {
+	userID, err := web.UserID(c)
+	if err != nil {
+		return err
+	}
+
+	id, err := uid.UUIDFromString(c.Param("id"))
+	if err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid id format")
+	}
+
+	var req UpdateNotePreferencesRequest
+	if err := c.Bind(&req); err != nil {
+		return web.JSONError(c, http.StatusBadRequest, "invalid request body")
+	}
+	if req.Favorite == nil || req.Archived == nil || req.HideCompleted == nil || req.CollapseImages == nil {
+		return web.JSONError(c, http.StatusBadRequest, "all preference fields are required")
+	}
+
+	row, err := h.svc.UpdatePreferences(
+		c.Request().Context(),
+		userID,
+		id,
+		*req.Favorite,
+		*req.Archived,
+		*req.HideCompleted,
+		*req.CollapseImages,
+	)
+	if err != nil {
+		if errors.Is(err, ErrNoteNotFound) {
+			return web.JSONError(c, http.StatusNotFound, "note not found")
+		}
+		c.Logger().Error(err)
+		return web.JSONError(c, http.StatusInternalServerError, "failed to update preferences")
+	}
+
+	return c.JSON(http.StatusOK, NotePreferencesResponse{
+		Favorite:       row.Favorite,
+		Archived:       row.Archived,
+		HideCompleted:  row.HideCompleted,
+		CollapseImages: row.CollapseImages,
+		UpdatedAt:      web.FormatTime(row.UpdatedAt),
+	})
 }
 
 func (h *Handler) Delete(c echo.Context) error {
@@ -215,6 +274,7 @@ type NoteResponseFields struct {
 	Excerpt        pgtype.Text
 	Favorite       bool
 	Archived       bool
+	HideCompleted  bool
 	CollapseImages bool
 	CreatedAt      pgtype.Timestamptz
 	UpdatedAt      pgtype.Timestamptz
@@ -236,6 +296,7 @@ func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 		Excerpt:        exc,
 		Favorite:       f.Favorite,
 		Archived:       f.Archived,
+		HideCompleted:  f.HideCompleted,
 		CollapseImages: f.CollapseImages,
 		CreatedAt:      f.CreatedAt.Time.Format(time.RFC3339Nano),
 		UpdatedAt:      f.UpdatedAt.Time.Format(time.RFC3339Nano),
@@ -248,13 +309,12 @@ func mapToNoteResponse(f NoteResponseFields) NoteResponse {
 
 func noteToResponseFields(n sqlcgen.Note) NoteResponseFields {
 	return NoteResponseFields{
-		ID:             n.ID,
-		Content:        n.Content,
-		Excerpt:        n.Excerpt,
-		CollapseImages: n.CollapseImages,
-		CreatedAt:      n.CreatedAt,
-		UpdatedAt:      n.UpdatedAt,
-		NoteIcon:       n.NoteIcon,
+		ID:        n.ID,
+		Content:   n.Content,
+		Excerpt:   n.Excerpt,
+		CreatedAt: n.CreatedAt,
+		UpdatedAt: n.UpdatedAt,
+		NoteIcon:  n.NoteIcon,
 	}
 }
 
@@ -265,6 +325,7 @@ func noteResponseFieldsFromGetRow(n sqlcgen.GetNoteByIDRow) NoteResponseFields {
 		Excerpt:        n.Excerpt,
 		Favorite:       n.Favorite,
 		Archived:       n.Archived,
+		HideCompleted:  n.HideCompleted,
 		CollapseImages: n.CollapseImages,
 		CreatedAt:      n.CreatedAt,
 		UpdatedAt:      n.UpdatedAt,
@@ -281,6 +342,7 @@ func noteResponseFieldsFromListRow(n sqlcgen.GetNotesRow) NoteResponseFields {
 		Excerpt:        n.Excerpt,
 		Favorite:       n.Favorite,
 		Archived:       n.Archived,
+		HideCompleted:  n.HideCompleted,
 		CollapseImages: n.CollapseImages,
 		CreatedAt:      n.CreatedAt,
 		UpdatedAt:      n.UpdatedAt,

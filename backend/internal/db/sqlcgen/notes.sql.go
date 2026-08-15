@@ -23,19 +23,18 @@ func (q *Queries) CountNotes(ctx context.Context, userID pgtype.UUID) (int64, er
 }
 
 const createNote = `-- name: CreateNote :one
-INSERT INTO notes (user_id, content, collapse_images)
-VALUES ($1, $2, $3)
-RETURNING id, user_id, content, excerpt, created_at, updated_at, deleted_at, collapse_images, revision, document, snapshot_revision, note_icon
+INSERT INTO notes (user_id, content)
+VALUES ($1, $2)
+RETURNING id, user_id, content, excerpt, created_at, updated_at, deleted_at, revision, document, snapshot_revision, note_icon
 `
 
 type CreateNoteParams struct {
-	UserID         pgtype.UUID `json:"user_id"`
-	Content        string      `json:"content"`
-	CollapseImages bool        `json:"collapse_images"`
+	UserID  pgtype.UUID `json:"user_id"`
+	Content string      `json:"content"`
 }
 
 func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error) {
-	row := q.db.QueryRow(ctx, createNote, arg.UserID, arg.Content, arg.CollapseImages)
+	row := q.db.QueryRow(ctx, createNote, arg.UserID, arg.Content)
 	var i Note
 	err := row.Scan(
 		&i.ID,
@@ -45,7 +44,6 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
-		&i.CollapseImages,
 		&i.Revision,
 		&i.Document,
 		&i.SnapshotRevision,
@@ -116,7 +114,7 @@ func (q *Queries) GetAllNotesForMigration(ctx context.Context) ([]GetAllNotesFor
 }
 
 const getLinkedNotes = `-- name: GetLinkedNotes :many
-SELECT DISTINCT n.id, n.user_id, n.content, n.excerpt, n.created_at, n.updated_at, n.deleted_at, n.collapse_images, n.revision, n.document, n.snapshot_revision, n.note_icon FROM notes n
+SELECT DISTINCT n.id, n.user_id, n.content, n.excerpt, n.created_at, n.updated_at, n.deleted_at, n.revision, n.document, n.snapshot_revision, n.note_icon FROM notes n
 JOIN note_links nl ON (n.id = nl.source_id OR n.id = nl.target_id)
 WHERE (nl.source_id = ANY($1::uuid[]) OR nl.target_id = ANY($1::uuid[]))
   AND n.id != ALL($1::uuid[])
@@ -147,7 +145,6 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
-			&i.CollapseImages,
 			&i.Revision,
 			&i.Document,
 			&i.SnapshotRevision,
@@ -164,9 +161,11 @@ func (q *Queries) GetLinkedNotes(ctx context.Context, arg GetLinkedNotesParams) 
 }
 
 const getNoteByID = `-- name: GetNoteByID :one
-SELECT n.id, n.user_id, n.content, n.excerpt, n.created_at, n.updated_at, n.deleted_at, n.collapse_images, n.revision, n.document, n.snapshot_revision, n.note_icon,
+SELECT n.id, n.user_id, n.content, n.excerpt, n.created_at, n.updated_at, n.deleted_at, n.revision, n.document, n.snapshot_revision, n.note_icon,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(unp.hide_completed, FALSE)::boolean AS hide_completed,
+  COALESCE(unp.collapse_images, FALSE)::boolean AS collapse_images,
   COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
   COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE owner_user.email END, '')::text AS shared_by_email,
   COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE owner_user.name END, '')::text AS shared_by_name
@@ -191,13 +190,14 @@ type GetNoteByIDRow struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
-	CollapseImages   bool               `json:"collapse_images"`
 	Revision         int64              `json:"revision"`
 	Document         []byte             `json:"document"`
 	SnapshotRevision int64              `json:"snapshot_revision"`
 	NoteIcon         []byte             `json:"note_icon"`
 	Favorite         bool               `json:"favorite"`
 	Archived         bool               `json:"archived"`
+	HideCompleted    bool               `json:"hide_completed"`
+	CollapseImages   bool               `json:"collapse_images"`
 	Permission       string             `json:"permission"`
 	SharedByEmail    string             `json:"shared_by_email"`
 	SharedByName     string             `json:"shared_by_name"`
@@ -214,13 +214,14 @@ func (q *Queries) GetNoteByID(ctx context.Context, arg GetNoteByIDParams) (GetNo
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
-		&i.CollapseImages,
 		&i.Revision,
 		&i.Document,
 		&i.SnapshotRevision,
 		&i.NoteIcon,
 		&i.Favorite,
 		&i.Archived,
+		&i.HideCompleted,
+		&i.CollapseImages,
 		&i.Permission,
 		&i.SharedByEmail,
 		&i.SharedByName,
@@ -233,11 +234,12 @@ SELECT
   n.id, n.user_id,
   n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
-  n.collapse_images,
   n.note_icon,
   COALESCE(NULLIF(regexp_replace(regexp_replace(split_part(ltrim(n.content, E' \t\r\n'), E'\n', 1), '^#+\s*', ''), '^[-*]\s*(\[[ xX]\]\s*)?', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(unp.hide_completed, FALSE)::boolean AS hide_completed,
+  COALESCE(unp.collapse_images, FALSE)::boolean AS collapse_images,
   COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
   COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE owner_user.email END, '')::text AS shared_by_email,
   COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE owner_user.name END, '')::text AS shared_by_name
@@ -268,11 +270,12 @@ type GetNotesRow struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
-	CollapseImages bool               `json:"collapse_images"`
 	NoteIcon       []byte             `json:"note_icon"`
 	Title          string             `json:"title"`
 	Favorite       bool               `json:"favorite"`
 	Archived       bool               `json:"archived"`
+	HideCompleted  bool               `json:"hide_completed"`
+	CollapseImages bool               `json:"collapse_images"`
 	Permission     string             `json:"permission"`
 	SharedByEmail  string             `json:"shared_by_email"`
 	SharedByName   string             `json:"shared_by_name"`
@@ -300,11 +303,12 @@ func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) ([]GetNotesR
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
-			&i.CollapseImages,
 			&i.NoteIcon,
 			&i.Title,
 			&i.Favorite,
 			&i.Archived,
+			&i.HideCompleted,
+			&i.CollapseImages,
 			&i.Permission,
 			&i.SharedByEmail,
 			&i.SharedByName,
@@ -324,11 +328,12 @@ SELECT
   n.id, n.user_id,
   n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
-  n.collapse_images,
   n.note_icon,
   COALESCE(NULLIF(regexp_replace(regexp_replace(split_part(ltrim(n.content, E' \t\r\n'), E'\n', 1), '^#+\s*', ''), '^[-*]\s*(\[[ xX]\]\s*)?', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
-  COALESCE(unp.archived, FALSE)::boolean AS archived
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(unp.hide_completed, FALSE)::boolean AS hide_completed,
+  COALESCE(unp.collapse_images, FALSE)::boolean AS collapse_images
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
 WHERE n.user_id = $1
@@ -345,11 +350,12 @@ type GetRecentNotesRow struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
-	CollapseImages bool               `json:"collapse_images"`
 	NoteIcon       []byte             `json:"note_icon"`
 	Title          string             `json:"title"`
 	Favorite       bool               `json:"favorite"`
 	Archived       bool               `json:"archived"`
+	HideCompleted  bool               `json:"hide_completed"`
+	CollapseImages bool               `json:"collapse_images"`
 }
 
 func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]GetRecentNotesRow, error) {
@@ -368,11 +374,12 @@ func (q *Queries) GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]Get
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
-			&i.CollapseImages,
 			&i.NoteIcon,
 			&i.Title,
 			&i.Favorite,
 			&i.Archived,
+			&i.HideCompleted,
+			&i.CollapseImages,
 		); err != nil {
 			return nil, err
 		}
@@ -408,20 +415,18 @@ func (q *Queries) TryAcquireGCLock(ctx context.Context) (bool, error) {
 const updateNote = `-- name: UpdateNote :one
 UPDATE notes
 SET content = COALESCE($3, content),
-    collapse_images = COALESCE($4, collapse_images),
-    note_icon = CASE WHEN $5::boolean THEN $6 ELSE note_icon END,
+    note_icon = CASE WHEN $4::boolean THEN $5 ELSE note_icon END,
     updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
-  AND ($7::timestamptz IS NULL OR notes.updated_at = $7)
+  AND ($6::timestamptz IS NULL OR notes.updated_at = $6)
   AND (notes.user_id = $2 OR EXISTS (SELECT 1 FROM note_shares WHERE note_shares.note_id = $1 AND note_shares.user_id = $2 AND note_shares.permission = 'edit'))
-RETURNING id, user_id, content, excerpt, created_at, updated_at, deleted_at, collapse_images, revision, document, snapshot_revision, note_icon
+RETURNING id, user_id, content, excerpt, created_at, updated_at, deleted_at, revision, document, snapshot_revision, note_icon
 `
 
 type UpdateNoteParams struct {
 	ID                pgtype.UUID        `json:"id"`
 	UserID            pgtype.UUID        `json:"user_id"`
 	Content           pgtype.Text        `json:"content"`
-	CollapseImages    pgtype.Bool        `json:"collapse_images"`
 	SetNoteIcon       pgtype.Bool        `json:"set_note_icon"`
 	NoteIcon          []byte             `json:"note_icon"`
 	ExpectedUpdatedAt pgtype.Timestamptz `json:"expected_updated_at"`
@@ -432,7 +437,6 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		arg.ID,
 		arg.UserID,
 		arg.Content,
-		arg.CollapseImages,
 		arg.SetNoteIcon,
 		arg.NoteIcon,
 		arg.ExpectedUpdatedAt,
@@ -446,7 +450,6 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
-		&i.CollapseImages,
 		&i.Revision,
 		&i.Document,
 		&i.SnapshotRevision,
@@ -467,4 +470,49 @@ type UpdateNoteContentParams struct {
 func (q *Queries) UpdateNoteContent(ctx context.Context, arg UpdateNoteContentParams) error {
 	_, err := q.db.Exec(ctx, updateNoteContent, arg.ID, arg.Content)
 	return err
+}
+
+const upsertUserNotePreference = `-- name: UpsertUserNotePreference :one
+INSERT INTO user_note_preferences (user_id, note_id, favorite, archived, hide_completed, collapse_images, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, NOW())
+ON CONFLICT (user_id, note_id) DO UPDATE
+SET favorite = EXCLUDED.favorite,
+    archived = EXCLUDED.archived,
+    hide_completed = EXCLUDED.hide_completed,
+    collapse_images = EXCLUDED.collapse_images,
+    updated_at = NOW()
+RETURNING user_id, note_id, hide_completed, filters, created_at, updated_at, favorite, archived, collapse_images
+`
+
+type UpsertUserNotePreferenceParams struct {
+	UserID         pgtype.UUID `json:"user_id"`
+	NoteID         pgtype.UUID `json:"note_id"`
+	Favorite       bool        `json:"favorite"`
+	Archived       bool        `json:"archived"`
+	HideCompleted  bool        `json:"hide_completed"`
+	CollapseImages bool        `json:"collapse_images"`
+}
+
+func (q *Queries) UpsertUserNotePreference(ctx context.Context, arg UpsertUserNotePreferenceParams) (UserNotePreference, error) {
+	row := q.db.QueryRow(ctx, upsertUserNotePreference,
+		arg.UserID,
+		arg.NoteID,
+		arg.Favorite,
+		arg.Archived,
+		arg.HideCompleted,
+		arg.CollapseImages,
+	)
+	var i UserNotePreference
+	err := row.Scan(
+		&i.UserID,
+		&i.NoteID,
+		&i.HideCompleted,
+		&i.Filters,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Favorite,
+		&i.Archived,
+		&i.CollapseImages,
+	)
+	return i, err
 }

@@ -60,6 +60,7 @@ type Querier interface {
 	UpdateNoteDocument(ctx context.Context, arg UpdateNoteDocumentParams) error
 	UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error)
 	UpsertNoteShareLink(ctx context.Context, arg UpsertNoteShareLinkParams) (NoteShareLink, error)
+	UpsertUserNotePreference(ctx context.Context, arg UpsertUserNotePreferenceParams) (UserNotePreference, error)
 }
 
 var _ Querier = (*Queries)(nil)

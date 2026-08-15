@@ -33,14 +33,13 @@ func isEmptyRegularNote(content string) bool {
 	return strings.TrimSpace(content) == ""
 }
 
-func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string, collapseImages bool) (sqlcgen.Note, error) {
+func (s *Service) CreateNote(ctx context.Context, userID pgtype.UUID, content string) (sqlcgen.Note, error) {
 	if isEmptyRegularNote(content) {
 		return sqlcgen.Note{}, ErrEmptyNote
 	}
 	arg := sqlcgen.CreateNoteParams{
-		UserID:         userID,
-		Content:        content,
-		CollapseImages: collapseImages,
+		UserID:  userID,
+		Content: content,
 	}
 	note, err := s.repo.CreateNote(ctx, arg)
 	if err != nil {
@@ -61,7 +60,7 @@ func (s *Service) GetNoteByID(ctx context.Context, id pgtype.UUID, userID pgtype
 	return note, nil
 }
 
-func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, collapseImages *bool, noteIcon NoteIconUpdate, expectedUpdatedAt *time.Time) (sqlcgen.Note, error) {
+func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, content *string, noteIcon NoteIconUpdate, expectedUpdatedAt *time.Time) (sqlcgen.Note, error) {
 	arg := sqlcgen.UpdateNoteParams{
 		ID:          id,
 		UserID:      userID,
@@ -73,9 +72,6 @@ func (s *Service) UpdateNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	}
 	if content != nil {
 		arg.Content = pgtype.Text{String: *content, Valid: true}
-	}
-	if collapseImages != nil {
-		arg.CollapseImages = pgtype.Bool{Bool: *collapseImages, Valid: true}
 	}
 
 	note, err := s.repo.UpdateNote(ctx, arg)
@@ -144,4 +140,26 @@ func (s *Service) GetNoteMarkdownByID(ctx context.Context, id pgtype.UUID, userI
 	}
 
 	return note.Content, nil
+}
+
+// UpdatePreferences upserts the authenticated user's preference row. Access is
+// gated by the same owner-or-share predicate used by catalog reads, so a shared
+// read-only user can still persist their own view settings.
+func (s *Service) UpdatePreferences(ctx context.Context, userID pgtype.UUID, id pgtype.UUID, favorite, archived, hideCompleted, collapseImages bool) (sqlcgen.UserNotePreference, error) {
+	if _, err := s.repo.GetNoteByID(ctx, id, userID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlcgen.UserNotePreference{}, ErrNoteNotFound
+		}
+		return sqlcgen.UserNotePreference{}, err
+	}
+
+	arg := sqlcgen.UpsertUserNotePreferenceParams{
+		UserID:         userID,
+		NoteID:         id,
+		Favorite:       favorite,
+		Archived:       archived,
+		HideCompleted:  hideCompleted,
+		CollapseImages: collapseImages,
+	}
+	return s.repo.UpsertUserNotePreference(ctx, arg)
 }

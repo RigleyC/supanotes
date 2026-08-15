@@ -75,7 +75,6 @@ type Note struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
-	CollapseImages   bool               `json:"collapse_images"`
 	Revision         int64              `json:"revision"`
 	Document         []byte             `json:"document"`
 	SnapshotRevision int64              `json:"snapshot_revision"`
@@ -112,6 +111,14 @@ type NoteShare struct {
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
+type NoteShareLink struct {
+	NoteID    pgtype.UUID        `json:"note_id"`
+	TokenID   pgtype.UUID        `json:"token_id"`
+	Enabled   bool               `json:"enabled"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type NoteWsLease struct {
 	NoteID    pgtype.UUID        `json:"note_id"`
 	MachineID string             `json:"machine_id"`
@@ -131,6 +138,31 @@ type RefreshToken struct {
 	ReuseDetectedAt pgtype.Timestamptz `json:"reuse_detected_at"`
 }
 
+type Task struct {
+	ID          pgtype.UUID        `json:"id"`
+	NoteID      pgtype.UUID        `json:"note_id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	Title       string             `json:"title"`
+	Status      string             `json:"status"`
+	DueDate     pgtype.Timestamptz `json:"due_date"`
+	Recurrence  pgtype.Text        `json:"recurrence"`
+	Position    string             `json:"position"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	HasTime     bool               `json:"has_time"`
+	Reminder    pgtype.Text        `json:"reminder"`
+}
+
+type TaskCompletion struct {
+	ID          pgtype.UUID        `json:"id"`
+	TaskID      pgtype.UUID        `json:"task_id"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	DueDate     pgtype.Date        `json:"due_date"`
+	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
+}
+
 type User struct {
 	ID           pgtype.UUID        `json:"id"`
 	Email        string             `json:"email"`
@@ -141,14 +173,15 @@ type User struct {
 }
 
 type UserNotePreference struct {
-	UserID        pgtype.UUID        `json:"user_id"`
-	NoteID        pgtype.UUID        `json:"note_id"`
-	HideCompleted bool               `json:"hide_completed"`
-	Filters       []byte             `json:"filters"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	Favorite      bool               `json:"favorite"`
-	Archived      bool               `json:"archived"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	NoteID         pgtype.UUID        `json:"note_id"`
+	HideCompleted  bool               `json:"hide_completed"`
+	Filters        []byte             `json:"filters"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	Favorite       bool               `json:"favorite"`
+	Archived       bool               `json:"archived"`
+	CollapseImages bool               `json:"collapse_images"`
 }
 
 type UserSetting struct {

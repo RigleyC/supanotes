@@ -14,6 +14,7 @@ type Repository interface {
 	UpdateNote(ctx context.Context, arg sqlcgen.UpdateNoteParams) (sqlcgen.Note, error)
 	DeleteNote(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) error
 	GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error)
+	UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error)
 	WithQuerier(q sqlcgen.Querier) Repository
 }
 
@@ -47,6 +48,10 @@ func (r *repository) DeleteNote(ctx context.Context, id pgtype.UUID, userID pgty
 
 func (r *repository) GetNotes(ctx context.Context, arg sqlcgen.GetNotesParams) ([]sqlcgen.GetNotesRow, error) {
 	return r.q.GetNotes(ctx, arg)
+}
+
+func (r *repository) UpsertUserNotePreference(ctx context.Context, arg sqlcgen.UpsertUserNotePreferenceParams) (sqlcgen.UserNotePreference, error) {
+	return r.q.UpsertUserNotePreference(ctx, arg)
 }
 
 

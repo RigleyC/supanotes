@@ -1,12 +1,14 @@
 -- name: CreateNote :one
-INSERT INTO notes (user_id, content, collapse_images)
-VALUES ($1, $2, $3)
+INSERT INTO notes (user_id, content)
+VALUES ($1, $2)
 RETURNING *;
 
 -- name: GetNoteByID :one
 SELECT n.*,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(unp.hide_completed, FALSE)::boolean AS hide_completed,
+  COALESCE(unp.collapse_images, FALSE)::boolean AS collapse_images,
   COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
   COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE owner_user.email END, '')::text AS shared_by_email,
   COALESCE(CASE WHEN n.user_id = $2 THEN NULL::text ELSE owner_user.name END, '')::text AS shared_by_name
@@ -20,7 +22,6 @@ WHERE n.id = $1 AND n.deleted_at IS NULL
 -- name: UpdateNote :one
 UPDATE notes
 SET content = COALESCE(sqlc.narg('content'), content),
-    collapse_images = COALESCE(sqlc.narg('collapse_images'), collapse_images),
     note_icon = CASE WHEN sqlc.narg('set_note_icon')::boolean THEN sqlc.narg('note_icon') ELSE note_icon END,
     updated_at = NOW()
 WHERE notes.id = $1 AND notes.deleted_at IS NULL
@@ -45,11 +46,12 @@ SELECT
   n.id, n.user_id,
   n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
-  n.collapse_images,
   n.note_icon,
   COALESCE(NULLIF(regexp_replace(regexp_replace(split_part(ltrim(n.content, E' \t\r\n'), E'\n', 1), '^#+\s*', ''), '^[-*]\s*(\[[ xX]\]\s*)?', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
   COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(unp.hide_completed, FALSE)::boolean AS hide_completed,
+  COALESCE(unp.collapse_images, FALSE)::boolean AS collapse_images,
   COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE ns.permission END, '')::text AS permission,
   COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE owner_user.email END, '')::text AS shared_by_email,
   COALESCE(CASE WHEN n.user_id = $1 THEN NULL::text ELSE owner_user.name END, '')::text AS shared_by_name
@@ -69,11 +71,12 @@ SELECT
   n.id, n.user_id,
   n.excerpt,
   n.created_at, n.updated_at, n.deleted_at,
-  n.collapse_images,
   n.note_icon,
   COALESCE(NULLIF(regexp_replace(regexp_replace(split_part(ltrim(n.content, E' \t\r\n'), E'\n', 1), '^#+\s*', ''), '^[-*]\s*(\[[ xX]\]\s*)?', ''), ''), '')::text AS title,
   COALESCE(unp.favorite, FALSE)::boolean AS favorite,
-  COALESCE(unp.archived, FALSE)::boolean AS archived
+  COALESCE(unp.archived, FALSE)::boolean AS archived,
+  COALESCE(unp.hide_completed, FALSE)::boolean AS hide_completed,
+  COALESCE(unp.collapse_images, FALSE)::boolean AS collapse_images
 FROM notes n
 LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = $1
 WHERE n.user_id = $1
@@ -81,6 +84,17 @@ WHERE n.user_id = $1
   AND n.updated_at >= NOW() - INTERVAL '48 hours'
 ORDER BY n.updated_at DESC
 LIMIT 10;
+
+-- name: UpsertUserNotePreference :one
+INSERT INTO user_note_preferences (user_id, note_id, favorite, archived, hide_completed, collapse_images, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, NOW())
+ON CONFLICT (user_id, note_id) DO UPDATE
+SET favorite = EXCLUDED.favorite,
+    archived = EXCLUDED.archived,
+    hide_completed = EXCLUDED.hide_completed,
+    collapse_images = EXCLUDED.collapse_images,
+    updated_at = NOW()
+RETURNING *;
 
 -- name: GetLinkedNotes :many
 SELECT DISTINCT n.* FROM notes n
