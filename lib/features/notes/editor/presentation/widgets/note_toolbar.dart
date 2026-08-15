@@ -43,12 +43,14 @@ class NoteToolbar extends StatefulWidget {
 
 class _NoteToolbarState extends State<NoteToolbar> {
   List<DocumentNode> _selected = const [];
+  String? _lastSignature;
 
   @override
   void initState() {
     super.initState();
     widget.composer.selectionNotifier.addListener(_onStateChange);
     widget.editor.context.document.addListener(_onStateChange);
+    _lastSignature = _toolbarSignature();
     _refreshSelected();
   }
 
@@ -75,7 +77,58 @@ class _NoteToolbarState extends State<NoteToolbar> {
 
   void _onStateChange([DocumentChangeLog? _]) {
     if (!mounted) return;
+    final signature = _toolbarSignature();
+    if (signature == _lastSignature) return;
+    _lastSignature = signature;
     setState(_refreshSelected);
+  }
+
+  String _toolbarSignature() {
+    final selection = widget.composer.selection;
+    final buffer = StringBuffer(
+      selection == null
+          ? 'hasSelection=false'
+          : 'hasSelection=true;collapsed=${selection.isCollapsed};node=${selection.extent.nodeId}',
+    );
+    for (final node in editorSelectionNodes(
+      widget.editor.context.document,
+      selection,
+    )) {
+      buffer
+        ..write(';')
+        ..write(node.id)
+        ..write('/')
+        ..write(node.runtimeType);
+      if (node is ParagraphNode) {
+        buffer
+          ..write('(blockType=')
+          ..write(node.getMetadataValue('blockType'))
+          ..write(')');
+      } else if (node is ListItemNode) {
+        buffer
+          ..write('(listType=')
+          ..write(node.type)
+          ..write(')');
+      }
+    }
+    if (selection != null && !selection.isCollapsed) {
+      for (final attribution in const [
+        boldAttribution,
+        italicsAttribution,
+        strikethroughAttribution,
+      ]) {
+        if (hasAttributionInEditorSelection(
+          widget.editor.context.document,
+          selection,
+          attribution,
+        )) {
+          buffer
+            ..write(';attribution=')
+            ..write(attribution.id);
+        }
+      }
+    }
+    return buffer.toString();
   }
 
   void _refreshSelected() {
@@ -100,9 +153,8 @@ class _NoteToolbarState extends State<NoteToolbar> {
     return selection != null && !selection.isCollapsed;
   }
 
-  bool get _hasListOrTask => _selected.any(
-        (node) => node is ListItemNode || node is TaskNode,
-      );
+  bool get _hasListOrTask =>
+      _selected.any((node) => node is ListItemNode || node is TaskNode);
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +167,9 @@ class _NoteToolbarState extends State<NoteToolbar> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: _ContextualToolbarContent(
-              mode: _isContextual ? _ToolbarMode.contextual : _ToolbarMode.normal,
+              mode: _isContextual
+                  ? _ToolbarMode.contextual
+                  : _ToolbarMode.normal,
               normalRow: _buildNormalRow(),
               contextualRow: _buildContextualRow(),
             ),
@@ -132,7 +186,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
       children: [
         ToolbarButton(
           svgAsset: 'assets/icons/h1_icon.svg',
-          spacious: true,
+
           isActive: blockType == header1Attribution,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: () => _setBlockType(header1Attribution),
@@ -140,7 +194,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           svgAsset: 'assets/icons/h2_icon.svg',
-          spacious: true,
+
           isActive: blockType == header2Attribution,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: () => _setBlockType(header2Attribution),
@@ -148,7 +202,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           svgAsset: 'assets/icons/h3_icon.svg',
-          spacious: true,
+
           isActive: blockType == header3Attribution,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: () => _setBlockType(header3Attribution),
@@ -156,7 +210,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           icon: Icons.format_quote,
-          spacious: true,
+
           isActive: blockType == blockquoteAttribution,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: () => _setBlockType(blockquoteAttribution),
@@ -165,7 +219,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         const ToolbarDivider(),
         ToolbarButton(
           icon: Icons.horizontal_rule,
-          spacious: true,
+
           isActive: false,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: _insertDivider,
@@ -174,7 +228,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         const ToolbarDivider(),
         ToolbarButton(
           icon: Icons.image,
-          spacious: true,
+
           isActive: false,
           haptic: ToolbarHaptic.controlTap,
           onPressed: widget.onAttachImage,
@@ -182,7 +236,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           icon: Icons.attach_file,
-          spacious: true,
+
           isActive: false,
           haptic: ToolbarHaptic.controlTap,
           onPressed: widget.onAttachFile,
@@ -198,7 +252,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
       children: [
         ToolbarButton(
           icon: Icons.format_bold,
-          spacious: true,
+
           isActive: _hasAttribution(boldAttribution),
           haptic: ToolbarHaptic.selectionChange,
           onPressed: _hasTextSelection
@@ -208,7 +262,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           icon: Icons.format_italic,
-          spacious: true,
+
           isActive: _hasAttribution(italicsAttribution),
           haptic: ToolbarHaptic.selectionChange,
           onPressed: _hasTextSelection
@@ -218,7 +272,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           icon: Icons.format_strikethrough,
-          spacious: true,
+
           isActive: _hasAttribution(strikethroughAttribution),
           haptic: ToolbarHaptic.selectionChange,
           onPressed: _hasTextSelection
@@ -229,7 +283,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         const ToolbarDivider(),
         ToolbarButton(
           icon: Icons.format_list_bulleted,
-          spacious: true,
+
           isActive: _selectedListType() == ListItemType.unordered,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: () => _convertToList(ListItemType.unordered),
@@ -237,7 +291,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           icon: Icons.format_list_numbered,
-          spacious: true,
+
           isActive: _selectedListType() == ListItemType.ordered,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: () => _convertToList(ListItemType.ordered),
@@ -245,7 +299,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           svgAsset: 'assets/icons/checkbox.svg',
-          spacious: true,
+
           isActive: _selected.every((node) => node is TaskNode),
           haptic: ToolbarHaptic.selectionChange,
           onPressed: _convertToTask,
@@ -254,7 +308,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         const ToolbarDivider(),
         ToolbarButton(
           icon: Icons.format_indent_decrease,
-          spacious: true,
+
           isActive: false,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: _hasListOrTask ? _unindentSelectedBlocks : null,
@@ -262,7 +316,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ),
         ToolbarButton(
           icon: Icons.format_indent_increase,
-          spacious: true,
+
           isActive: false,
           haptic: ToolbarHaptic.selectionChange,
           onPressed: _hasListOrTask ? _indentSelectedBlocks : null,
@@ -292,7 +346,10 @@ class _NoteToolbarState extends State<NoteToolbar> {
     if (nodes.isEmpty || nodes.any((node) => node is! ListItemNode)) {
       return null;
     }
-    final listTypes = nodes.cast<ListItemNode>().map((node) => node.type).toSet();
+    final listTypes = nodes
+        .cast<ListItemNode>()
+        .map((node) => node.type)
+        .toSet();
     return listTypes.length == 1 ? listTypes.single : null;
   }
 
