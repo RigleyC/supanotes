@@ -8,6 +8,8 @@ class UserNotePreferences extends Table {
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
   BoolColumn get hideCompleted =>
       boolean().withDefault(const Constant(false))();
+  BoolColumn get collapseImages =>
+      boolean().withDefault(const Constant(false))();
   TextColumn get filters => text().withDefault(const Constant('{}'))();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();

@@ -24,7 +24,7 @@ abstract class INotesRepository {
   Stream<NoteModel?> watchNoteById(String id);
   Future<NoteModel?> getNoteById(String id);
   Future<NoteModel> upsertNote({required String id, String content = ''});
-  Future<void> updateNote(String id, {String? content, bool? collapseImages});
+  Future<void> updateNote(String id, {String? content});
 
   /// Saves shared note icon metadata immediately. A `null` icon clears it.
   Future<void> updateNoteIcon(String id, NoteIcon? icon);
@@ -102,7 +102,6 @@ class NotesRepository implements INotesRepository {
   Future<void> updateNote(
     String id, {
     String? content,
-    bool? collapseImages,
   }) async {
     final current = await _local.getNoteById(id);
     if (current == null) return;
@@ -113,9 +112,6 @@ class NotesRepository implements INotesRepository {
       excerpt: content == null
           ? const Value.absent()
           : Value(_excerptFrom(content)),
-      collapseImages: collapseImages == null
-          ? const Value.absent()
-          : Value(collapseImages),
       updatedAt: Value(DateTime.now().toUtc()),
       isDirty: const Value(true),
     );

@@ -17,8 +17,6 @@ class Notes extends Table {
       boolean().withDefault(const Constant(false))();
   BoolColumn get noteIconDirty =>
       boolean().withDefault(const Constant(false))();
-  BoolColumn get collapseImages =>
-      boolean().withDefault(const Constant(false))();
   TextColumn get lifecycleState =>
       text().withDefault(const Constant(emptyDraftLifecycleState))();
 

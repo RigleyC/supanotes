@@ -30,9 +30,21 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.isDirty.equals(true))).get();
   }
 
-  Future<void> clearDirtyFlag(String userId, String noteId) async {
+  /// Clears the dirty flag only when the row's [pushedUpdatedAt] still
+  /// matches — a preference edited while the push was in flight keeps its
+  /// flag so the next sync round sends the newer value.
+  Future<void> clearDirtyFlag(
+    String userId,
+    String noteId,
+    DateTime pushedUpdatedAt,
+  ) async {
     await (update(userNotePreferences)
-          ..where((t) => t.userId.equals(userId) & t.noteId.equals(noteId)))
+          ..where(
+            (t) =>
+                t.userId.equals(userId) &
+                t.noteId.equals(noteId) &
+                t.updatedAt.equals(pushedUpdatedAt),
+          ))
         .write(const UserNotePreferencesCompanion(isDirty: Value(false)));
   }
 
@@ -98,6 +110,111 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
         isDirty: const Value(true),
       ),
     );
+  }
+
+  Future<void> setCollapseImages(
+    String userId,
+    String noteId,
+    bool collapseImages,
+  ) async {
+    final now = DateTime.now();
+    await _writePreference(
+      noteId: noteId,
+      materialized: collapseImages,
+      insertion: UserNotePreferencesCompanion.insert(
+        userId: userId,
+        noteId: noteId,
+        collapseImages: Value(collapseImages),
+        updatedAt: Value(now),
+        isDirty: const Value(true),
+      ),
+      update: UserNotePreferencesCompanion(
+        collapseImages: Value(collapseImages),
+        updatedAt: Value(now),
+        isDirty: const Value(true),
+      ),
+    );
+  }
+
+  /// Writes all four preference fields as a single dirty row so a synced
+  /// device applies and pushes them together.
+  Future<void> setPreferences({
+    required String userId,
+    required String noteId,
+    required bool favorite,
+    required bool archived,
+    required bool hideCompleted,
+    required bool collapseImages,
+  }) async {
+    final now = DateTime.now();
+    await _writePreference(
+      noteId: noteId,
+      materialized: favorite || archived || hideCompleted || collapseImages,
+      insertion: UserNotePreferencesCompanion.insert(
+        userId: userId,
+        noteId: noteId,
+        favorite: Value(favorite),
+        archived: Value(archived),
+        hideCompleted: Value(hideCompleted),
+        collapseImages: Value(collapseImages),
+        updatedAt: Value(now),
+        isDirty: const Value(true),
+      ),
+      update: UserNotePreferencesCompanion(
+        favorite: Value(favorite),
+        archived: Value(archived),
+        hideCompleted: Value(hideCompleted),
+        collapseImages: Value(collapseImages),
+        updatedAt: Value(now),
+        isDirty: const Value(true),
+      ),
+    );
+  }
+
+  /// Applies a complete remote preference row, but only when the local row
+  /// is clean. Returns `false` and leaves the local row untouched when an
+  /// offline edit is pending so it is not lost.
+  Future<bool> applyRemotePreference({
+    required String userId,
+    required String noteId,
+    required bool favorite,
+    required bool archived,
+    required bool hideCompleted,
+    required bool collapseImages,
+    required DateTime remoteUpdatedAt,
+  }) async {
+    return attachedDatabase.transaction(() async {
+      final local = await getPreference(userId, noteId);
+      if (local != null && local.isDirty) return false;
+
+      final update = UserNotePreferencesCompanion(
+        favorite: Value(favorite),
+        archived: Value(archived),
+        hideCompleted: Value(hideCompleted),
+        collapseImages: Value(collapseImages),
+        updatedAt: Value(remoteUpdatedAt),
+        isDirty: const Value(false),
+      );
+      await into(userNotePreferences)
+          .insert(
+            UserNotePreferencesCompanion.insert(
+              userId: userId,
+              noteId: noteId,
+              favorite: Value(favorite),
+              archived: Value(archived),
+              hideCompleted: Value(hideCompleted),
+              collapseImages: Value(collapseImages),
+              updatedAt: Value(remoteUpdatedAt),
+              isDirty: const Value(false),
+            ),
+            onConflict: DoUpdate((_) => update),
+          );
+
+      if (favorite || archived || hideCompleted || collapseImages) {
+        await attachedDatabase.noteLifecycleDao.markMaterialized(noteId);
+      }
+      return true;
+    });
   }
 
   Future<void> _writePreference({

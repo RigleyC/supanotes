@@ -101,7 +101,7 @@ class NoteModel {
       createdAt: qr.note.createdAt,
       updatedAt: qr.note.updatedAt,
       hideCompleted: qr.hideCompleted,
-      collapseImages: qr.note.collapseImages,
+      collapseImages: qr.collapseImages,
       permission: qr.note.permission?.isNotEmpty == true
           ? qr.note.permission
           : null,

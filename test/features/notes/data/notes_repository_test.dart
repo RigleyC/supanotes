@@ -223,6 +223,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       favorite: false,
       archived: false,
       hideCompleted: false,
+      collapseImages: false,
     );
   }
 
@@ -245,7 +246,6 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       isDirty: false,
       hasRemoteCopy: false,
       noteIconDirty: false,
-      collapseImages: false,
       lifecycleState: 'empty_draft',
     );
     _store[id] = data;
@@ -255,6 +255,7 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
       favorite: false,
       archived: false,
       hideCompleted: false,
+      collapseImages: false,
     );
   }
 
@@ -316,7 +317,11 @@ class FakeUserNotePreferencesDao implements UserNotePreferencesDao {
       Future.value([]);
 
   @override
-  Future<void> clearDirtyFlag(String userId, String noteId) async {}
+  Future<void> clearDirtyFlag(
+    String userId,
+    String noteId,
+    DateTime pushedUpdatedAt,
+  ) async {}
 
   @override
   Future<void> setFavorite(String userId, String noteId, bool favorite) async {}

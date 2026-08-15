@@ -805,7 +805,7 @@ void main() {
       'viewer-user',
     );
     expect(query!.title, 'Shared');
-    expect(query.note.collapseImages, isTrue);
+    expect(query.collapseImages, isTrue);
     final document =
         await (database.select(database.localNoteDocuments)
               ..where((document) => document.noteId.equals('shared-view-note')))

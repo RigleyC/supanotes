@@ -78,11 +78,17 @@ class NotePreferenceMutationController
       current: current,
       previousValue: current.collapseImages,
       targetValue: value,
-      write: (next) =>
-          _notesRepository.updateNote(current.id, collapseImages: next),
+      write: (next) => _preferencesRepository.setCollapseImages(
+        _userId,
+        current.id,
+        next,
+      ),
       readCurrentValue: (note) => note.collapseImages,
-      rollback: (previous) =>
-          _notesRepository.updateNote(current.id, collapseImages: previous),
+      rollback: (previous) => _preferencesRepository.setCollapseImages(
+        _userId,
+        current.id,
+        previous,
+      ),
     );
   }
 

@@ -31,3 +31,32 @@
 - [x] Calculate the fade from the rendered viewport instead of screen height.
 - [x] Apply the shared fade to the notes list and note editor.
 - [x] Validate fade geometry and existing editor layout behavior.
+
+## Per-note preference sync (plan 2026-08-14) — Task 2: collapse ownership → preference row
+
+- [x] Failing DAO tests: collapse changes dirty the shared preference row; remote
+  data is clean; remote data cannot replace a dirty local row; schema upgrade
+  preserves the old local collapse value under its owner.
+- [x] Removed `collapseImages` from the Drift `Notes` table; added it to
+  `UserNotePreferences`; bumped schema to 30.
+- [x] v29→v30 migration backfills owner preference rows from the legacy
+  `notes.collapse_images` (dirty, so the preserved value is pushed), materializes
+  collapsed notes, then drops the old column. Removed the collapse clause from the
+  lifecycle materialization predicate. Migration test simulates the v29→30 delta
+  on one open connection using the production `perUserCollapseBackfillSql`
+  (Drift cannot reopen a closed `NativeDatabase`).
+- [x] Pref DAO gains `setCollapseImages`, whole-row `setPreferences`, guarded
+  `applyRemotePreference`, and timestamp-guarded `clearDirtyFlag(userId, noteId,
+  pushedUpdatedAt)`.
+- [x] `NotesDao` projects `collapse_images` from the preference join;
+  `NoteModel.fromQueryResult` maps `qr.collapseImages`.
+- [x] Collapse UI mutation now writes the owner's preference row via
+  `UserNotePreferencesRepository`; `NotesRepository.updateNote` lost its
+  `collapseImages` param; catalog hydration no longer writes the shared column.
+- [x] `flutter analyze --no-pub` clean; DAO tests green; `git diff --check` clean.
+- [x] Committed `refactor(notes): store collapse images per user`.
+
+**Deferred to Task 3/4 (compile-coupled, per plan):** note_catalog_sync push/apply
+wiring (`pushDirtyPreferences`, `applyRemotePreference` in hydration), extending
+`RemoteNoteMetadata` to all four flags, controller/sync test fixtures, and final
+dead-code audit.

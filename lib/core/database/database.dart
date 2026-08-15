@@ -40,6 +40,25 @@ final class UpdateRemoteNote extends RemoteNoteWriteMode {
   final DateTime expectedUpdatedAt;
 }
 
+/// Backfills a note owner's `user_note_preferences` row from the legacy
+/// shared `notes.collapse_images` column before it is dropped. Rows that
+/// carry a collapsed state are marked dirty so the preserved local value is
+/// pushed to the backend, and their notes are materialized.
+const perUserCollapseBackfillSql = '''
+INSERT INTO user_note_preferences
+  (user_id, note_id, collapse_images, updated_at, is_dirty)
+SELECT n.user_id, n.id, n.collapse_images, n.updated_at, 1
+FROM notes n
+WHERE n.collapse_images = 1
+ON CONFLICT(user_id, note_id) DO UPDATE SET
+  collapse_images = excluded.collapse_images,
+  is_dirty = 1;
+UPDATE notes
+SET lifecycle_state = '$materializedLifecycleState'
+WHERE collapse_images = 1
+  AND lifecycle_state <> '$materializedLifecycleState';
+''';
+
 @DriftDatabase(
   tables: [
     Notes,
@@ -148,7 +167,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 29;
+  int get schemaVersion => 30;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -166,6 +185,24 @@ class AppDatabase extends _$AppDatabase {
     await _migrateSyncStorage(m, from);
     await _migrateNoteMetadata(m, from);
     await _migrateEffectiveDocuments(m, from);
+    await _migratePerUserCollapse(m, from);
+  }
+
+  /// Moves `collapse_images` from the shared `notes` column into each note
+  /// owner's `user_note_preferences` row. The old value is preserved
+  /// locally and marked dirty so the owner's preference is pushed to the
+  /// backend instead of being overwritten by another device.
+  Future<void> _migratePerUserCollapse(Migrator m, int from) async {
+    if (from < 30) {
+      await _addColumnIfMissing(
+        m,
+        userNotePreferences,
+        'user_note_preferences',
+        userNotePreferences.collapseImages,
+      );
+      await customStatement(perUserCollapseBackfillSql);
+      await customStatement('ALTER TABLE notes DROP COLUMN collapse_images');
+    }
   }
 
   Future<void> _migrateEffectiveDocuments(Migrator m, int from) async {
@@ -253,7 +290,9 @@ class AppDatabase extends _$AppDatabase {
       await m.createTable(attachments);
     }
     if (from < 10) {
-      await m.addColumn(notes, notes.collapseImages);
+      await customStatement(
+        'ALTER TABLE notes ADD COLUMN collapse_images INTEGER NOT NULL DEFAULT 0',
+      );
     }
     if (from < 11) {
       await m.createTable(userNotePreferences);
@@ -414,7 +453,6 @@ class AppDatabase extends _$AppDatabase {
       SET lifecycle_state = '$materializedLifecycleState'
       WHERE has_remote_copy = 1
          OR TRIM(content) <> ''
-         OR collapse_images = 1
          OR note_icon_json IS NOT NULL
          OR note_icon_dirty = 1
          OR EXISTS (

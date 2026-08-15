@@ -13,6 +13,7 @@ typedef NoteQueryResult = ({
   bool favorite,
   bool archived,
   bool hideCompleted,
+  bool collapseImages,
 });
 
 /// Derives a display title from note content by extracting the first non-empty
@@ -44,6 +45,7 @@ const _noteSelectColumns =
     'COALESCE(unp.favorite, 0) AS favorite, '
     'COALESCE(unp.archived, 0) AS archived, '
     'COALESCE(unp.hide_completed, 0) AS hide_completed, '
+    'COALESCE(unp.collapse_images, 0) AS collapse_images, '
     'n.content AS title';
 
 @DriftAccessor(tables: [Notes, UserNotePreferences])
@@ -129,7 +131,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       isDirty: row.read<bool>('is_dirty'),
       hasRemoteCopy: row.read<bool>('has_remote_copy'),
       noteIconDirty: row.read<bool>('note_icon_dirty'),
-      collapseImages: row.read<bool>('collapse_images'),
       lifecycleState: row.read<String>('lifecycle_state'),
       permission: row.read<String?>('permission'),
       sharedByEmail: row.read<String?>('shared_by_email'),
@@ -142,6 +143,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       favorite: row.read<bool>('favorite'),
       archived: row.read<bool>('archived'),
       hideCompleted: row.read<bool>('hide_completed'),
+      collapseImages: row.read<bool>('collapse_images'),
     );
   }
 
@@ -434,7 +436,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         (note.content.present && note.content.value.trim().isNotEmpty) ||
         (note.hasRemoteCopy.present && note.hasRemoteCopy.value);
     final hasMeaningfulMetadata =
-        (note.collapseImages.present && note.collapseImages.value) ||
         (note.noteIconJson.present && note.noteIconJson.value != null) ||
         (note.noteIconDirty.present && note.noteIconDirty.value);
     if (!hasMeaningfulValue && !hasMeaningfulMetadata) return note;

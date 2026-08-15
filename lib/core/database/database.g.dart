@@ -126,21 +126,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     ),
     defaultValue: const Constant(false),
   );
-  static const VerificationMeta _collapseImagesMeta = const VerificationMeta(
-    'collapseImages',
-  );
-  @override
-  late final GeneratedColumn<bool> collapseImages = GeneratedColumn<bool>(
-    'collapse_images',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("collapse_images" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
   static const VerificationMeta _lifecycleStateMeta = const VerificationMeta(
     'lifecycleState',
   );
@@ -209,7 +194,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
     isDirty,
     hasRemoteCopy,
     noteIconDirty,
-    collapseImages,
     lifecycleState,
     permission,
     sharedByEmail,
@@ -298,15 +282,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         noteIconDirty.isAcceptableOrUnknown(
           data['note_icon_dirty']!,
           _noteIconDirtyMeta,
-        ),
-      );
-    }
-    if (data.containsKey('collapse_images')) {
-      context.handle(
-        _collapseImagesMeta,
-        collapseImages.isAcceptableOrUnknown(
-          data['collapse_images']!,
-          _collapseImagesMeta,
         ),
       );
     }
@@ -401,10 +376,6 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteData> {
         DriftSqlType.bool,
         data['${effectivePrefix}note_icon_dirty'],
       )!,
-      collapseImages: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}collapse_images'],
-      )!,
       lifecycleState: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}lifecycle_state'],
@@ -445,7 +416,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
   final bool isDirty;
   final bool hasRemoteCopy;
   final bool noteIconDirty;
-  final bool collapseImages;
   final String lifecycleState;
   final String? permission;
   final String? sharedByEmail;
@@ -462,7 +432,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     required this.isDirty,
     required this.hasRemoteCopy,
     required this.noteIconDirty,
-    required this.collapseImages,
     required this.lifecycleState,
     this.permission,
     this.sharedByEmail,
@@ -486,7 +455,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     map['is_dirty'] = Variable<bool>(isDirty);
     map['has_remote_copy'] = Variable<bool>(hasRemoteCopy);
     map['note_icon_dirty'] = Variable<bool>(noteIconDirty);
-    map['collapse_images'] = Variable<bool>(collapseImages);
     map['lifecycle_state'] = Variable<String>(lifecycleState);
     if (!nullToAbsent || permission != null) {
       map['permission'] = Variable<String>(permission);
@@ -519,7 +487,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       isDirty: Value(isDirty),
       hasRemoteCopy: Value(hasRemoteCopy),
       noteIconDirty: Value(noteIconDirty),
-      collapseImages: Value(collapseImages),
       lifecycleState: Value(lifecycleState),
       permission: permission == null && nullToAbsent
           ? const Value.absent()
@@ -552,7 +519,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       isDirty: serializer.fromJson<bool>(json['isDirty']),
       hasRemoteCopy: serializer.fromJson<bool>(json['hasRemoteCopy']),
       noteIconDirty: serializer.fromJson<bool>(json['noteIconDirty']),
-      collapseImages: serializer.fromJson<bool>(json['collapseImages']),
       lifecycleState: serializer.fromJson<String>(json['lifecycleState']),
       permission: serializer.fromJson<String?>(json['permission']),
       sharedByEmail: serializer.fromJson<String?>(json['sharedByEmail']),
@@ -574,7 +540,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       'isDirty': serializer.toJson<bool>(isDirty),
       'hasRemoteCopy': serializer.toJson<bool>(hasRemoteCopy),
       'noteIconDirty': serializer.toJson<bool>(noteIconDirty),
-      'collapseImages': serializer.toJson<bool>(collapseImages),
       'lifecycleState': serializer.toJson<String>(lifecycleState),
       'permission': serializer.toJson<String?>(permission),
       'sharedByEmail': serializer.toJson<String?>(sharedByEmail),
@@ -594,7 +559,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     bool? isDirty,
     bool? hasRemoteCopy,
     bool? noteIconDirty,
-    bool? collapseImages,
     String? lifecycleState,
     Value<String?> permission = const Value.absent(),
     Value<String?> sharedByEmail = const Value.absent(),
@@ -611,7 +575,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     isDirty: isDirty ?? this.isDirty,
     hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
     noteIconDirty: noteIconDirty ?? this.noteIconDirty,
-    collapseImages: collapseImages ?? this.collapseImages,
     lifecycleState: lifecycleState ?? this.lifecycleState,
     permission: permission.present ? permission.value : this.permission,
     sharedByEmail: sharedByEmail.present
@@ -636,9 +599,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
       noteIconDirty: data.noteIconDirty.present
           ? data.noteIconDirty.value
           : this.noteIconDirty,
-      collapseImages: data.collapseImages.present
-          ? data.collapseImages.value
-          : this.collapseImages,
       lifecycleState: data.lifecycleState.present
           ? data.lifecycleState.value
           : this.lifecycleState,
@@ -670,7 +630,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           ..write('isDirty: $isDirty, ')
           ..write('hasRemoteCopy: $hasRemoteCopy, ')
           ..write('noteIconDirty: $noteIconDirty, ')
-          ..write('collapseImages: $collapseImages, ')
           ..write('lifecycleState: $lifecycleState, ')
           ..write('permission: $permission, ')
           ..write('sharedByEmail: $sharedByEmail, ')
@@ -692,7 +651,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
     isDirty,
     hasRemoteCopy,
     noteIconDirty,
-    collapseImages,
     lifecycleState,
     permission,
     sharedByEmail,
@@ -713,7 +671,6 @@ class NoteData extends DataClass implements Insertable<NoteData> {
           other.isDirty == this.isDirty &&
           other.hasRemoteCopy == this.hasRemoteCopy &&
           other.noteIconDirty == this.noteIconDirty &&
-          other.collapseImages == this.collapseImages &&
           other.lifecycleState == this.lifecycleState &&
           other.permission == this.permission &&
           other.sharedByEmail == this.sharedByEmail &&
@@ -732,7 +689,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
   final Value<bool> isDirty;
   final Value<bool> hasRemoteCopy;
   final Value<bool> noteIconDirty;
-  final Value<bool> collapseImages;
   final Value<String> lifecycleState;
   final Value<String?> permission;
   final Value<String?> sharedByEmail;
@@ -750,7 +706,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.isDirty = const Value.absent(),
     this.hasRemoteCopy = const Value.absent(),
     this.noteIconDirty = const Value.absent(),
-    this.collapseImages = const Value.absent(),
     this.lifecycleState = const Value.absent(),
     this.permission = const Value.absent(),
     this.sharedByEmail = const Value.absent(),
@@ -769,7 +724,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     this.isDirty = const Value.absent(),
     this.hasRemoteCopy = const Value.absent(),
     this.noteIconDirty = const Value.absent(),
-    this.collapseImages = const Value.absent(),
     this.lifecycleState = const Value.absent(),
     this.permission = const Value.absent(),
     this.sharedByEmail = const Value.absent(),
@@ -792,7 +746,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Expression<bool>? isDirty,
     Expression<bool>? hasRemoteCopy,
     Expression<bool>? noteIconDirty,
-    Expression<bool>? collapseImages,
     Expression<String>? lifecycleState,
     Expression<String>? permission,
     Expression<String>? sharedByEmail,
@@ -811,7 +764,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       if (isDirty != null) 'is_dirty': isDirty,
       if (hasRemoteCopy != null) 'has_remote_copy': hasRemoteCopy,
       if (noteIconDirty != null) 'note_icon_dirty': noteIconDirty,
-      if (collapseImages != null) 'collapse_images': collapseImages,
       if (lifecycleState != null) 'lifecycle_state': lifecycleState,
       if (permission != null) 'permission': permission,
       if (sharedByEmail != null) 'shared_by_email': sharedByEmail,
@@ -832,7 +784,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     Value<bool>? isDirty,
     Value<bool>? hasRemoteCopy,
     Value<bool>? noteIconDirty,
-    Value<bool>? collapseImages,
     Value<String>? lifecycleState,
     Value<String?>? permission,
     Value<String?>? sharedByEmail,
@@ -851,7 +802,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
       isDirty: isDirty ?? this.isDirty,
       hasRemoteCopy: hasRemoteCopy ?? this.hasRemoteCopy,
       noteIconDirty: noteIconDirty ?? this.noteIconDirty,
-      collapseImages: collapseImages ?? this.collapseImages,
       lifecycleState: lifecycleState ?? this.lifecycleState,
       permission: permission ?? this.permission,
       sharedByEmail: sharedByEmail ?? this.sharedByEmail,
@@ -894,9 +844,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
     if (noteIconDirty.present) {
       map['note_icon_dirty'] = Variable<bool>(noteIconDirty.value);
     }
-    if (collapseImages.present) {
-      map['collapse_images'] = Variable<bool>(collapseImages.value);
-    }
     if (lifecycleState.present) {
       map['lifecycle_state'] = Variable<String>(lifecycleState.value);
     }
@@ -931,7 +878,6 @@ class NotesCompanion extends UpdateCompanion<NoteData> {
           ..write('isDirty: $isDirty, ')
           ..write('hasRemoteCopy: $hasRemoteCopy, ')
           ..write('noteIconDirty: $noteIconDirty, ')
-          ..write('collapseImages: $collapseImages, ')
           ..write('lifecycleState: $lifecycleState, ')
           ..write('permission: $permission, ')
           ..write('sharedByEmail: $sharedByEmail, ')
@@ -2082,6 +2028,21 @@ class $UserNotePreferencesTable extends UserNotePreferences
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _collapseImagesMeta = const VerificationMeta(
+    'collapseImages',
+  );
+  @override
+  late final GeneratedColumn<bool> collapseImages = GeneratedColumn<bool>(
+    'collapse_images',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("collapse_images" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _filtersMeta = const VerificationMeta(
     'filters',
   );
@@ -2140,6 +2101,7 @@ class $UserNotePreferencesTable extends UserNotePreferences
     favorite,
     archived,
     hideCompleted,
+    collapseImages,
     filters,
     createdAt,
     updatedAt,
@@ -2191,6 +2153,15 @@ class $UserNotePreferencesTable extends UserNotePreferences
         hideCompleted.isAcceptableOrUnknown(
           data['hide_completed']!,
           _hideCompletedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('collapse_images')) {
+      context.handle(
+        _collapseImagesMeta,
+        collapseImages.isAcceptableOrUnknown(
+          data['collapse_images']!,
+          _collapseImagesMeta,
         ),
       );
     }
@@ -2247,6 +2218,10 @@ class $UserNotePreferencesTable extends UserNotePreferences
         DriftSqlType.bool,
         data['${effectivePrefix}hide_completed'],
       )!,
+      collapseImages: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}collapse_images'],
+      )!,
       filters: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}filters'],
@@ -2279,6 +2254,7 @@ class UserNotePreferenceData extends DataClass
   final bool favorite;
   final bool archived;
   final bool hideCompleted;
+  final bool collapseImages;
   final String filters;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -2289,6 +2265,7 @@ class UserNotePreferenceData extends DataClass
     required this.favorite,
     required this.archived,
     required this.hideCompleted,
+    required this.collapseImages,
     required this.filters,
     required this.createdAt,
     required this.updatedAt,
@@ -2302,6 +2279,7 @@ class UserNotePreferenceData extends DataClass
     map['favorite'] = Variable<bool>(favorite);
     map['archived'] = Variable<bool>(archived);
     map['hide_completed'] = Variable<bool>(hideCompleted);
+    map['collapse_images'] = Variable<bool>(collapseImages);
     map['filters'] = Variable<String>(filters);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -2316,6 +2294,7 @@ class UserNotePreferenceData extends DataClass
       favorite: Value(favorite),
       archived: Value(archived),
       hideCompleted: Value(hideCompleted),
+      collapseImages: Value(collapseImages),
       filters: Value(filters),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -2334,6 +2313,7 @@ class UserNotePreferenceData extends DataClass
       favorite: serializer.fromJson<bool>(json['favorite']),
       archived: serializer.fromJson<bool>(json['archived']),
       hideCompleted: serializer.fromJson<bool>(json['hideCompleted']),
+      collapseImages: serializer.fromJson<bool>(json['collapseImages']),
       filters: serializer.fromJson<String>(json['filters']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -2349,6 +2329,7 @@ class UserNotePreferenceData extends DataClass
       'favorite': serializer.toJson<bool>(favorite),
       'archived': serializer.toJson<bool>(archived),
       'hideCompleted': serializer.toJson<bool>(hideCompleted),
+      'collapseImages': serializer.toJson<bool>(collapseImages),
       'filters': serializer.toJson<String>(filters),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -2362,6 +2343,7 @@ class UserNotePreferenceData extends DataClass
     bool? favorite,
     bool? archived,
     bool? hideCompleted,
+    bool? collapseImages,
     String? filters,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -2372,6 +2354,7 @@ class UserNotePreferenceData extends DataClass
     favorite: favorite ?? this.favorite,
     archived: archived ?? this.archived,
     hideCompleted: hideCompleted ?? this.hideCompleted,
+    collapseImages: collapseImages ?? this.collapseImages,
     filters: filters ?? this.filters,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -2386,6 +2369,9 @@ class UserNotePreferenceData extends DataClass
       hideCompleted: data.hideCompleted.present
           ? data.hideCompleted.value
           : this.hideCompleted,
+      collapseImages: data.collapseImages.present
+          ? data.collapseImages.value
+          : this.collapseImages,
       filters: data.filters.present ? data.filters.value : this.filters,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -2401,6 +2387,7 @@ class UserNotePreferenceData extends DataClass
           ..write('favorite: $favorite, ')
           ..write('archived: $archived, ')
           ..write('hideCompleted: $hideCompleted, ')
+          ..write('collapseImages: $collapseImages, ')
           ..write('filters: $filters, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -2416,6 +2403,7 @@ class UserNotePreferenceData extends DataClass
     favorite,
     archived,
     hideCompleted,
+    collapseImages,
     filters,
     createdAt,
     updatedAt,
@@ -2430,6 +2418,7 @@ class UserNotePreferenceData extends DataClass
           other.favorite == this.favorite &&
           other.archived == this.archived &&
           other.hideCompleted == this.hideCompleted &&
+          other.collapseImages == this.collapseImages &&
           other.filters == this.filters &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -2443,6 +2432,7 @@ class UserNotePreferencesCompanion
   final Value<bool> favorite;
   final Value<bool> archived;
   final Value<bool> hideCompleted;
+  final Value<bool> collapseImages;
   final Value<String> filters;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -2454,6 +2444,7 @@ class UserNotePreferencesCompanion
     this.favorite = const Value.absent(),
     this.archived = const Value.absent(),
     this.hideCompleted = const Value.absent(),
+    this.collapseImages = const Value.absent(),
     this.filters = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -2466,6 +2457,7 @@ class UserNotePreferencesCompanion
     this.favorite = const Value.absent(),
     this.archived = const Value.absent(),
     this.hideCompleted = const Value.absent(),
+    this.collapseImages = const Value.absent(),
     this.filters = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -2479,6 +2471,7 @@ class UserNotePreferencesCompanion
     Expression<bool>? favorite,
     Expression<bool>? archived,
     Expression<bool>? hideCompleted,
+    Expression<bool>? collapseImages,
     Expression<String>? filters,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -2491,6 +2484,7 @@ class UserNotePreferencesCompanion
       if (favorite != null) 'favorite': favorite,
       if (archived != null) 'archived': archived,
       if (hideCompleted != null) 'hide_completed': hideCompleted,
+      if (collapseImages != null) 'collapse_images': collapseImages,
       if (filters != null) 'filters': filters,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -2505,6 +2499,7 @@ class UserNotePreferencesCompanion
     Value<bool>? favorite,
     Value<bool>? archived,
     Value<bool>? hideCompleted,
+    Value<bool>? collapseImages,
     Value<String>? filters,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -2517,6 +2512,7 @@ class UserNotePreferencesCompanion
       favorite: favorite ?? this.favorite,
       archived: archived ?? this.archived,
       hideCompleted: hideCompleted ?? this.hideCompleted,
+      collapseImages: collapseImages ?? this.collapseImages,
       filters: filters ?? this.filters,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -2542,6 +2538,9 @@ class UserNotePreferencesCompanion
     }
     if (hideCompleted.present) {
       map['hide_completed'] = Variable<bool>(hideCompleted.value);
+    }
+    if (collapseImages.present) {
+      map['collapse_images'] = Variable<bool>(collapseImages.value);
     }
     if (filters.present) {
       map['filters'] = Variable<String>(filters.value);
@@ -2569,6 +2568,7 @@ class UserNotePreferencesCompanion
           ..write('favorite: $favorite, ')
           ..write('archived: $archived, ')
           ..write('hideCompleted: $hideCompleted, ')
+          ..write('collapseImages: $collapseImages, ')
           ..write('filters: $filters, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -4713,7 +4713,6 @@ typedef $$NotesTableCreateCompanionBuilder =
       Value<bool> isDirty,
       Value<bool> hasRemoteCopy,
       Value<bool> noteIconDirty,
-      Value<bool> collapseImages,
       Value<String> lifecycleState,
       Value<String?> permission,
       Value<String?> sharedByEmail,
@@ -4733,7 +4732,6 @@ typedef $$NotesTableUpdateCompanionBuilder =
       Value<bool> isDirty,
       Value<bool> hasRemoteCopy,
       Value<bool> noteIconDirty,
-      Value<bool> collapseImages,
       Value<String> lifecycleState,
       Value<String?> permission,
       Value<String?> sharedByEmail,
@@ -4797,11 +4795,6 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<bool> get noteIconDirty => $composableBuilder(
     column: $table.noteIconDirty,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get collapseImages => $composableBuilder(
-    column: $table.collapseImages,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4890,11 +4883,6 @@ class $$NotesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get collapseImages => $composableBuilder(
-    column: $table.collapseImages,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get lifecycleState => $composableBuilder(
     column: $table.lifecycleState,
     builder: (column) => ColumnOrderings(column),
@@ -4964,11 +4952,6 @@ class $$NotesTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<bool> get collapseImages => $composableBuilder(
-    column: $table.collapseImages,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<String> get lifecycleState => $composableBuilder(
     column: $table.lifecycleState,
     builder: (column) => column,
@@ -5033,7 +5016,6 @@ class $$NotesTableTableManager
                 Value<bool> isDirty = const Value.absent(),
                 Value<bool> hasRemoteCopy = const Value.absent(),
                 Value<bool> noteIconDirty = const Value.absent(),
-                Value<bool> collapseImages = const Value.absent(),
                 Value<String> lifecycleState = const Value.absent(),
                 Value<String?> permission = const Value.absent(),
                 Value<String?> sharedByEmail = const Value.absent(),
@@ -5051,7 +5033,6 @@ class $$NotesTableTableManager
                 isDirty: isDirty,
                 hasRemoteCopy: hasRemoteCopy,
                 noteIconDirty: noteIconDirty,
-                collapseImages: collapseImages,
                 lifecycleState: lifecycleState,
                 permission: permission,
                 sharedByEmail: sharedByEmail,
@@ -5071,7 +5052,6 @@ class $$NotesTableTableManager
                 Value<bool> isDirty = const Value.absent(),
                 Value<bool> hasRemoteCopy = const Value.absent(),
                 Value<bool> noteIconDirty = const Value.absent(),
-                Value<bool> collapseImages = const Value.absent(),
                 Value<String> lifecycleState = const Value.absent(),
                 Value<String?> permission = const Value.absent(),
                 Value<String?> sharedByEmail = const Value.absent(),
@@ -5089,7 +5069,6 @@ class $$NotesTableTableManager
                 isDirty: isDirty,
                 hasRemoteCopy: hasRemoteCopy,
                 noteIconDirty: noteIconDirty,
-                collapseImages: collapseImages,
                 lifecycleState: lifecycleState,
                 permission: permission,
                 sharedByEmail: sharedByEmail,
@@ -5862,6 +5841,7 @@ typedef $$UserNotePreferencesTableCreateCompanionBuilder =
       Value<bool> favorite,
       Value<bool> archived,
       Value<bool> hideCompleted,
+      Value<bool> collapseImages,
       Value<String> filters,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -5875,6 +5855,7 @@ typedef $$UserNotePreferencesTableUpdateCompanionBuilder =
       Value<bool> favorite,
       Value<bool> archived,
       Value<bool> hideCompleted,
+      Value<bool> collapseImages,
       Value<String> filters,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -5913,6 +5894,11 @@ class $$UserNotePreferencesTableFilterComposer
 
   ColumnFilters<bool> get hideCompleted => $composableBuilder(
     column: $table.hideCompleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get collapseImages => $composableBuilder(
+    column: $table.collapseImages,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5971,6 +5957,11 @@ class $$UserNotePreferencesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get collapseImages => $composableBuilder(
+    column: $table.collapseImages,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get filters => $composableBuilder(
     column: $table.filters,
     builder: (column) => ColumnOrderings(column),
@@ -6015,6 +6006,11 @@ class $$UserNotePreferencesTableAnnotationComposer
 
   GeneratedColumn<bool> get hideCompleted => $composableBuilder(
     column: $table.hideCompleted,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get collapseImages => $composableBuilder(
+    column: $table.collapseImages,
     builder: (column) => column,
   );
 
@@ -6079,6 +6075,7 @@ class $$UserNotePreferencesTableTableManager
                 Value<bool> favorite = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 Value<bool> hideCompleted = const Value.absent(),
+                Value<bool> collapseImages = const Value.absent(),
                 Value<String> filters = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -6090,6 +6087,7 @@ class $$UserNotePreferencesTableTableManager
                 favorite: favorite,
                 archived: archived,
                 hideCompleted: hideCompleted,
+                collapseImages: collapseImages,
                 filters: filters,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -6103,6 +6101,7 @@ class $$UserNotePreferencesTableTableManager
                 Value<bool> favorite = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 Value<bool> hideCompleted = const Value.absent(),
+                Value<bool> collapseImages = const Value.absent(),
                 Value<String> filters = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -6114,6 +6113,7 @@ class $$UserNotePreferencesTableTableManager
                 favorite: favorite,
                 archived: archived,
                 hideCompleted: hideCompleted,
+                collapseImages: collapseImages,
                 filters: filters,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

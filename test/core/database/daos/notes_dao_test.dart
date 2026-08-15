@@ -205,6 +205,38 @@ void main() {
     await db.close();
   });
 
+  test('projects collapse_images from the preference join', () async {
+    final db = AppDatabase.test();
+    final now = DateTime(2026, 7, 6);
+
+    await db
+        .into(db.notes)
+        .insert(
+          NotesCompanion.insert(
+            id: 'collapse-note',
+            userId: 'user-1',
+            content: 'collapsed body',
+            createdAt: now,
+            updatedAt: now,
+            lifecycleState: const Value(materializedLifecycleState),
+          ),
+        );
+
+    await db.userNotePreferencesDao.setCollapseImages(
+      'user-1',
+      'collapse-note',
+      true,
+    );
+
+    final qr = await db.notesDao.getNoteWithPrefsById(
+      'collapse-note',
+      'user-1',
+    );
+    expect(qr!.collapseImages, isTrue);
+
+    await db.close();
+  });
+
   test('does not reset a materialized note on an empty upsert', () async {
     final db = AppDatabase.test();
     final now = DateTime(2026, 7, 6);

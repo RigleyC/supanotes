@@ -33,6 +33,18 @@ class UserNotePreferencesRepository {
       hideCompleted,
     );
   }
+
+  Future<void> setCollapseImages(
+    String userId,
+    String noteId,
+    bool collapseImages,
+  ) {
+    return _db.userNotePreferencesDao.setCollapseImages(
+      userId,
+      noteId,
+      collapseImages,
+    );
+  }
 }
 
 final userNotePreferencesRepositoryProvider =

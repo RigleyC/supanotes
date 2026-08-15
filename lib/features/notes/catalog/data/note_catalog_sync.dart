@@ -464,7 +464,6 @@ class NoteCatalogSync {
         ),
         isDirty: const Value(false),
         hasRemoteCopy: const Value(true),
-        collapseImages: Value(catalog.collapseImages),
         permission: _permissionValueFor(catalog),
         sharedByEmail: _sharedByEmailValueFor(catalog),
         sharedByName: _sharedByNameValueFor(catalog),
