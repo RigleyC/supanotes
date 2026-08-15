@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:super_editor/super_editor.dart';
 
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/editor/document/document_projection_applier.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
@@ -264,4 +265,90 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test(
+    'skips the rebuild and preserves composition when snapshot plus pending '
+    'ops already match the current document',
+    () async {
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'block-1', text: AttributedText('Hello sim'))],
+      );
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      final applier = DocumentProjectionApplier(
+        document: document,
+        editor: editor,
+        codec: const NoteDocumentCodec(),
+      );
+      var suppressCalls = 0;
+      var resumeCalls = 0;
+      var mirrorCalls = 0;
+
+      final before = DocumentSelection(
+        base: const DocumentPosition(
+          nodeId: 'block-1',
+          nodePosition: TextNodePosition(offset: 8),
+        ),
+        extent: const DocumentPosition(
+          nodeId: 'block-1',
+          nodePosition: TextNodePosition(offset: 10),
+        ),
+      );
+      editor.execute([
+        ChangeSelectionRequest(
+          before,
+          SelectionChangeType.placeCaret,
+          SelectionReason.userInteraction,
+        ),
+      ]);
+
+      await applier.rebuildFromSnapshot(
+        snapshot: const {
+          'blocks': [
+            {
+              'id': 'block-1',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'Hello'},
+              ],
+            },
+          ],
+        },
+        pendingOps: [
+          PendingNoteOperationData(
+            operationId: 'pending-1',
+            noteId: 'note-1',
+            baseRevision: 1,
+            ordinal: 0,
+            kind: NoteOperationWireNames.textDelta,
+            blockId: 'block-1',
+            payloadJson: '{"ops":[{"retain":5},{"insert":" sim"}]}',
+            createdAt: DateTime.utc(2026, 8, 15),
+            status: 'pending',
+            attemptCount: 0,
+          ),
+        ],
+        repairPersistedSnapshot: false,
+        suppressCapture: () => suppressCalls++,
+        resumeCapture: () => resumeCalls++,
+        rebuildMirror: () => mirrorCalls++,
+      );
+
+      expect(suppressCalls, 1);
+      expect(resumeCalls, 1);
+      expect(mirrorCalls, 1);
+      final node = document.getNodeById('block-1')! as TextNode;
+      expect(node.text.toPlainText(), 'Hello sim');
+      expect(composer.selection, isNotNull);
+      expect(composer.selection!.base.nodeId, 'block-1');
+      expect((composer.selection!.base.nodePosition as TextNodePosition).offset, 8);
+      expect(
+        (composer.selection!.extent.nodePosition as TextNodePosition).offset,
+        10,
+      );
+    },
+  );
 }

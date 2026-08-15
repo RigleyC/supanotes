@@ -336,6 +336,34 @@ class NoteOperationAdapter {
     );
   }
 
+  List<PendingNoteOperationData> _mergeInMemoryOps(
+    List<PendingNoteOperationData> persisted,
+  ) {
+    if (_pendingOps.isEmpty) return persisted;
+    final merged = List<PendingNoteOperationData>.from(persisted);
+    final startOrdinal = persisted.isEmpty
+        ? 0
+        : persisted.last.ordinal + 1;
+    var ordinal = startOrdinal;
+    for (final op in _pendingOps) {
+      merged.add(
+        PendingNoteOperationData(
+          operationId: op.operationId,
+          noteId: _noteId,
+          baseRevision: op.baseRevision,
+          ordinal: ordinal++,
+          kind: op.kind,
+          blockId: op.blockId,
+          payloadJson: jsonEncode(op.payload),
+          createdAt: DateTime.now().toUtc(),
+          attemptCount: 0,
+          status: '',
+        ),
+      );
+    }
+    return merged;
+  }
+
   Future<void> rebuildFromSnapshot({
     required Map<String, dynamic> snapshot,
     required List<PendingNoteOperationData>? rebasedOps,
@@ -345,6 +373,9 @@ class NoteOperationAdapter {
       NoteSyncDebug.log('adapter.rebuild.deferred_composing', noteId: _noteId);
       _pendingRebuild = _RebuildRequest(snapshot: snapshot, ops: rebasedOps);
       return;
+    }
+    if (rebasedOps != null) {
+      rebasedOps = _mergeInMemoryOps(rebasedOps);
     }
 
     NoteSyncDebug.log(

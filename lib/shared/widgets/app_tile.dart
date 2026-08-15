@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:motor/motor.dart';
 
 import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_press_scale.dart';
 
 /// Shared row for settings and task metadata flows.
 class AppTile extends StatefulWidget {
@@ -37,14 +37,13 @@ class AppTile extends StatefulWidget {
 }
 
 class _AppTileState extends State<AppTile> {
-  double _scale = 1;
+  bool _pressed = false;
 
   bool get _interactive => widget.enabled && widget.onTap != null;
 
   void _setPressed(bool pressed) {
-    final scale = pressed ? 0.96 : 1.0;
-    if (_scale == scale) return;
-    setState(() => _scale = scale);
+    if (_pressed == pressed) return;
+    setState(() => _pressed = pressed);
   }
 
   @override
@@ -126,11 +125,8 @@ class _AppTileState extends State<AppTile> {
         onTapDown: interactive ? (_) => _setPressed(true) : null,
         onTapUp: interactive ? (_) => _setPressed(false) : null,
         onTapCancel: interactive ? () => _setPressed(false) : null,
-        child: SingleMotionBuilder(
-          motion: CupertinoMotion.smooth(),
-          value: interactive ? _scale : 1,
-          builder: (context, scale, child) =>
-              Transform.scale(scale: scale, child: child),
+        child: AppPressScale(
+          pressed: interactive && _pressed,
           child: Container(
             constraints: const BoxConstraints(minHeight: AppSpacing.tileHeight),
             padding: widget.contentPadding,

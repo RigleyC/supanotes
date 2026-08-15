@@ -161,7 +161,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
     return TapRegion(
       groupId: noteEditorToolbarTapRegionGroup,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(30),
           child: BackdropFilter(

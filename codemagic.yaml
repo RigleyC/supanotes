@@ -35,8 +35,16 @@ workflows:
           flutter pub get
       - name: Calculate app version
         script: |
+          set -eu
           git fetch --tags --force
-          eval "$(dart run scripts/app_version.dart --build-number \"$BUILD_NUMBER\")"
+          VERSION_OUTPUT="$(dart run scripts/app_version.dart --build-number "${BUILD_NUMBER:?BUILD_NUMBER env var is required}")"
+          APP_VERSION="$(printf '%s\n' "$VERSION_OUTPUT" | sed -n 's/^APP_VERSION=//p' | tail -n 1)"
+          APP_BUILD_NUMBER="$(printf '%s\n' "$VERSION_OUTPUT" | sed -n 's/^APP_BUILD_NUMBER=//p' | tail -n 1)"
+          if [ -z "$APP_VERSION" ] || [ -z "$APP_BUILD_NUMBER" ]; then
+            echo "ERROR: failed to extract app version from output:"
+            printf '%s\n' "$VERSION_OUTPUT"
+            exit 1
+          fi
           echo "Building SupaNotes $APP_VERSION+$APP_BUILD_NUMBER"
           echo "APP_VERSION=$APP_VERSION" >> "$CM_ENV"
           echo "APP_BUILD_NUMBER=$APP_BUILD_NUMBER" >> "$CM_ENV"
@@ -120,8 +128,16 @@ workflows:
           flutter pub get
       - name: Calculate app version
         script: |
+          set -eu
           git fetch --tags --force
-          eval "$(dart run scripts/app_version.dart --build-number \"$BUILD_NUMBER\")"
+          VERSION_OUTPUT="$(dart run scripts/app_version.dart --build-number "${BUILD_NUMBER:?BUILD_NUMBER env var is required}")"
+          APP_VERSION="$(printf '%s\n' "$VERSION_OUTPUT" | sed -n 's/^APP_VERSION=//p' | tail -n 1)"
+          APP_BUILD_NUMBER="$(printf '%s\n' "$VERSION_OUTPUT" | sed -n 's/^APP_BUILD_NUMBER=//p' | tail -n 1)"
+          if [ -z "$APP_VERSION" ] || [ -z "$APP_BUILD_NUMBER" ]; then
+            echo "ERROR: failed to extract app version from output:"
+            printf '%s\n' "$VERSION_OUTPUT"
+            exit 1
+          fi
           echo "Building SupaNotes $APP_VERSION+$APP_BUILD_NUMBER"
           echo "APP_VERSION=$APP_VERSION" >> "$CM_ENV"
           echo "APP_BUILD_NUMBER=$APP_BUILD_NUMBER" >> "$CM_ENV"
@@ -133,7 +149,7 @@ workflows:
           keychain initialize
       - name: Fetch signing certificates and profiles
         script: |
-          app-store-connect fetch-signing-files "com.example.supanotes" \
+          app-store-connect fetch-signing-files "com.rigley.supanotes" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
@@ -142,12 +158,30 @@ workflows:
       - name: Use profiles
         script: |
           xcode-project use-profiles
+      - name: Write export options
+        script: |
+          cat > export_options.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>ad-hoc</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          PLIST
       - name: Build signed IPA
         script: |
           flutter build ipa --release \
             --build-name="$APP_VERSION" \
             --build-number="$APP_BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
-            --export-options-plist=/Users/builder/export_options.plist
+            --export-options-plist=export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa

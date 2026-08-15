@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motor/motor.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 
 import '../../helpers/haptic_test_helper.dart';
@@ -135,15 +134,19 @@ void main() {
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('Salvar')),
       );
-      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      await tester.pumpAndSettle();
 
-      final motion = tester.widget<SingleMotionBuilder>(
-        find.byType(SingleMotionBuilder),
+      final transformFind = find.descendant(
+        of: find.byType(AppButton),
+        matching: find.byType(Transform),
       );
-      expect(motion.value, lessThan(1));
+      final transform = tester.widget<Transform>(transformFind);
+      expect(transform.transform.storage[0], lessThan(1));
 
       await gesture.up();
-      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      await tester.pumpAndSettle();
     });
   });
 }

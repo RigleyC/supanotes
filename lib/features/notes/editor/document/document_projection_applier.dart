@@ -41,6 +41,24 @@ class DocumentProjectionApplier {
         'selection': previousSelection,
       },
     );
+
+    if (!repairPersistedSnapshot && _matchesCurrentEffectiveDoc(
+      snapshot: snapshot,
+      pendingOps: pendingOps,
+    )) {
+      NoteSyncDebug.log(
+        'projection.rebuild.skip_effective_doc',
+        fields: {
+          'pendingOperations': pendingOps?.length ?? 0,
+          'nodeCount': _document.nodeCount,
+          'selection': previousSelection,
+        },
+      );
+      rebuildMirror();
+      resumeCapture();
+      return;
+    }
+
     var rebuildCompleted = false;
     try {
       _editor.startTransaction();
@@ -298,6 +316,251 @@ class DocumentProjectionApplier {
       'completions': currentCompletions,
     });
     _replaceNode(targetId, newNode);
+  }
+
+  bool _matchesCurrentEffectiveDoc({
+    required Map<String, dynamic> snapshot,
+    required List<PendingNoteOperationData>? pendingOps,
+  }) {
+    final projected = _projectEffectiveBlocks(snapshot, pendingOps);
+    final current = _codec.encodeDocument(_document);
+    return _sameBlockList(projected, current);
+  }
+
+  List<Map<String, dynamic>> _projectEffectiveBlocks(
+    Map<String, dynamic> snapshot,
+    List<PendingNoteOperationData>? pendingOps,
+  ) {
+    final nodes = <DocumentNode>[];
+    final blocks = snapshot['blocks'] as List<dynamic>? ?? [];
+    if (blocks.isEmpty) {
+      nodes.add(
+        ParagraphNode(id: initialNoteBlockId, text: AttributedText()),
+      );
+    } else {
+      final insertedNodeIds = <String>{};
+      for (final block in blocks) {
+        final b = block as Map<String, dynamic>;
+        final node = _codec.decodeNode(b);
+        if (!insertedNodeIds.add(node.id)) continue;
+        nodes.add(node);
+      }
+    }
+
+    if (pendingOps != null) {
+      for (final op in pendingOps) {
+        final payload = jsonDecode(op.payloadJson) as Map<String, dynamic>;
+        _applyProjectedPayload(
+          nodes,
+          kind: op.kind,
+          blockId: op.blockId,
+          payload: payload,
+        );
+      }
+    }
+
+    return nodes.map((node) => _codec.encodeNode(node)).toList(growable: false);
+  }
+
+  void _applyProjectedPayload(
+    List<DocumentNode> nodes, {
+    required String kind,
+    required String? blockId,
+    required Map<String, dynamic> payload,
+  }) {
+    switch (kind) {
+      case NoteOperationWireNames.textDelta:
+        _projectTextDelta(nodes, blockId, payload);
+        break;
+      case NoteOperationWireNames.createBlock:
+        _projectCreateBlock(nodes, payload);
+        break;
+      case NoteOperationWireNames.deleteBlock:
+        _projectDeleteBlock(nodes, blockId);
+        break;
+      case NoteOperationWireNames.moveBlock:
+        _projectMoveBlock(nodes, blockId, payload);
+        break;
+      case NoteOperationWireNames.setBlockType:
+        _projectSetBlockType(nodes, blockId, payload);
+        break;
+      case NoteOperationWireNames.setBlockMetadata:
+        _projectSetBlockMetadata(nodes, blockId, payload);
+        break;
+      case NoteOperationWireNames.completeTaskOccurrence:
+        _projectCompleteTaskOccurrence(nodes, blockId, payload);
+        break;
+    }
+  }
+
+  void _projectTextDelta(
+    List<DocumentNode> nodes,
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    if (blockId == null) return;
+    final index = nodes.indexWhere((node) => node.id == blockId);
+    if (index < 0) return;
+    final node = nodes[index];
+    if (node is! TextNode) return;
+
+    final rawOps = payload['ops'] as List<dynamic>?;
+    if (rawOps == null) return;
+    final ops = rawOps.cast<Map<String, dynamic>>();
+    final newText = _codec.applyDeltaToText(node.text, ops);
+    if (newText == null) return;
+
+    nodes[index] = _createNodeWithUpdatedText(node, newText);
+  }
+
+  void _projectCreateBlock(
+    List<DocumentNode> nodes,
+    Map<String, dynamic> payload,
+  ) {
+    final node = _codec.decodeNode(payload);
+    if (nodes.any((existing) => existing.id == node.id)) return;
+
+    final afterBlockId = payload['afterBlockId'] as String?;
+    int insertIndex = nodes.length;
+    if (afterBlockId != null) {
+      final targetIndex = nodes.indexWhere((existing) => existing.id == afterBlockId);
+      if (targetIndex >= 0) {
+        insertIndex = targetIndex + 1;
+      }
+    } else {
+      insertIndex = 0;
+    }
+    nodes.insert(insertIndex.clamp(0, nodes.length), node);
+  }
+
+  void _projectDeleteBlock(List<DocumentNode> nodes, String? blockId) {
+    if (blockId == null) return;
+    final index = nodes.indexWhere((node) => node.id == blockId);
+    if (index >= 0 && nodes.length > 1) {
+      nodes.removeAt(index);
+    }
+  }
+
+  void _projectMoveBlock(
+    List<DocumentNode> nodes,
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    final moveBlockId = payload['blockId'] as String? ?? blockId;
+    if (moveBlockId == null) return;
+    final sourceIndex = nodes.indexWhere((node) => node.id == moveBlockId);
+    if (sourceIndex < 0 || nodes.length <= 1) return;
+
+    final afterBlockId = payload['afterBlockId'] as String?;
+    if (afterBlockId == moveBlockId) return;
+    int targetIndex = nodes.length - 1;
+    if (afterBlockId == null) {
+      targetIndex = 0;
+    } else {
+      final targetIndexInList = nodes.indexWhere((node) => node.id == afterBlockId);
+      if (targetIndexInList >= 0) {
+        targetIndex = targetIndexInList + 1;
+        if (sourceIndex < targetIndexInList) {
+          targetIndex -= 1;
+        }
+      }
+    }
+    final node = nodes.removeAt(sourceIndex);
+    nodes.insert(targetIndex.clamp(0, nodes.length), node);
+  }
+
+  void _projectSetBlockType(
+    List<DocumentNode> nodes,
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    if (blockId == null) return;
+    final index = nodes.indexWhere((node) => node.id == blockId);
+    if (index < 0) return;
+    final node = nodes[index];
+
+    final newType = payload['type'] as String? ?? 'paragraph';
+    final text = (node is TextNode) ? node.text : AttributedText();
+    final isComplete = (node is TaskNode) ? node.isComplete : false;
+    nodes[index] = _codec.createNodeFromBlockType(
+      nodeId: blockId,
+      type: newType,
+      text: text,
+      isTaskComplete: isComplete,
+      metadata: Map<String, dynamic>.from(node.metadata),
+    );
+  }
+
+  void _projectSetBlockMetadata(
+    List<DocumentNode> nodes,
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    if (blockId == null) return;
+    final index = nodes.indexWhere((node) => node.id == blockId);
+    if (index < 0) return;
+    final node = nodes[index];
+    final meta = payload['metadata'] as Map<String, dynamic>?;
+    if (meta == null) return;
+
+    nodes[index] = _createNodeWithUpdatedMetadata(node, meta);
+  }
+
+  void _projectCompleteTaskOccurrence(
+    List<DocumentNode> nodes,
+    String? blockId,
+    Map<String, dynamic> payload,
+  ) {
+    final targetId = blockId ?? payload['taskId'] as String?;
+    if (targetId == null) return;
+    final index = nodes.indexWhere((node) => node.id == targetId);
+    if (index < 0) return;
+    final node = nodes[index];
+    final scheduledAt = payload['scheduledAt'] as String?;
+    final completedAt = payload['completedAt'] as String?;
+    if (node is! TaskNode || scheduledAt == null) return;
+
+    final currentCompletions = Map<String, dynamic>.from(
+      node.metadata['completions'] as Map? ?? {},
+    );
+    if (completedAt != null && completedAt.isNotEmpty) {
+      currentCompletions[scheduledAt] = completedAt;
+    } else {
+      currentCompletions.remove(scheduledAt);
+    }
+    nodes[index] = _createNodeWithUpdatedMetadata(node, {
+      'completions': currentCompletions,
+    });
+  }
+
+  static bool _sameBlockList(
+    List<Map<String, dynamic>> a,
+    List<Map<String, dynamic>> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!_sameJsonValue(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  static bool _sameJsonValue(dynamic a, dynamic b) {
+    if (a is Map && b is Map) {
+      if (a.length != b.length) return false;
+      for (final entry in a.entries) {
+        if (!b.containsKey(entry.key)) return false;
+        if (!_sameJsonValue(entry.value, b[entry.key])) return false;
+      }
+      return true;
+    }
+    if (a is List && b is List) {
+      if (a.length != b.length) return false;
+      for (var i = 0; i < a.length; i++) {
+        if (!_sameJsonValue(a[i], b[i])) return false;
+      }
+      return true;
+    }
+    return a == b;
   }
 
   DocumentSelection? _selectionAfterRebuild(DocumentSelection? previous) {

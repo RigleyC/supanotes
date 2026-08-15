@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:motor/motor.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/shared/widgets/app_press_scale.dart';
 
 enum AppButtonVariant { primary, secondary, tonal, danger, text, fab }
 
@@ -27,20 +27,22 @@ class AppButton extends StatefulWidget {
 }
 
 class _AppButtonState extends State<AppButton> {
-  double _scale = 1;
+  bool _pressed = false;
 
   @override
   void didUpdateWidget(covariant AppButton oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isLoading || widget.onPressed == null) _scale = 1;
+    if (widget.isLoading || widget.onPressed == null) {
+      _pressed = false;
+    }
   }
 
   void _setPressed(bool pressed) {
     if (widget.isLoading || widget.onPressed == null) {
-      if (_scale != 1) setState(() => _scale = 1);
+      if (_pressed) setState(() => _pressed = false);
       return;
     }
-    setState(() => _scale = pressed ? 0.96 : 1);
+    setState(() => _pressed = pressed);
   }
 
   @override
@@ -66,13 +68,8 @@ class _AppButtonState extends State<AppButton> {
       onPointerDown: (_) => _setPressed(true),
       onPointerUp: (_) => _setPressed(false),
       onPointerCancel: (_) => _setPressed(false),
-      child: SingleMotionBuilder(
-        motion: CupertinoMotion.smooth(),
-        value: _scale,
-        builder: (context, scale, child) => Transform.scale(
-          scale: scale,
-          child: child,
-        ),
+      child: AppPressScale(
+        pressed: _pressed,
         child: _AppButtonLayout(
           variant: widget.variant,
           width: widget.width,

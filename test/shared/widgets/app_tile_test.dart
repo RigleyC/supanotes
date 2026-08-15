@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:motor/motor.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
 
 import '../../helpers/haptic_test_helper.dart';
@@ -215,19 +214,21 @@ void main() {
     final gesture = await tester.startGesture(
       tester.getCenter(find.text('Data')),
     );
-    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    await tester.pumpAndSettle();
 
-    final pressedMotion = tester.widget<SingleMotionBuilder>(
-      find.byType(SingleMotionBuilder),
+    final pressedFind = find.descendant(
+      of: find.byType(AppTile),
+      matching: find.byType(Transform),
     );
-    expect(pressedMotion.value, lessThan(1));
+    final pressedTransform = tester.widget<Transform>(pressedFind);
+    expect(pressedTransform.transform.storage[0], lessThan(1));
 
     await gesture.up();
-    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    await tester.pumpAndSettle();
 
-    final releasedMotion = tester.widget<SingleMotionBuilder>(
-      find.byType(SingleMotionBuilder),
-    );
-    expect(releasedMotion.value, 1);
+    final releasedTransform = tester.widget<Transform>(pressedFind);
+    expect(releasedTransform.transform.storage[0], closeTo(1, 0.001));
   });
 }
