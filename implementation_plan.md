@@ -267,16 +267,3 @@ Scope includes the shared control defaults, the `GlobalSheetHeader`, all
 controls inside the task metadata sheet, all controls inside the emoji/icon
 picker sheets, and normalization of the existing editor haptic calls. The
 plan keeps native picker feedback and feature-owned scrolling unchanged.
-
-## Progressive content fade
-
-Status: implemented and focused validation complete.
-
-The design and execution plan are in
-`docs/superpowers/specs/2026-08-14-progressive-content-fade-design.md` and
-`docs/superpowers/plans/2026-08-14-progressive-content-fade.md`.
-
-1. [x] Add a bounds-based shared `ProgressiveFade`.
-2. [x] Replace AppBar background gradients with content opacity masks.
-3. [x] Apply the mask to the notes list and note editor viewports.
-4. [x] Add focused regression coverage and run static analysis.

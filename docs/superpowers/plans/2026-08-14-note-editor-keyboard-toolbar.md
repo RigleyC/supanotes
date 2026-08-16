@@ -232,9 +232,9 @@ Expected: geometry or property assertion fails because the body currently extend
 
 Wrap the screen `Scaffold` with `KeyboardScaffoldSafeArea`. Set `resizeToAvoidBottomInset: false` and remove `extendBodyBehindAppBar: true`. Remove the redundant top `SafeArea` around the body. Keep top visual treatment inside the AppBar instead of changing the editor viewport.
 
-- [ ] **Step 4: Remove the editor-wide top fade from this screen**
+- [ ] **Step 4: Keep the top of the editor viewport clean**
 
-Remove `ProgressiveFade` from `_NoteEditorBody`. Do not delete or edit the shared widget because it has unrelated local work. If a top transition remains required, implement it in `_NoteEditorAppBar` with a surface color or AppBar-owned decoration.
+Keep any top visual treatment inside the `_NoteEditorAppBar` with a surface color or AppBar-owned decoration, instead of changing the editor viewport.
 
 - [ ] **Step 5: Run screen and editor layout tests**
 

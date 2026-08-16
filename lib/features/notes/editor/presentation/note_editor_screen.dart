@@ -26,7 +26,6 @@ import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.d
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
-import 'package:supanotes/shared/widgets/progressive_fade.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String noteId;
@@ -77,15 +76,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           screenIsReadOnly: screenIsReadOnly,
           sessionAsync: sessionAsync,
         ),
-        body: ProgressiveFade(
-          child: _NoteEditorBody(
-            noteId: widget.noteId,
-            attachmentDelivery: widget.attachmentDelivery,
-            noteAsync: noteAsync,
-            sessionAsync: sessionAsync,
-            taskForMetadata: _taskForMetadata,
-            readSession: _readSession,
-          ),
+        body: _NoteEditorBody(
+          noteId: widget.noteId,
+          attachmentDelivery: widget.attachmentDelivery,
+          noteAsync: noteAsync,
+          sessionAsync: sessionAsync,
+          taskForMetadata: _taskForMetadata,
+          readSession: _readSession,
         ),
       ),
     );

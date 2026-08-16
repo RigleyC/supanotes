@@ -171,18 +171,3 @@ Verification:
 - Windows debug build: passed.
 - Controlled `flutter run -d windows --debug`: reached VM service attachment
   with no `FormatException` or note-session startup error.
-
-## Progressive content fade
-
-The AppBar background gradient was removed because it painted a background
-over the document and did not change document opacity. The notes list and note
-editor now use a shared `ProgressiveFade` below their transparent AppBars.
-The mask follows `kToolbarHeight` and fades the AppBar's 56-pixel content
-region through 20%, 40%, 60%, 80%, and 100% opacity. The top stays partially
-visible instead of becoming fully transparent.
-
-Focused verification:
-
-- Progressive fade tests: 2 passed.
-- Progressive fade plus editor layout tests: 5 passed.
-- Static analysis of the changed Dart files: no issues found.

@@ -17,7 +17,6 @@ import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_list
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
 
 import 'package:supanotes/shared/widgets/app_error_view.dart';
-import 'package:supanotes/shared/widgets/progressive_fade.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_more_menu.dart';
@@ -66,7 +65,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final trimmedSearchQuery = _searchQuery.trim();
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -119,25 +117,23 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
-                  child: ProgressiveFade(
-                    child: isGridView
-                        ? NotesGridView(
-                            key: const ValueKey('grid'),
-                            notes: filteredNotes,
-                            onTap: _openNote,
-                            onDelete: _deleteNote,
-                            onToggleFavorite: _toggleFavorite,
-                            onEditIcon: _editNoteIcon,
-                          )
-                        : NotesListView(
-                            key: const ValueKey('list'),
-                            notes: filteredNotes,
-                            onTap: _openNote,
-                            onDelete: _deleteNote,
-                            onToggleFavorite: _toggleFavorite,
-                            onEditIcon: _editNoteIcon,
-                          ),
-                  ),
+                  child: isGridView
+                      ? NotesGridView(
+                          key: const ValueKey('grid'),
+                          notes: filteredNotes,
+                          onTap: _openNote,
+                          onDelete: _deleteNote,
+                          onToggleFavorite: _toggleFavorite,
+                          onEditIcon: _editNoteIcon,
+                        )
+                      : NotesListView(
+                          key: const ValueKey('list'),
+                          notes: filteredNotes,
+                          onTap: _openNote,
+                          onDelete: _deleteNote,
+                          onToggleFavorite: _toggleFavorite,
+                          onEditIcon: _editNoteIcon,
+                        ),
                 ),
               ],
             );
