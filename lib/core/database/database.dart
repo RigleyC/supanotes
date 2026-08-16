@@ -59,6 +59,41 @@ WHERE collapse_images = 1
   AND lifecycle_state <> '$materializedLifecycleState';
 ''';
 
+Future<bool> _tableHasColumn(
+  AppDatabase db,
+  String tableName,
+  String columnName,
+) async {
+  final columns = await db.customSelect('PRAGMA table_info($tableName)').get();
+  return columns.any((column) => column.data['name'] == columnName);
+}
+
+/// Moves `collapse_images` from the shared `notes` column into each note
+/// owner's `user_note_preferences` row. The old value is preserved
+/// locally and marked dirty so the owner's preference is pushed to the
+/// backend instead of being overwritten by another device. Extracted as a
+/// top-level function so the v29→v30 upgrade can be exercised directly.
+Future<void> migratePerUserCollapse(
+  AppDatabase db,
+  Migrator m,
+  int from,
+) async {
+  if (from < 30) {
+    if (!await _tableHasColumn(
+      db,
+      'user_note_preferences',
+      'collapse_images',
+    )) {
+      await m.addColumn(
+        db.userNotePreferences,
+        db.userNotePreferences.collapseImages,
+      );
+    }
+    await db.customStatement(perUserCollapseBackfillSql);
+    await db.customStatement('ALTER TABLE notes DROP COLUMN collapse_images');
+  }
+}
+
 @DriftDatabase(
   tables: [
     Notes,
@@ -185,24 +220,7 @@ class AppDatabase extends _$AppDatabase {
     await _migrateSyncStorage(m, from);
     await _migrateNoteMetadata(m, from);
     await _migrateEffectiveDocuments(m, from);
-    await _migratePerUserCollapse(m, from);
-  }
-
-  /// Moves `collapse_images` from the shared `notes` column into each note
-  /// owner's `user_note_preferences` row. The old value is preserved
-  /// locally and marked dirty so the owner's preference is pushed to the
-  /// backend instead of being overwritten by another device.
-  Future<void> _migratePerUserCollapse(Migrator m, int from) async {
-    if (from < 30) {
-      await _addColumnIfMissing(
-        m,
-        userNotePreferences,
-        'user_note_preferences',
-        userNotePreferences.collapseImages,
-      );
-      await customStatement(perUserCollapseBackfillSql);
-      await customStatement('ALTER TABLE notes DROP COLUMN collapse_images');
-    }
+    await migratePerUserCollapse(this, m, from);
   }
 
   Future<void> _migrateEffectiveDocuments(Migrator m, int from) async {
@@ -229,8 +247,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<bool> _hasColumn(String tableName, String columnName) async {
-    final columns = await customSelect('PRAGMA table_info($tableName)').get();
-    return columns.any((column) => column.data['name'] == columnName);
+    return _tableHasColumn(this, tableName, columnName);
   }
 
   Future<void> _addColumnIfMissing(

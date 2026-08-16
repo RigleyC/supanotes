@@ -48,93 +48,45 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
         .write(const UserNotePreferencesCompanion(isDirty: Value(false)));
   }
 
-  Future<void> setFavorite(String userId, String noteId, bool favorite) async {
-    final now = DateTime.now();
-    await _writePreference(
-      noteId: noteId,
-      materialized: favorite,
-      insertion: UserNotePreferencesCompanion.insert(
+  Future<void> setFavorite(String userId, String noteId, bool favorite) =>
+      _writePreference(
         userId: userId,
         noteId: noteId,
-        favorite: Value(favorite),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-      update: UserNotePreferencesCompanion(
-        favorite: Value(favorite),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-    );
-  }
+        changes: UserNotePreferencesCompanion(favorite: Value(favorite)),
+      );
 
-  Future<void> setArchived(String userId, String noteId, bool archived) async {
-    final now = DateTime.now();
-    await _writePreference(
-      noteId: noteId,
-      materialized: archived,
-      insertion: UserNotePreferencesCompanion.insert(
+  Future<void> setArchived(String userId, String noteId, bool archived) =>
+      _writePreference(
         userId: userId,
         noteId: noteId,
-        archived: Value(archived),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-      update: UserNotePreferencesCompanion(
-        archived: Value(archived),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-    );
-  }
+        changes: UserNotePreferencesCompanion(archived: Value(archived)),
+      );
 
   Future<void> setHideCompleted(
     String userId,
     String noteId,
     bool hideCompleted,
-  ) async {
-    final now = DateTime.now();
-    await _writePreference(
-      noteId: noteId,
-      materialized: hideCompleted,
-      insertion: UserNotePreferencesCompanion.insert(
+  ) =>
+      _writePreference(
         userId: userId,
         noteId: noteId,
-        hideCompleted: Value(hideCompleted),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-      update: UserNotePreferencesCompanion(
-        hideCompleted: Value(hideCompleted),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-    );
-  }
+        changes: UserNotePreferencesCompanion(
+          hideCompleted: Value(hideCompleted),
+        ),
+      );
 
   Future<void> setCollapseImages(
     String userId,
     String noteId,
     bool collapseImages,
-  ) async {
-    final now = DateTime.now();
-    await _writePreference(
-      noteId: noteId,
-      materialized: collapseImages,
-      insertion: UserNotePreferencesCompanion.insert(
+  ) =>
+      _writePreference(
         userId: userId,
         noteId: noteId,
-        collapseImages: Value(collapseImages),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-      update: UserNotePreferencesCompanion(
-        collapseImages: Value(collapseImages),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-    );
-  }
+        changes: UserNotePreferencesCompanion(
+          collapseImages: Value(collapseImages),
+        ),
+      );
 
   /// Writes all four preference fields as a single dirty row so a synced
   /// device applies and pushes them together.
@@ -145,31 +97,17 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
     required bool archived,
     required bool hideCompleted,
     required bool collapseImages,
-  }) async {
-    final now = DateTime.now();
-    await _writePreference(
-      noteId: noteId,
-      materialized: favorite || archived || hideCompleted || collapseImages,
-      insertion: UserNotePreferencesCompanion.insert(
+  }) =>
+      _writePreference(
         userId: userId,
         noteId: noteId,
-        favorite: Value(favorite),
-        archived: Value(archived),
-        hideCompleted: Value(hideCompleted),
-        collapseImages: Value(collapseImages),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-      update: UserNotePreferencesCompanion(
-        favorite: Value(favorite),
-        archived: Value(archived),
-        hideCompleted: Value(hideCompleted),
-        collapseImages: Value(collapseImages),
-        updatedAt: Value(now),
-        isDirty: const Value(true),
-      ),
-    );
-  }
+        changes: UserNotePreferencesCompanion(
+          favorite: Value(favorite),
+          archived: Value(archived),
+          hideCompleted: Value(hideCompleted),
+          collapseImages: Value(collapseImages),
+        ),
+      );
 
   /// Applies a complete remote preference row, but only when the local row
   /// is clean. Returns `false` and leaves the local row untouched when an
@@ -187,7 +125,7 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
       final local = await getPreference(userId, noteId);
       if (local != null && local.isDirty) return false;
 
-      final update = UserNotePreferencesCompanion(
+      final remote = UserNotePreferencesCompanion(
         favorite: Value(favorite),
         archived: Value(archived),
         hideCompleted: Value(hideCompleted),
@@ -195,41 +133,59 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
         updatedAt: Value(remoteUpdatedAt),
         isDirty: const Value(false),
       );
-      await into(userNotePreferences)
-          .insert(
-            UserNotePreferencesCompanion.insert(
-              userId: userId,
-              noteId: noteId,
-              favorite: Value(favorite),
-              archived: Value(archived),
-              hideCompleted: Value(hideCompleted),
-              collapseImages: Value(collapseImages),
-              updatedAt: Value(remoteUpdatedAt),
-              isDirty: const Value(false),
-            ),
-            onConflict: DoUpdate((_) => update),
-          );
-
-      if (favorite || archived || hideCompleted || collapseImages) {
-        await attachedDatabase.noteLifecycleDao.markMaterialized(noteId);
-      }
+      await _writeRow(
+        insertion: remote.copyWith(
+          userId: Value(userId),
+          noteId: Value(noteId),
+        ),
+        update: remote,
+        noteId: noteId,
+      );
       return true;
     });
   }
 
   Future<void> _writePreference({
+    required String userId,
     required String noteId,
-    required bool materialized,
-    required UserNotePreferencesCompanion insertion,
-    required UserNotePreferencesCompanion update,
+    required UserNotePreferencesCompanion changes,
   }) async {
+    final now = DateTime.now();
+    final update = changes.copyWith(
+      updatedAt: Value(now),
+      isDirty: const Value(true),
+    );
     await attachedDatabase.transaction(() async {
-      await into(
-        userNotePreferences,
-      ).insert(insertion, onConflict: DoUpdate((_) => update));
-      if (materialized) {
-        await attachedDatabase.noteLifecycleDao.markMaterialized(noteId);
-      }
+      await _writeRow(
+        insertion: update.copyWith(
+          userId: Value(userId),
+          noteId: Value(noteId),
+        ),
+        update: update,
+        noteId: noteId,
+      );
     });
   }
+
+  /// Inserts or replaces a preference row and materializes the note when the
+  /// new state keeps it visible. `update` doubles as the conflict target, so
+  /// a concurrent row is overwritten with the exact state being written.
+  Future<void> _writeRow({
+    required UserNotePreferencesCompanion insertion,
+    required UserNotePreferencesCompanion update,
+    required String noteId,
+  }) async {
+    await into(
+      userNotePreferences,
+    ).insert(insertion, onConflict: DoUpdate((_) => update));
+    if (_anyMaterializing(update)) {
+      await attachedDatabase.noteLifecycleDao.markMaterialized(noteId);
+    }
+  }
+
+  bool _anyMaterializing(UserNotePreferencesCompanion changes) =>
+      (changes.favorite.present && changes.favorite.value) ||
+      (changes.archived.present && changes.archived.value) ||
+      (changes.hideCompleted.present && changes.hideCompleted.value) ||
+      (changes.collapseImages.present && changes.collapseImages.value);
 }

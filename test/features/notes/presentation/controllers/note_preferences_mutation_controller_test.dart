@@ -106,7 +106,7 @@ void main() {
       preferences.nextHideCompletedWrite = (_) async {
         throw StateError('hide failed');
       };
-      notes.nextUpdateNoteWrite = (_) async {
+      preferences.nextCollapseImagesWrite = (_) async {
         await secondWrite.future;
       };
 
@@ -163,6 +163,7 @@ class _FakePreferencesRepository implements UserNotePreferencesRepository {
 
   final _FakeNotesRepository notes;
   Future<void> Function(bool value)? nextHideCompletedWrite;
+  Future<void> Function(bool value)? nextCollapseImagesWrite;
 
   @override
   Future<void> setHideCompleted(
@@ -180,6 +181,21 @@ class _FakePreferencesRepository implements UserNotePreferencesRepository {
   }
 
   @override
+  Future<void> setCollapseImages(
+    String userId,
+    String noteId,
+    bool collapseImages,
+  ) async {
+    final write = nextCollapseImagesWrite;
+    nextCollapseImagesWrite = null;
+    if (write != null) {
+      await write(collapseImages);
+      return;
+    }
+    notes.applyCollapseImages(collapseImages);
+  }
+
+  @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -187,10 +203,13 @@ class _FakeNotesRepository implements INotesRepository {
   _FakeNotesRepository(this.note);
 
   NoteModel note;
-  Future<void> Function(bool? collapseImages)? nextUpdateNoteWrite;
 
   void applyHideCompleted(bool value) {
     note = note.copyWith(hideCompleted: value);
+  }
+
+  void applyCollapseImages(bool value) {
+    note = note.copyWith(collapseImages: value);
   }
 
   @override
@@ -199,11 +218,6 @@ class _FakeNotesRepository implements INotesRepository {
     String? content,
     bool? collapseImages,
   }) async {
-    final write = nextUpdateNoteWrite;
-    nextUpdateNoteWrite = null;
-    if (write != null) {
-      await write(collapseImages);
-    }
     if (collapseImages != null) {
       note = note.copyWith(collapseImages: collapseImages);
     }

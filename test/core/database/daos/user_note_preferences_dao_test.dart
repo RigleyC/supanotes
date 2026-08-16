@@ -120,8 +120,8 @@ void main() {
     test('preserves the old local collapse value under its owner preference', () async {
       final db = AppDatabase.test();
 
-      // Recreate the v29 shapes the migration reads, writes and drops on one
-      // open connection, then run the production backfill SQL verbatim.
+      // Recreate the v29 shapes the migration reads, writes and drops, then
+      // run the real migration step `_onUpgrade` executes.
       await db.customStatement(
         'ALTER TABLE notes ADD COLUMN collapse_images INTEGER NOT NULL DEFAULT 0',
       );
@@ -135,12 +135,7 @@ void main() {
         "VALUES ('migrated-note', 'owner-1', '', strftime('%s', 'now'), "
         "strftime('%s', 'now'), 1, '$materializedLifecycleState', 1)",
       );
-      await db.customStatement(
-        'ALTER TABLE user_note_preferences '
-        'ADD COLUMN collapse_images INTEGER NOT NULL DEFAULT 0',
-      );
-      await db.customStatement(perUserCollapseBackfillSql);
-      await db.customStatement('ALTER TABLE notes DROP COLUMN collapse_images');
+      await migratePerUserCollapse(db, Migrator(db), 29);
 
       final pref = await db.userNotePreferencesDao
           .getPreference('owner-1', 'migrated-note');

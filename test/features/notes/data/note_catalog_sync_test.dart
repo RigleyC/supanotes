@@ -758,7 +758,6 @@ void main() {
           'shared_by_name': 'Owner',
           'created_at': '2026-07-31T12:00:00.000Z',
           'updated_at': '2026-07-31T12:00:00.000Z',
-          'collapse_images': true,
         },
       ],
     );
@@ -805,7 +804,6 @@ void main() {
       'viewer-user',
     );
     expect(query!.title, 'Shared');
-    expect(query.collapseImages, isTrue);
     final document =
         await (database.select(database.localNoteDocuments)
               ..where((document) => document.noteId.equals('shared-view-note')))
