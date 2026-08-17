@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
 import 'snack.dart';
 import 'snack_overlay.dart';
 
@@ -10,6 +11,7 @@ void showExpressiveSnack({
   SnackBarAction? action,
   Duration duration = const Duration(seconds: 4),
 }) {
+  AppHaptics.snackbar();
   final snack = Snack(
     title: title,
     subtitle: subtitle,

@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:flutter/physics.dart';
 import 'package:motor/motor.dart';
+import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/shared/theme/app_colors.dart';
 
 import 'snack.dart';
 import 'snack_overlay.dart';
@@ -290,6 +291,7 @@ class _Pill extends StatelessWidget {
                 const SizedBox(width: 12),
                 TextButton(
                   onPressed: () {
+                    AppHaptics.controlTap();
                     snack.action!.onPressed();
                     onTap();
                   },

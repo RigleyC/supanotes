@@ -10,9 +10,11 @@ class AppTile extends StatefulWidget {
     super.key,
     required this.title,
     this.subtitle,
+    this.subtitleWidget,
     this.leading,
     this.trailing,
     this.onTap,
+    this.onLongPress,
     this.enableHaptics = true,
     this.enabled = true,
     this.selected = false,
@@ -24,9 +26,11 @@ class AppTile extends StatefulWidget {
 
   final String title;
   final String? subtitle;
+  final Widget? subtitleWidget;
   final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final bool enableHaptics;
   final bool enabled;
   final bool selected;
@@ -39,7 +43,8 @@ class AppTile extends StatefulWidget {
 class _AppTileState extends State<AppTile> {
   bool _pressed = false;
 
-  bool get _interactive => widget.enabled && widget.onTap != null;
+  bool get _interactive =>
+      widget.enabled && (widget.onTap != null || widget.onLongPress != null);
 
   void _setPressed(bool pressed) {
     if (_pressed == pressed) return;
@@ -70,38 +75,15 @@ class _AppTileState extends State<AppTile> {
           ? scheme.onSurfaceVariant
           : scheme.onSurface.withValues(alpha: 0.38),
     );
-    final leading = switch (widget.leading) {
-      null => null,
-      final Icon icon =>
-        widget.selected
-            ? Icon(
-                icon.icon,
-                key: icon.key,
-                size: icon.size ?? AppSpacing.tileIconSize,
-                fill: icon.fill,
-                weight: icon.weight,
-                grade: icon.grade,
-                opticalSize: icon.opticalSize,
-                color: leadingColor,
-                shadows: icon.shadows,
-                semanticLabel: icon.semanticLabel,
-                textDirection: icon.textDirection,
-                applyTextScaling: icon.applyTextScaling,
-                blendMode: icon.blendMode,
-                fontWeight: icon.fontWeight,
-              )
-            : IconTheme.merge(
-                data: IconThemeData(
-                  color: leadingColor,
-                  size: AppSpacing.tileIconSize,
-                ),
-                child: icon,
-              ),
-      final leadingWidget => IconTheme.merge(
-        data: IconThemeData(color: leadingColor, size: AppSpacing.tileIconSize),
-        child: leadingWidget,
-      ),
-    };
+    final leading = widget.leading != null
+        ? IconTheme.merge(
+            data: IconThemeData(
+              color: leadingColor,
+              size: AppSpacing.tileIconSize,
+            ),
+            child: widget.leading!,
+          )
+        : null;
     final trailing = widget.selected && widget.trailing == null
         ? Icon(
             Icons.check_rounded,
@@ -109,22 +91,40 @@ class _AppTileState extends State<AppTile> {
             color: foreground,
           )
         : widget.trailing;
+    final subtitle = widget.subtitleWidget ??
+        (widget.subtitle != null
+            ? Text(
+                widget.subtitle!,
+                style: subtitleStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
+            : null);
     final interactive = _interactive;
 
     return Semantics(
-      button: widget.onTap != null,
+      button: widget.onTap != null || widget.onLongPress != null,
       enabled: widget.enabled,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: interactive
+        onTapDown: interactive ? (_) => _setPressed(true) : null,
+        onTapUp: interactive ? (_) => _setPressed(false) : null,
+        onTapCancel: interactive ? () => _setPressed(false) : null,
+        onTap: widget.enabled && widget.onTap != null
             ? () {
                 if (widget.enableHaptics) AppHaptics.controlTap();
                 widget.onTap!();
               }
             : null,
-        onTapDown: interactive ? (_) => _setPressed(true) : null,
-        onTapUp: interactive ? (_) => _setPressed(false) : null,
-        onTapCancel: interactive ? () => _setPressed(false) : null,
+        onLongPressDown: interactive ? (_) => _setPressed(true) : null,
+        onLongPressEnd: interactive ? (_) => _setPressed(false) : null,
+        onLongPressCancel: interactive ? () => _setPressed(false) : null,
+        onLongPress: widget.enabled && widget.onLongPress != null
+            ? () {
+                if (widget.enableHaptics) AppHaptics.longPress();
+                widget.onLongPress!();
+              }
+            : null,
         child: AppPressScale(
           pressed: interactive && _pressed,
           child: Container(
@@ -142,9 +142,13 @@ class _AppTileState extends State<AppTile> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.title, style: titleStyle),
-                      if (widget.subtitle != null)
-                        Text(widget.subtitle!, style: subtitleStyle),
+                      Text(
+                        widget.title,
+                        style: titleStyle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      ?subtitle,
                     ],
                   ),
                 ),

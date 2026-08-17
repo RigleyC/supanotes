@@ -34,4 +34,16 @@ void main() {
 
     expect(recorder.count('HapticFeedbackType.mediumImpact'), 1);
   });
+
+  test('sends a medium impact on long press', () async {
+    await AppHaptics.longPress();
+
+    expect(recorder.count('HapticFeedbackType.mediumImpact'), 1);
+  });
+
+  test('sends light impact for snackbar', () async {
+    await AppHaptics.snackbar();
+
+    expect(recorder.count('HapticFeedbackType.lightImpact'), 1);
+  });
 }

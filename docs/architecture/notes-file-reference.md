@@ -23,9 +23,8 @@ esse estado é documentada no controller, provider ou repositório indicado.
 | `catalog/application/notes_providers.dart` | `activeNotesProvider`, `noteWithTasksProvider` | Convertem os streams do repositório em `AsyncValue`; a tela não decide como consultar Drift. |
 | `catalog/presentation/notes_list_screen.dart` | `NotesListScreen` | `_openSearch`/`_closeSearch` controlam somente UI; `_onSearchQueryChanged` aplica debounce; `_openNewNote`, `_deleteNote`, `_toggleFavorite` delegam ao repositório; `build` combina `AsyncValue` com grid/lista. |
 | `catalog/presentation/widgets/notes_grid_view.dart` | `NotesGridView` | `build` apenas distribui `NoteCard` em grid; callbacks continuam pertencendo à tela. |
-| `catalog/presentation/widgets/notes_list_view.dart` | `NotesListView` | `build` distribui `NoteListRow` em lista. |
+| `catalog/presentation/widgets/notes_list_view.dart` | `NotesListView` | `build` distribui `AppTile` envolvido em `Dismissible` em lista. |
 | `catalog/presentation/widgets/note_card.dart` | `NoteCard` | `build` exibe resumo; `_confirmDelete` pede confirmação antes de delegar exclusão. |
-| `catalog/presentation/widgets/note_list_row.dart` | `NoteListRow` | `build` exibe título, excerpt, favorito e compartilhamento; não busca dados adicionais. |
 | `catalog/presentation/widgets/notes_more_menu.dart` | `NotesMoreMenu` | `build` oferece modo de exibição, settings e logout; não implementa essas ações. |
 
 ## Editor: application

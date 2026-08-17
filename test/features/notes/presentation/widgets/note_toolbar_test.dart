@@ -72,8 +72,31 @@ void main() {
       expect(find.bySemanticsLabel('Título 2'), findsOneWidget);
       expect(find.bySemanticsLabel('Título 3'), findsOneWidget);
       expect(find.bySemanticsLabel('Citação'), findsOneWidget);
+      expect(find.bySemanticsLabel('Task'), findsOneWidget);
       expect(find.bySemanticsLabel('Inserir divisor'), findsOneWidget);
       expect(find.bySemanticsLabel('Negrito'), findsNothing);
+    });
+
+    testWidgets('converts a paragraph to task from normal toolbar', (
+      tester,
+    ) async {
+      final harness = buildToolbarHarness(
+        nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Todo'))],
+        selection: caretSelection('node-1'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Task'));
+      await tester.pumpAndSettle();
+
+      final node = harness.document.getNodeById('node-1');
+      expect(node, isA<TaskNode>());
+      expect((node as TaskNode).text.toPlainText(), 'Todo');
     });
 
     testWidgets('converts a paragraph to H1', (tester) async {

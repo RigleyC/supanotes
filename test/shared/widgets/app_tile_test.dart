@@ -76,7 +76,7 @@ void main() {
     expect(find.byIcon(Icons.check_rounded), findsOneWidget);
   });
 
-  testWidgets('recolors an explicitly colored leading icon when selected', (
+  testWidgets('applies selected color to leading icon via IconTheme', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -85,15 +85,17 @@ void main() {
           body: AppTile(
             title: 'Hoje',
             selected: true,
-            leading: const Icon(Icons.calendar_today, color: Colors.grey),
+            leading: const Icon(Icons.calendar_today),
           ),
         ),
       ),
     );
 
-    final icon = tester.widget<Icon>(find.byIcon(Icons.calendar_today));
+    final iconTheme = IconTheme.of(
+      tester.element(find.byIcon(Icons.calendar_today)),
+    );
     expect(
-      icon.color,
+      iconTheme.color,
       Theme.of(tester.element(find.byType(AppTile))).colorScheme.primary,
     );
   });
@@ -230,5 +232,48 @@ void main() {
 
     final releasedTransform = tester.widget<Transform>(pressedFind);
     expect(releasedTransform.transform.storage[0], closeTo(1, 0.001));
+  });
+
+  testWidgets('calls onLongPress and plays mediumImpact haptic when enabled', (
+    tester,
+  ) async {
+    final recorder = HapticTestRecorder()..install();
+    addTearDown(recorder.dispose);
+    var longPressed = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppTile(
+            title: 'Nota',
+            onLongPress: () => longPressed++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.longPress(find.text('Nota'));
+    expect(longPressed, 1);
+    expect(recorder.count('HapticFeedbackType.mediumImpact'), 1);
+  });
+
+  testWidgets('renders custom subtitleWidget when provided', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: AppTile(
+            title: 'Nota',
+            subtitleWidget: Row(
+              children: [
+                Icon(Icons.person_outline, size: 14),
+                Text('De: autor@test.com'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.person_outline), findsOneWidget);
+    expect(find.text('De: autor@test.com'), findsOneWidget);
   });
 }

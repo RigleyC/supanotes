@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_interaction_policy.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_view.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'note_list_row.dart';
+import 'package:supanotes/shared/widgets/app_tile.dart';
+import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
 /// List representation of the notes list, anchored to the bottom.
 ///
@@ -29,6 +33,8 @@ class NotesListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.fromLTRB(
@@ -40,13 +46,92 @@ class NotesListView extends StatelessWidget {
       itemCount: notes.length,
       itemBuilder: (context, index) {
         final note = notes[notes.length - 1 - index];
-        return NoteListRow(
-          key: ValueKey(note.id),
+        final canLongPressToEditIcon =
+            NoteIconInteractionPolicy.canUseLongPress(
           note: note,
-          onTap: () => onTap(note),
-          onDelete: () => onDelete(note),
-          onToggleFavorite: () => onToggleFavorite(note),
           onEditIcon: () => onEditIcon(note),
+        );
+
+        final Widget? leading = note.noteIcon != null
+            ? NoteIconView(icon: note.noteIcon!, size: 20)
+            : null;
+
+        final Widget? subtitleWidget = note.sharedByEmail != null
+            ? Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.person_outline,
+                      size: 14,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        '${NoteStrings.sharedFromPrefix} ${note.sharedByEmail}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : null;
+
+        final Widget? trailing = note.favorite
+            ? Icon(
+                Icons.star_rate_rounded,
+                size: 18,
+                color: scheme.tertiary,
+              )
+            : null;
+
+        return Dismissible(
+          key: ValueKey('note-${note.id}'),
+          direction: DismissDirection.horizontal,
+          background: Container(
+            color: scheme.primaryContainer,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Icon(
+              note.favorite ? Icons.star_border_rounded : Icons.star_border,
+              color: scheme.onPrimaryContainer,
+            ),
+          ),
+          secondaryBackground: Container(
+            color: scheme.errorContainer,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
+          ),
+          confirmDismiss: (direction) async {
+            if (direction == DismissDirection.startToEnd) {
+              onToggleFavorite(note);
+              return false;
+            }
+            final confirmed = await showConfirmDialog(
+              context: context,
+              title: NoteStrings.deleteConfirmTitle,
+              message: NoteStrings.deleteConfirmMessage,
+              confirmLabel: NoteStrings.deleteConfirmLabel,
+              destructive: true,
+            );
+            if (confirmed) onDelete(note);
+            return confirmed;
+          },
+          child: AppTile(
+            title: note.title,
+            leading: leading,
+            trailing: trailing,
+            subtitleWidget: subtitleWidget,
+            onTap: () => onTap(note),
+            onLongPress: canLongPressToEditIcon ? () => onEditIcon(note) : null,
+          ),
         );
       },
     );

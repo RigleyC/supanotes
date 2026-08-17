@@ -216,6 +216,14 @@ class _NoteToolbarState extends State<NoteToolbar> {
           onPressed: () => _setBlockType(blockquoteAttribution),
           semanticLabel: 'Citação',
         ),
+        ToolbarButton(
+          svgAsset: 'assets/icons/checkbox.svg',
+
+          isActive: _selected.isNotEmpty && _selected.every((node) => node is TaskNode),
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: _convertToTask,
+          semanticLabel: 'Task',
+        ),
         const ToolbarDivider(),
         ToolbarButton(
           icon: Icons.horizontal_rule,
@@ -300,7 +308,7 @@ class _NoteToolbarState extends State<NoteToolbar> {
         ToolbarButton(
           svgAsset: 'assets/icons/checkbox.svg',
 
-          isActive: _selected.every((node) => node is TaskNode),
+          isActive: _selected.isNotEmpty && _selected.every((node) => node is TaskNode),
           haptic: ToolbarHaptic.selectionChange,
           onPressed: _convertToTask,
           semanticLabel: 'Task',

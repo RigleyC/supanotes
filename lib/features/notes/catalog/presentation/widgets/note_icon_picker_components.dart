@@ -97,19 +97,15 @@ class _PickerAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: AppTile(
-        contentPadding: EdgeInsets.zero,
-        enableHaptics: false,
-        leading: Icon(icon, size: AppSpacing.tileIconSize),
-        title: label,
-        onTap: () {
-          AppHaptics.controlTap();
-          onTap();
-        },
-      ),
+    return AppTile(
+      contentPadding: EdgeInsets.zero,
+      enableHaptics: false,
+      leading: Icon(icon, size: AppSpacing.tileIconSize),
+      title: label,
+      onTap: () {
+        AppHaptics.controlTap();
+        onTap();
+      },
     );
   }
 }
