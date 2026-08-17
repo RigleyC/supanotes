@@ -1,6 +1,6 @@
 # Spec: Compartilhar Links para Notas com Preview
 
-Permite compartilhar uma URL a partir do share sheet nativo do iOS ou Android diretamente para uma nota do SupaNotes, sem abrir o app principal. O usuário escolhe uma nota em uma interface nativa compacta, recebe confirmação imediata de salvamento e retorna ao app de origem. O backend adiciona o link ao final da versão mais recente da nota e enriquece o bloco com metadata visual para renderização como card no Super Editor.
+Permite compartilhar uma URL a partir do share sheet nativo do iOS ou Android diretamente para uma nota do SupaNotes, sem abrir o app principal. O usuário escolhe uma nota em uma interface nativa compacta, recebe confirmação imediata de salvamento local e retorna ao app de origem. O backend adiciona o link ao final da versão mais recente da nota e enriquece o bloco com metadata visual para renderização como card no Super Editor.
 
 ## User Review Required
 
@@ -9,7 +9,7 @@ Permite compartilhar uma URL a partir do share sheet nativo do iOS ou Android di
 > - A tela de compartilhamento é nativa em cada plataforma, não Flutter.
 > - A lista de notas replica o padrão atual do app: busca no topo, título + pequena prévia do conteúdo, ordenação por `updatedAt DESC`.
 > - Somente notas editáveis aparecem na extensão/Activity.
-> - Ao tocar numa nota, o link é salvo imediatamente e a UI mostra uma confirmação curta antes de fechar.
+> - Ao tocar numa nota, o compartilhamento é persistido localmente antes do envio e a UI mostra uma confirmação curta antes de fechar.
 > - O link é sempre adicionado ao final da versão mais recente da nota.
 > - URLs iguais podem ser adicionadas várias vezes; somente retries do mesmo `shareId` são deduplicados.
 > - A metadata visual é enriquecida no backend. Falha de Open Graph não impede o salvamento; o node usa fallback compacto.
@@ -41,6 +41,7 @@ Share Extension (SwiftUI)
         ├─ lê notes_index.json no App Group
         ├─ busca + lista de notas
         ├─ grava share_inbox.json
+        ├─ lê credencial da sessão em storage seguro compartilhado
         └─ inicia upload em background
                     │
                     ▼
@@ -52,6 +53,7 @@ Share Activity nativa
         ├─ lê notes_index.json
         ├─ busca + lista de notas
         ├─ grava share_inbox.json
+        ├─ lê credencial da sessão em storage seguro nativo
         └─ envia ao backend
                     │
                     ▼
@@ -102,17 +104,9 @@ A extensão deve:
 
 Registrar uma Activity nativa para `ACTION_SEND` com conteúdo textual/URL.
 
-A Activity deve oferecer a mesma experiência e protocolo do iOS:
+A Activity deve oferecer a mesma experiência e protocolo do iOS: busca, lista por `updatedAt DESC`, título + preview, somente notas editáveis, persistência local antes do envio, confirmação curta e finalização imediata após a seleção.
 
-- busca;
-- lista por `updatedAt DESC`;
-- título + preview;
-- somente notas editáveis;
-- persistência local antes do envio;
-- confirmação curta;
-- finalização imediata após a seleção.
-
-A UI pode ser implementada com componentes nativos Android. Não deve inicializar a tela Flutter principal para esse fluxo.
+A UI não deve inicializar a tela Flutter principal para esse fluxo.
 
 ## 3. Shared Storage
 
@@ -120,40 +114,36 @@ A ponte nativa usa dois arquivos JSON pequenos. Eles não substituem o banco Dri
 
 ### `notes_index.json`
 
-Snapshot somente-leitura para a UI de share:
+Usar um envelope com ownership explícito:
 
 ```json
-[
-  {
-    "noteId": "note-uuid",
-    "title": "Ideias",
-    "preview": "Texto inicial da nota...",
-    "updatedAt": "2026-08-17T18:00:00Z",
-    "canEdit": true
-  }
-]
+{
+  "ownerUserId": "user-uuid",
+  "notes": [
+    {
+      "noteId": "note-uuid",
+      "title": "Ideias",
+      "preview": "Texto inicial da nota...",
+      "updatedAt": "2026-08-17T18:00:00Z",
+      "canEdit": true
+    }
+  ]
+}
 ```
 
-O app principal atualiza esse arquivo sempre que houver mudança relevante em:
+O app principal atualiza o arquivo quando houver mudança relevante em criação/exclusão, título, preview, `updatedAt` ou permissão.
 
-- criação/exclusão de nota;
-- título;
-- preview usado na lista;
-- `updatedAt`;
-- permissão de edição.
-
-No iOS, o arquivo fica no container do App Group compartilhado entre o app e a Share Extension.
-
-No Android, o mesmo contrato JSON fica em armazenamento interno acessível pelo fluxo nativo do aplicativo.
+No iOS, o arquivo fica no container do App Group. No Android, o mesmo contrato JSON fica em armazenamento interno acessível pelo fluxo nativo do aplicativo.
 
 ### `share_inbox.json`
 
-Contém apenas compartilhamentos que ainda não tiveram entrega confirmada pelo backend:
+Contém somente compartilhamentos ainda não confirmados pelo backend:
 
 ```json
 [
   {
     "shareId": "uuid",
+    "ownerUserId": "user-uuid",
     "noteId": "note-uuid",
     "url": "https://example.com/post",
     "createdAt": "2026-08-17T18:10:00Z",
@@ -162,7 +152,7 @@ Contém apenas compartilhamentos que ainda não tiveram entrega confirmada pelo 
 ]
 ```
 
-A escrita deve ser atômica: escrever um arquivo temporário completo e fazer rename/substituição somente após flush bem-sucedido.
+A escrita deve ser atômica: escrever o conteúdo completo em arquivo temporário, fazer flush e só então substituir o arquivo anterior.
 
 ### Lifecycle
 
@@ -170,24 +160,51 @@ A escrita deve ser atômica: escrever um arquivo temporário completo e fazer re
 seleciona nota
 → cria shareId
 → grava item na inbox
+→ mostra confirmação de salvamento local
 → inicia envio
 → backend confirma shareId
 → remove item da inbox
 ```
 
-Se houver timeout, falta de internet ou encerramento do processo, o item permanece disponível para retry com o mesmo `shareId`.
+Se houver timeout, falta de internet ou encerramento do processo, o item permanece para retry com o mesmo `shareId`.
 
-A inbox não possui `baseRevision`, conflito, `in_flight` de sync, merge ou resolução de revisão. Ela é somente a ponte durável entre UI nativa e backend.
+A inbox não possui `baseRevision`, conflito, merge ou resolução de revisão. Ela é apenas a ponte durável entre UI nativa e backend.
 
-## 4. Relação com `pending_note_operations`
+## 4. Autenticação do Fluxo Nativo
+
+Hoje a sessão Flutter persiste access token e refresh token em `FlutterSecureStorage`, que usa Keychain no iOS e armazenamento seguro no Android. O código nativo do share não deve depender de inicializar Flutter para recuperar essas credenciais.
+
+Criar uma abstração `ShareAuthStore` de plataforma, sincronizada pelo app principal sempre que a sessão for instalada, renovada ou removida.
+
+### iOS
+
+Usar Keychain Access Group compartilhado entre app e Share Extension. O App Group continua sendo usado para arquivos; credenciais não devem ser gravadas em JSON ou `UserDefaults`.
+
+### Android
+
+Usar armazenamento seguro nativo acessível à Share Activity dentro do mesmo aplicativo. A implementação deve evitar depender de detalhes internos do formato usado por `flutter_secure_storage`; o app Flutter deve escrever/limpar explicitamente os valores necessários através da ponte de plataforma.
+
+### Conteúdo
+
+O `ShareAuthStore` pode manter o par JWT da sessão atual para permitir o mesmo protocolo de refresh já usado pelo app. O `ownerUserId` deve acompanhar o estado da sessão para impedir que um item pendente seja entregue usando outra conta.
+
+Regras:
+
+- login/registro: instalar credenciais no storage Flutter e no `ShareAuthStore`;
+- refresh: substituir o par nos dois storages de forma coerente;
+- logout: limpar ambos antes de permitir nova sessão;
+- uploader nativo: se access token estiver expirado, usar o endpoint de refresh existente e substituir o par de forma atômica;
+- item da inbox só pode ser enviado se `ownerUserId` coincidir com a sessão nativa atual.
+
+Se não houver sessão válida, a UI de share deve informar que o usuário precisa abrir o SupaNotes e autenticar-se; ela não deve descartar silenciosamente o link já persistido quando existir ownership válido.
+
+## 5. Relação com `pending_note_operations`
 
 O projeto já possui `pending_note_operations` como outbox de edições produzidas pelo app Flutter, com `baseRevision`, `ordinal`, `kind`, `payloadJson`, ownership, status e retry.
 
 Essa infraestrutura permanece como a única outbox do fluxo normal de edição Flutter.
 
 O compartilhamento externo não escreve diretamente nessa tabela porque, no iOS, a Share Extension vive em outro sandbox e o banco atual `supanotes.sqlite` fica no Application Documents Directory do app principal.
-
-Portanto:
 
 ```text
 Flutter edit
@@ -207,11 +224,11 @@ HTTP idempotente
 Backend
 ```
 
-Os dois fluxos convergem no backend e depois retornam ao cliente pelo sync normal.
+Os dois fluxos convergem no backend e retornam ao cliente pelo sync normal.
 
-## 5. Endpoint de Compartilhamento
+## 6. Endpoint de Compartilhamento
 
-Adicionar um endpoint autenticado equivalente a:
+Adicionar endpoint autenticado equivalente a:
 
 ```http
 POST /api/v1/notes/:noteId/shared-links
@@ -231,27 +248,23 @@ Regras:
 
 1. Validar autenticação.
 2. Validar que o usuário é dono da nota ou possui permissão `edit`.
-3. Deduplicar por `(userId, shareId)` ou outro escopo equivalente que impeça colisões entre usuários.
+3. Deduplicar por `(userId, shareId)`.
 4. Não deduplicar por URL.
-5. Validar esquema da URL e aceitar apenas `http`/`https` na V1.
+5. Aceitar somente URLs `http`/`https` na V1.
 6. Carregar a versão canônica mais recente da nota.
 7. Gerar metadata do link.
 8. Construir `LinkPreviewNode`.
 9. Inserir o node ao final da versão mais recente do documento.
-10. Persistir nova revisão usando o mecanismo canônico de mutação de documento do backend.
-11. Retornar sucesso idempotente para retries de um `shareId` já aceito.
+10. Persistir nova revisão usando o mecanismo canônico de mutação do backend.
+11. Retornar sucesso idempotente para retries de `shareId` já aceito.
 
-O endpoint não recebe uma cópia do documento nem uma `baseRevision` fornecida pela extensão.
+O endpoint não recebe snapshot do documento nem `baseRevision` da extensão.
 
-## 6. Concorrência
+## 7. Concorrência
 
-O comando do share é semântico:
+O comando é semântico: **adicione esta URL ao final da versão mais recente desta nota**.
 
-> Adicione esta URL ao final da versão mais recente desta nota.
-
-O backend nunca substitui a nota por um snapshot construído pela extensão.
-
-Exemplo:
+O backend nunca substitui a nota por snapshot produzido pela extensão.
 
 ```text
 rev 20
@@ -262,35 +275,23 @@ rev 20
 → rev 22
 ```
 
-Se outro dispositivo possuir operações offline baseadas em uma revisão anterior, o pipeline de sync já existente deve reconciliar essas operações contra a nova revisão remota. O cliente não terá lógica especial de conflito para links compartilhados.
+Se outro dispositivo tiver operações offline baseadas em revisão anterior, o pipeline de sync existente deve reconciliá-las contra a nova revisão. Não haverá lógica especial de conflito para links no cliente.
 
-## 7. Enriquecimento de Link
+## 8. Enriquecimento de Link
 
-O backend resolve metadata após receber o comando e antes de persistir o node final.
-
-Prioridade de fontes:
+Prioridade de metadata:
 
 1. Open Graph (`og:title`, `og:description`, `og:image`, `og:site_name`).
 2. HTML title/description quando úteis.
 3. favicon e hostname como fallback.
 
-O serviço deve:
+O serviço deve seguir redirects com limite, aplicar timeout curto, limitar HTML recebido, aceitar apenas HTTP(S), normalizar campos e bloquear SSRF, inclusive destinos locais/privados, metadata services de cloud e redirects para redes bloqueadas.
 
-- seguir redirects com limite;
-- aplicar timeout curto;
-- limitar tamanho de resposta HTML;
-- rejeitar esquemas não HTTP(S);
-- proteger contra SSRF, incluindo destinos locais/privados e redirects para redes bloqueadas;
-- normalizar campos excessivamente longos;
-- tratar metadata inválida sem falhar o compartilhamento.
+Falha de metadata cria node válido em `failed`; não falha o compartilhamento.
 
-Falha de metadata gera um node válido em estado `failed`, não erro de compartilhamento.
+## 9. `LinkPreviewNode` no Super Editor
 
-## 8. `LinkPreviewNode` no Super Editor
-
-O link é um tipo próprio de `DocumentNode`, renderizado por um `ComponentBuilder` próprio.
-
-Modelo conceitual:
+Criar um tipo próprio de `DocumentNode`, renderizado por `ComponentBuilder` próprio:
 
 ```text
 LinkPreviewNode
@@ -304,25 +305,16 @@ LinkPreviewNode
 └─ previewStatus
 ```
 
-`previewStatus` na V1:
+Estados da V1:
 
-- `ready`: metadata suficiente foi resolvida;
-- `failed`: metadata não pôde ser resolvida; mostrar fallback.
+- `ready`: metadata resolvida;
+- `failed`: fallback por domínio/URL.
 
-Não é necessário estado `pending` no documento Flutter porque o backend só publica a nova revisão depois de construir o node final.
+Não é necessário `pending` no documento Flutter porque a revisão só é publicada depois de o backend construir o node final.
 
-O node deve ser atômico:
+O node é atômico: seleção, exclusão e movimentação do bloco inteiro, sem cursor textual interno. A serialização canônica do documento inclui o snapshot da metadata para cards antigos não mudarem silenciosamente.
 
-- seleção do bloco inteiro;
-- exclusão como bloco;
-- movimentação como bloco;
-- sem cursor textual interno.
-
-A serialização canônica do documento deve incluir todos os campos necessários para o snapshot do preview, para que cards existentes não mudem silenciosamente quando o site de origem alterar metadata.
-
-## 9. Layout do Card
-
-Layout aprovado:
+## 10. Layout do Card
 
 ```text
 ┌─────────────────────────────────────────────┐
@@ -338,29 +330,27 @@ Regras:
 
 - imagem à esquerda;
 - título à direita, até 2 linhas;
-- descrição abaixo do título, até 2 linhas;
+- descrição abaixo, até 2 linhas;
 - site/domínio abaixo da descrição;
 - card inteiro clicável e abre a URL;
-- sem imagem: conteúdo textual ocupa toda a largura;
-- `failed`: mostrar card compacto com domínio e URL, sem estado visual de erro agressivo.
+- sem imagem: texto ocupa toda a largura;
+- `failed`: card compacto com domínio + URL.
 
-## 10. Atualização no Flutter
+## 11. Atualização no Flutter
 
-Nenhum novo canal de realtime é necessário para a V1.
+Nenhum novo canal realtime é necessário.
 
-### App fechado
+App fechado:
 
 ```text
 backend grava nova revisão
 → usuário abre SupaNotes
-→ sync atual executa
+→ sync atual
 → revisão atualizada chega ao armazenamento local
-→ LinkPreviewNode aparece
+→ card aparece
 ```
 
-### App aberto
-
-Se o mecanismo atual de stream/sync receber atualização remota enquanto a nota estiver aberta:
+App aberto:
 
 ```text
 nova revisão remota
@@ -370,124 +360,108 @@ nova revisão remota
 → card aparece
 ```
 
-A feature deve reutilizar o mecanismo existente de atualização do documento; não criar polling específico para previews.
+A feature reutiliza o mecanismo atual de atualização; não cria polling específico.
 
-## 11. Retry e Background
+## 12. Retry e Background
 
 ### iOS
 
-Usar background `URLSession` configurada para a Share Extension e associada ao App Group/shared container. A entrega pode continuar após o fechamento da interface da extensão conforme as capacidades permitidas pelo sistema.
+Usar background `URLSession` da Share Extension associado ao App Group/shared container. Não assumir que o app Flutter será executado depois que a extensão fechar.
 
-Não assumir execução imediata do app Flutter depois que a extensão fecha.
-
-Itens ainda presentes em `share_inbox.json` devem ser reenviados quando houver nova oportunidade segura de execução, sempre usando o mesmo `shareId`.
+Itens ainda na inbox devem ser reenviados quando houver nova oportunidade segura de execução, sempre com o mesmo `shareId`.
 
 ### Android
 
-O envio inicial pode começar pela Share Activity. A persistência na inbox garante que um envio incompleto possa ser retomado posteriormente pelo app/processamento apropriado, sem exigir que a UI de share permaneça aberta.
+O envio inicial começa pela Share Activity. A inbox garante retomada posterior. A implementação deve usar mecanismo de background compatível com as restrições modernas do Android e não depender de processo residente indefinidamente.
 
-O design de implementação deve usar mecanismo de background compatível com as restrições modernas do Android, sem depender de processo indefinidamente residente.
-
-## 12. Logout e Troca de Conta
-
-`notes_index.json` e `share_inbox.json` pertencem à sessão autenticada atual.
+## 13. Logout e Troca de Conta
 
 Ao logout:
 
-- remover o índice de notas;
-- não entregar itens pendentes usando credenciais de outro usuário;
-- itens pendentes devem manter ownership explícito ou ser descartados conforme a política de logout escolhida na implementação.
+- remover `notes_index.json`;
+- limpar `ShareAuthStore`;
+- nunca enviar item pendente com credenciais de outro usuário.
 
-Para a V1, a política recomendada é armazenar `ownerUserId` em cada item da inbox e só reenviá-lo quando a sessão autenticada corresponder ao mesmo usuário. O índice também deve incluir um identificador de owner da sessão no envelope do arquivo para evitar exibir notas de uma conta anterior.
+Itens pendentes mantêm `ownerUserId` e só são enviados quando a sessão atual corresponde ao mesmo usuário.
 
-## 13. Error Handling
+## 14. Error Handling
 
-- URL inválida: extensão mostra erro e permanece aberta.
-- Falha ao persistir `share_inbox.json`: não mostrar sucesso; permanecer aberta para retry.
-- Falha de rede após persistência: mostrar sucesso de salvamento local e manter item para retry.
-- Nota removida antes do processamento: backend rejeita como não encontrada; item deixa de ser retry infinito e o app pode registrar falha local para diagnóstico.
-- Permissão removida: backend rejeita; mesmo tratamento de erro terminal.
-- Metadata indisponível: criar `LinkPreviewNode` fallback e considerar operação concluída.
-- Retry do mesmo `shareId`: retornar sucesso sem criar outro node.
+- URL inválida: UI mostra erro e permanece aberta.
+- Falha ao persistir inbox: não mostrar sucesso.
+- Falha de rede após persistência: mostrar sucesso local e manter item para retry.
+- Sessão ausente/inválida: manter item, não enviar com outra conta.
+- Nota removida antes do processamento: backend retorna erro terminal; não repetir para sempre.
+- Permissão removida: erro terminal equivalente.
+- Metadata indisponível: criar fallback e concluir.
+- Retry do mesmo `shareId`: sucesso sem duplicação.
 
-## 14. Segurança
+## 15. Segurança
 
-O backend deve ser a autoridade final para permissão. O filtro `canEdit` do índice serve somente para UX.
+O backend é autoridade final para permissões; `canEdit` serve somente à UX.
 
-O enriquecimento de URLs deve implementar proteção SSRF e nunca permitir que URLs fornecidas pelo usuário façam o servidor acessar:
+Credenciais não podem aparecer em `notes_index.json`, `share_inbox.json` ou logs. O enriquecimento de URL deve bloquear loopback, link-local, redes privadas, metadata services, esquemas locais e redirects para destinos bloqueados.
 
-- loopback;
-- link-local;
-- redes privadas;
-- metadata services de cloud;
-- esquemas locais como `file:`;
-- redirects para destinos bloqueados.
+A extensão armazena somente índice mínimo de notas, inbox de compartilhamentos e credenciais no storage seguro da plataforma.
 
-A extensão não recebe nem armazena dados sensíveis do documento completo; somente índice mínimo de notas e itens de share pendentes.
-
-## 15. Testes
+## 16. Testes
 
 ### Flutter / Documento
 
-1. Serializar e desserializar `LinkPreviewNode` `ready`.
-2. Serializar e desserializar fallback `failed`.
-3. Renderizar card com imagem.
-4. Renderizar card sem imagem.
-5. Selecionar/excluir/mover o node como bloco atômico.
-6. Atualizar documento efetivo via stream e verificar aparecimento do node sem recriar lógica especial de polling.
+1. Serializar/desserializar `LinkPreviewNode` `ready` e `failed`.
+2. Renderizar com e sem imagem.
+3. Selecionar/excluir/mover como bloco atômico.
+4. Receber revisão atualizada pela stream existente e exibir o node.
 
 ### Backend
 
-1. Usuário dono consegue adicionar link.
-2. Usuário com `edit` consegue adicionar link.
-3. Usuário `view` recebe rejeição.
-4. `shareId` repetido não duplica node.
-5. Mesma URL com `shareId` diferente cria outro node.
-6. Concorrência: sempre append na revisão mais recente.
-7. Metadata válida produz node `ready`.
-8. Metadata ausente produz fallback `failed` e operação bem-sucedida.
-9. Redirects e timeout são limitados.
-10. SSRF para IP privado/loopback é bloqueado.
-11. Nota excluída entre seleção e processamento retorna erro terminal.
+1. Dono e usuário `edit` conseguem adicionar; `view` não.
+2. `shareId` repetido não duplica.
+3. Mesma URL com outro `shareId` duplica intencionalmente.
+4. Concorrência sempre faz append na revisão mais recente.
+5. Metadata válida produz `ready`; metadata ausente produz `failed` sem falhar.
+6. Timeout/redirects são limitados e SSRF é bloqueado.
+7. Nota excluída ou permissão removida gera erro terminal.
 
-### iOS
+### Auth nativo
 
-1. Share sheet reconhece URL.
-2. Lista usa `notes_index.json` e ordena por `updatedAt DESC`.
-3. Busca filtra corretamente.
-4. Notas não editáveis não aparecem.
-5. Seleção persiste inbox antes do envio.
-6. Confirmação aparece após persistência local.
-7. Falha de rede mantém item pendente.
-8. Retry usa o mesmo `shareId`.
-9. Escrita interrompida não corrompe JSON anterior.
-10. Troca de conta não expõe índice antigo.
+1. Login instala sessão no `ShareAuthStore`.
+2. Refresh substitui o par sem janela de conta cruzada.
+3. Logout limpa o storage nativo.
+4. Share com access token expirado consegue refresh.
+5. `ownerUserId` divergente impede envio.
 
-### Android
+### iOS / Android
 
-Executar os mesmos casos funcionais do iOS para `ACTION_SEND`, lista, busca, persistência, retry, confirmação e isolamento de sessão.
+1. Share sheet/`ACTION_SEND` reconhece URL.
+2. Lista ordena por `updatedAt DESC`, busca corretamente e oculta read-only.
+3. Seleção persiste inbox antes do envio e mostra confirmação.
+4. Falha de rede mantém item.
+5. Retry mantém `shareId`.
+6. Escrita interrompida não corrompe JSON anterior.
+7. Troca de conta não expõe notas ou credenciais antigas.
 
 ### End-to-End
 
-1. Compartilhar online, fechar imediatamente e abrir SupaNotes depois: card já sincronizado ou sincroniza na abertura.
-2. Compartilhar offline, recuperar internet e confirmar entrega posterior.
+1. Compartilhar online e abrir SupaNotes depois: card já sincronizado ou sincroniza na abertura.
+2. Compartilhar offline, recuperar internet e confirmar entrega posterior sem abrir a tela principal para concluir o envio quando o SO permitir o job/background pendente.
 3. Compartilhar enquanto a mesma nota recebe outra edição remota; ambas permanecem.
 4. Compartilhar enquanto outro dispositivo possui operações locais pendentes; sync converge sem perda.
-5. Manter app aberto na nota e confirmar que o card aparece pelo mecanismo atual de atualização.
+5. Manter app aberto na nota e confirmar que o card aparece pelo mecanismo atual.
 6. Centenas de notas no índice continuam abrindo e buscando rapidamente.
 
-## 16. Critérios de Aceite
+## 17. Critérios de Aceite
 
 A feature está concluída quando:
 
 - SupaNotes aparece no share sheet de iOS e Android para URLs.
 - É possível buscar e selecionar uma nota sem abrir o app principal.
-- A lista corresponde ao padrão atual de título + preview + `updatedAt DESC` e contém somente notas editáveis.
-- A seleção persiste localmente antes de qualquer dependência de rede.
-- O usuário recebe confirmação curta e volta ao app de origem.
-- O compartilhamento pode ser entregue ao backend sem exigir abertura manual do SupaNotes.
-- O backend é idempotente por `shareId`, valida permissão e adiciona o bloco ao final da revisão mais recente.
+- A lista usa título + preview + `updatedAt DESC` e contém somente notas editáveis.
+- A seleção persiste localmente antes da rede.
+- O usuário recebe confirmação curta e retorna ao app de origem.
+- O uploader nativo autentica com storage seguro próprio, incluindo refresh, sem depender de inicializar Flutter.
+- O compartilhamento pode ser entregue ao backend sem exigir abertura manual do SupaNotes, sujeito às garantias de execução em background do sistema operacional.
+- O backend é idempotente por `shareId`, valida permissão e adiciona ao final da revisão mais recente.
 - O preview é enriquecido no backend com fallback seguro.
 - O Super Editor renderiza `LinkPreviewNode` no layout aprovado.
-- O link chega ao Flutter exclusivamente através do documento/sync já existente.
-- Nenhuma alteração concorrente é perdida em testes de integração.
+- O link chega ao Flutter através do documento/sync já existente.
+- Nenhuma alteração concorrente é perdida nos testes de integração.
