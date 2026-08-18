@@ -23,7 +23,7 @@ Stylesheet buildNoteStylesheet(
 }) {
   final colorScheme = Theme.of(context).colorScheme;
   final linkColor = colorScheme.primary;
-  const editorTextColor = Colors.white;
+  final editorTextColor = colorScheme.onSurface;
 
   return defaultStylesheet.copyWith(
     documentPadding: documentPadding,
