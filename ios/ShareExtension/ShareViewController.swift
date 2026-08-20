@@ -11,16 +11,22 @@ final class ShareViewController: UIViewController {
 
   private func loadSharedText() {
     guard let item = extensionContext?.inputItems.first as? NSExtensionItem,
-          let provider = item.attachments?.first,
-          provider.hasItemConformingToTypeIdentifier("public.plain-text")
+          let provider = item.attachments?.first
     else {
       extensionContext?.cancelRequest(withError: NSError(domain: "SupaNotesShare", code: 1))
       return
     }
-    provider.loadItem(forTypeIdentifier: "public.plain-text", options: nil) { [weak self] item, _ in
+    let type = provider.hasItemConformingToTypeIdentifier("public.plain-text")
+      ? "public.plain-text"
+      : "public.url"
+    provider.loadItem(forTypeIdentifier: type, options: nil) { [weak self] item, _ in
       DispatchQueue.main.async {
         if let text = item as? String {
           self?.presentShare(text: text)
+        } else if let url = item as? URL {
+          self?.presentShare(text: url.absoluteString)
+        } else {
+          self?.extensionContext?.cancelRequest(withError: NSError(domain: "SupaNotesShare", code: 2))
         }
       }
     }

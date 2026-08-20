@@ -39,7 +39,7 @@ class AuthController extends AsyncNotifier<User?> {
       return null;
     }
 
-    await _publishNativeSession(user.id);
+    unawaited(_publishNativeSession(user.id));
 
     return user;
   }
@@ -51,10 +51,12 @@ class AuthController extends AsyncNotifier<User?> {
     try {
       final result = await attempt();
       await _sessionCache.hydrate({'settings': result.session.settings});
-      await _publishNativeSession(
-        result.user.id,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
+      unawaited(
+        _publishNativeSession(
+          result.user.id,
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+        ),
       );
       state = AsyncValue.data(result.user);
       return result;
