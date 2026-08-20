@@ -14,6 +14,10 @@ abstract interface class NativeShareBridge {
   Future<void> clearShareSession();
 
   Future<void> retryPendingShares();
+
+  Future<String?> readPendingShare();
+
+  Future<void> clearPendingShare();
 }
 
 final class MethodChannelNativeShareBridge implements NativeShareBridge {
@@ -44,4 +48,12 @@ final class MethodChannelNativeShareBridge implements NativeShareBridge {
   @override
   Future<void> retryPendingShares() =>
       _channel.invokeMethod('retryPendingShares');
+
+  @override
+  Future<String?> readPendingShare() =>
+      _channel.invokeMethod<String>('readPendingShare');
+
+  @override
+  Future<void> clearPendingShare() =>
+      _channel.invokeMethod('clearPendingShare');
 }

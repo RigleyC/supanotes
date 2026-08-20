@@ -17,7 +17,7 @@ private fun methodArgumentJson(arguments: Any?): String? {
         null -> null
         is Map<*, *> -> JSONObject(arguments).toString()
         is String -> arguments
-        else -> arguments.toString()
+        else -> throw IllegalArgumentException("Unsupported share bridge payload")
     }
 }
 
@@ -75,6 +75,11 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "retryPendingShares" -> result.success(null)
+                    "readPendingShare" -> result.success(prefs.getString("pending_shared_text", null))
+                    "clearPendingShare" -> {
+                        prefs.edit().remove("pending_shared_text").apply()
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

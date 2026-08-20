@@ -39,6 +39,8 @@ class AuthController extends AsyncNotifier<User?> {
       return null;
     }
 
+    await _publishNativeSession(user.id);
+
     return user;
   }
 
@@ -49,6 +51,11 @@ class AuthController extends AsyncNotifier<User?> {
     try {
       final result = await attempt();
       await _sessionCache.hydrate({'settings': result.session.settings});
+      await _publishNativeSession(
+        result.user.id,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
       state = AsyncValue.data(result.user);
       return result;
     } catch (e, st) {
@@ -85,6 +92,11 @@ class AuthController extends AsyncNotifier<User?> {
     }
     await _tokenManager.clearSession();
     _sessionCache.clear();
+    try {
+      await ref.read(nativeShareBridgeProvider).clearShareSession();
+    } catch (error) {
+      debugPrint('Error clearing native share session: $error');
+    }
 
     if (clearLocalData) {
       // Clear last synced time to force a full pull next time
@@ -141,6 +153,27 @@ class AuthController extends AsyncNotifier<User?> {
     await _clearSession(clearLocalData: false);
     ref.read(sessionResetProvider.notifier).update((state) => state + 1);
   });
+
+  Future<void> _publishNativeSession(
+    String userId, {
+    String? accessToken,
+    String? refreshToken,
+  }) async {
+    try {
+      final access = accessToken ?? await _tokenManager.getAccessToken();
+      final refresh = refreshToken ?? await _tokenManager.getRefreshToken();
+      if (access == null || refresh == null) return;
+      await ref
+          .read(nativeShareBridgeProvider)
+          .publishSessionCredentials(
+            ownerUserId: userId,
+            accessToken: access,
+            refreshToken: refresh,
+          );
+    } catch (error) {
+      debugPrint('Error publishing native share session: $error');
+    }
+  }
 
   Future<T> _serialize<T>(Future<T> Function() operation) {
     final previous = _operationTail;

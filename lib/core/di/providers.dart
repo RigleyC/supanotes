@@ -31,6 +31,8 @@ import 'package:supanotes/features/notes/editor/sync/note_session_activity_track
 import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
+import 'package:supanotes/features/notes/share/application/native_share_bridge.dart';
+import 'package:supanotes/features/notes/share/application/shared_link_delivery.dart';
 
 // ---------------------------------------------------------------------------
 // API client
@@ -79,6 +81,14 @@ final authControllerProvider = AsyncNotifierProvider<AuthController, User?>(
 );
 
 final sessionResetProvider = StateProvider<int>((ref) => 0);
+
+final nativeShareBridgeProvider = Provider<NativeShareBridge>((ref) {
+  return MethodChannelNativeShareBridge();
+});
+
+final sharedLinkDeliveryProvider = Provider<SharedLinkDelivery>((ref) {
+  return SharedLinkDelivery(ref.watch(apiClientProvider));
+});
 
 // ---------------------------------------------------------------------------
 // Local notification service
