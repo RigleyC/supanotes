@@ -138,6 +138,14 @@ type RefreshToken struct {
 	ReuseDetectedAt pgtype.Timestamptz `json:"reuse_detected_at"`
 }
 
+type SharedLinkIngestion struct {
+	UserID      pgtype.UUID        `json:"user_id"`
+	ShareID     pgtype.UUID        `json:"share_id"`
+	NoteID      pgtype.UUID        `json:"note_id"`
+	OperationID pgtype.UUID        `json:"operation_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type Task struct {
 	ID          pgtype.UUID        `json:"id"`
 	NoteID      pgtype.UUID        `json:"note_id"`

@@ -43,6 +43,7 @@ type Querier interface {
 	GetRecentNotes(ctx context.Context, userID pgtype.UUID) ([]GetRecentNotesRow, error)
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRefreshTokenRecord(ctx context.Context, tokenHash string) (RefreshToken, error)
+	GetSharedLinkIngestion(ctx context.Context, arg GetSharedLinkIngestionParams) (SharedLinkIngestion, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserSettings(ctx context.Context, userID pgtype.UUID) (UserSetting, error)
@@ -51,6 +52,7 @@ type Querier interface {
 	InsertOperation(ctx context.Context, arg InsertOperationParams) (NoteOperation, error)
 	ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]Attachment, error)
 	LockNote(ctx context.Context, id pgtype.UUID) (LockNoteRow, error)
+	ReserveSharedLinkIngestion(ctx context.Context, arg ReserveSharedLinkIngestionParams) (SharedLinkIngestion, error)
 	RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error
 	RevokeRefreshTokenFamily(ctx context.Context, familyID pgtype.UUID) error
