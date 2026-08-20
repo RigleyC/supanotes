@@ -13,9 +13,7 @@ abstract interface class NativeShareBridge {
 
   Future<void> clearShareSession();
 
-  Future<void> retryPendingShares();
-
-  Future<String?> readPendingShare();
+  Future<Map<String, dynamic>?> readPendingShare();
 
   Future<void> clearPendingShare();
 }
@@ -46,12 +44,11 @@ final class MethodChannelNativeShareBridge implements NativeShareBridge {
       _channel.invokeMethod('clearShareSession');
 
   @override
-  Future<void> retryPendingShares() =>
-      _channel.invokeMethod('retryPendingShares');
-
-  @override
-  Future<String?> readPendingShare() =>
-      _channel.invokeMethod<String>('readPendingShare');
+  Future<Map<String, dynamic>?> readPendingShare() async {
+    final value = await _channel.invokeMethod<dynamic>('readPendingShare');
+    if (value is! Map) return null;
+    return Map<String, dynamic>.from(value);
+  }
 
   @override
   Future<void> clearPendingShare() =>

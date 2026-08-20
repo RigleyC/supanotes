@@ -33,8 +33,8 @@ final class ShareViewController: UIViewController {
   }
 
   private func presentShare(text: String) {
-    let view = ShareView(notes: store.notes()) { [weak self] _ in
-      self?.store.savePending(text: text)
+    let view = ShareView(notes: store.notes()) { [weak self] note in
+      self?.store.savePending(text: text, noteId: note.noteId)
       self?.extensionContext?.completeRequest(returningItems: nil)
     }
     let host = UIHostingController(rootView: view)

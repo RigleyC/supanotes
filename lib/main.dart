@@ -121,9 +121,10 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
     try {
       final bridge = ref.read(nativeShareBridgeProvider);
       final pending = await bridge.readPendingShare();
-      if (pending == null || pending.trim().isEmpty || !mounted) return;
+      final pendingText = pending?['text'] as String?;
+      if (pendingText == null || pendingText.trim().isEmpty || !mounted) return;
       final delivery = ref.read(sharedLinkDeliveryProvider);
-      final url = delivery.extractUrl(pending);
+      final url = delivery.extractUrl(pendingText);
       if (url == null) {
         await bridge.clearPendingShare();
         if (mounted) {
@@ -137,10 +138,21 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
       }
       final notes = await ref.read(activeNotesProvider.future);
       if (!mounted) return;
-      final note = await showDialog<NoteModel>(
-        context: context,
-        builder: (_) => _ShareNotePicker(notes: notes),
-      );
+      final targetNoteId = pending?['noteId'] as String?;
+      NoteModel? note;
+      if (targetNoteId == null || targetNoteId.isEmpty) {
+        note = await showDialog<NoteModel>(
+          context: context,
+          builder: (_) => _ShareNotePicker(notes: notes),
+        );
+      } else {
+        for (final candidate in notes) {
+          if (candidate.id == targetNoteId) {
+            note = candidate;
+            break;
+          }
+        }
+      }
       if (note == null) return;
       await delivery.appendToNote(noteId: note.id, url: url);
       await bridge.clearPendingShare();

@@ -25,9 +25,15 @@ final class ShareBridgeStore {
     SecItemAdd(query as CFDictionary, nil)
   }
 
+  func savePendingShare(text: String, noteId: String) {
+    defaults.set(text, forKey: "pending_shared_text")
+    defaults.set(noteId, forKey: "pending_shared_note_id")
+  }
+
   func clear() {
     defaults.removeObject(forKey: "notes_index")
     defaults.removeObject(forKey: "pending_shared_text")
+    defaults.removeObject(forKey: "pending_shared_note_id")
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
@@ -36,11 +42,13 @@ final class ShareBridgeStore {
     SecItemDelete(query as CFDictionary)
   }
 
-  func readPendingShare() -> String? {
-    defaults.string(forKey: "pending_shared_text")
+  func readPendingShare() -> [String: String]? {
+    guard let text = defaults.string(forKey: "pending_shared_text") else { return nil }
+    return ["text": text, "noteId": defaults.string(forKey: "pending_shared_note_id") ?? ""]
   }
 
   func clearPendingShare() {
     defaults.removeObject(forKey: "pending_shared_text")
+    defaults.removeObject(forKey: "pending_shared_note_id")
   }
 }

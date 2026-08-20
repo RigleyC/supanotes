@@ -74,8 +74,9 @@ class MainActivity : FlutterActivity() {
                         ShareCredentialStore.clear(this)
                         result.success(null)
                     }
-                    "retryPendingShares" -> result.success(null)
-                    "readPendingShare" -> result.success(prefs.getString("pending_shared_text", null))
+                    "readPendingShare" -> result.success(mapOf(
+                        "text" to prefs.getString("pending_shared_text", null),
+                    ))
                     "clearPendingShare" -> {
                         prefs.edit().remove("pending_shared_text").apply()
                         result.success(null)

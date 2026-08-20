@@ -23,7 +23,8 @@ final class SharedShareStore {
     return index.notes.filter(\.canEdit)
   }
 
-  func savePending(text: String) {
+  func savePending(text: String, noteId: String) {
     defaults.set(text, forKey: "pending_shared_text")
+    defaults.set(noteId, forKey: "pending_shared_note_id")
   }
 }

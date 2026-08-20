@@ -34,8 +34,6 @@ import UserNotifications
       case "clearShareSession":
         ShareBridgeStore.shared.clear()
         result(nil)
-      case "retryPendingShares":
-        result(nil)
       case "readPendingShare":
         result(ShareBridgeStore.shared.readPendingShare())
       case "clearPendingShare":
