@@ -36,7 +36,7 @@ class ShareActivity : Activity() {
             text = "Cancelar"
             setOnClickListener {
                 getSharedPreferences("share_bridge", MODE_PRIVATE).edit()
-                    .remove("pending_shared_text").apply()
+                    .remove("pending_shared_text").remove("pending_shared_id").apply()
                 finish()
             }
         })

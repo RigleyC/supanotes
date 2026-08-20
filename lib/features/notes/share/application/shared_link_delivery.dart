@@ -1,5 +1,4 @@
 import 'package:supanotes/core/api/api_client.dart';
-import 'package:uuid/uuid.dart';
 
 final class SharedLinkDelivery {
   const SharedLinkDelivery(this._api);
@@ -26,11 +25,15 @@ final class SharedLinkDelivery {
     return uri;
   }
 
-  Future<void> appendToNote({required String noteId, required Uri url}) async {
+  Future<void> appendToNote({
+    required String noteId,
+    required Uri url,
+    required String shareId,
+  }) async {
     await _api.post<void>(
       '/notes/$noteId/shared-links',
       data: {
-        'shareId': const Uuid().v4(),
+        'shareId': shareId,
         'url': url.toString(),
         'createdAt': DateTime.now().toUtc().toIso8601String(),
       },

@@ -34,6 +34,7 @@ final class ShareBridgeStore {
     defaults.removeObject(forKey: "notes_index")
     defaults.removeObject(forKey: "pending_shared_text")
     defaults.removeObject(forKey: "pending_shared_note_id")
+    defaults.removeObject(forKey: "pending_shared_id")
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
@@ -44,11 +45,18 @@ final class ShareBridgeStore {
 
   func readPendingShare() -> [String: String]? {
     guard let text = defaults.string(forKey: "pending_shared_text") else { return nil }
-    return ["text": text, "noteId": defaults.string(forKey: "pending_shared_note_id") ?? ""]
+    let shareId = defaults.string(forKey: "pending_shared_id") ?? UUID().uuidString.lowercased()
+    defaults.set(shareId, forKey: "pending_shared_id")
+    return [
+      "text": text,
+      "noteId": defaults.string(forKey: "pending_shared_note_id") ?? "",
+      "shareId": shareId,
+    ]
   }
 
   func clearPendingShare() {
     defaults.removeObject(forKey: "pending_shared_text")
     defaults.removeObject(forKey: "pending_shared_note_id")
+    defaults.removeObject(forKey: "pending_shared_id")
   }
 }

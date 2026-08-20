@@ -6,6 +6,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
+import java.util.UUID
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -74,11 +75,18 @@ class MainActivity : FlutterActivity() {
                         ShareCredentialStore.clear(this)
                         result.success(null)
                     }
-                    "readPendingShare" -> result.success(mapOf(
-                        "text" to prefs.getString("pending_shared_text", null),
-                    ))
+                    "readPendingShare" -> {
+                        val shareId = prefs.getString("pending_shared_id", null)
+                            ?: UUID.randomUUID().toString().also {
+                                prefs.edit().putString("pending_shared_id", it).apply()
+                            }
+                        result.success(mapOf(
+                            "text" to prefs.getString("pending_shared_text", null),
+                            "shareId" to shareId,
+                        ))
+                    }
                     "clearPendingShare" -> {
-                        prefs.edit().remove("pending_shared_text").apply()
+                        prefs.edit().remove("pending_shared_text").remove("pending_shared_id").apply()
                         result.success(null)
                     }
                     else -> result.notImplemented()

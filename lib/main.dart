@@ -122,7 +122,9 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
       final bridge = ref.read(nativeShareBridgeProvider);
       final pending = await bridge.readPendingShare();
       final pendingText = pending?['text'] as String?;
+      final shareId = pending?['shareId'] as String?;
       if (pendingText == null || pendingText.trim().isEmpty || !mounted) return;
+      if (shareId == null || shareId.isEmpty) return;
       final delivery = ref.read(sharedLinkDeliveryProvider);
       final url = delivery.extractUrl(pendingText);
       if (url == null) {
@@ -154,7 +156,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
         }
       }
       if (note == null) return;
-      await delivery.appendToNote(noteId: note.id, url: url);
+      await delivery.appendToNote(noteId: note.id, url: url, shareId: shareId);
       await bridge.clearPendingShare();
       if (mounted) {
         ScaffoldMessenger.of(
