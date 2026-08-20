@@ -306,7 +306,6 @@ class AttachmentRichLinkCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hasPreview = node.title != null || node.description != null;
     final linkUrl = node.url ?? '';
     final parsedLink = Uri.tryParse(linkUrl);
     final canOpenLink =
@@ -334,29 +333,33 @@ class AttachmentRichLinkCard extends StatelessWidget {
                   color: cs.outlineVariant.withValues(alpha: 0.4),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (node.imageUrl != null)
-                    Image.network(
-                      node.imageUrl!,
-                      height: 160,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const SizedBox(),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          node.domain ?? linkUrl,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.labelSmall?.copyWith(color: cs.outline),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (node.imageUrl != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          node.imageUrl!,
+                          height: 88,
+                          width: 88,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            height: 88,
+                            width: 88,
+                            color: cs.surfaceContainer,
+                            child: Icon(Icons.link, color: cs.onSurfaceVariant),
+                          ),
                         ),
-                        if (hasPreview) ...[
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           if (node.title != null)
                             Text(
                               node.title!,
@@ -365,18 +368,31 @@ class AttachmentRichLinkCard extends StatelessWidget {
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                           if (node.description != null)
-                            Text(
-                              node.description!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                node.description!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
                             ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              node.domain ?? linkUrl,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: cs.outline),
+                            ),
+                          ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -30,4 +30,65 @@ void main() {
       );
     }
   });
+
+  test('round-trips a rich link block with preview metadata', () {
+    const codec = NoteDocumentCodec();
+    final snapshot = codec.parseSnapshot({
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': 'link-1',
+          'type': 'rich_link',
+          'delta': <Map<String, dynamic>>[],
+          'metadata': {
+            'url': 'https://example.com/post',
+            'title': 'Example',
+            'description': 'A safe link',
+            'imageUrl': 'https://example.com/image.jpg',
+            'domain': 'example.com',
+          },
+        },
+      ],
+    });
+
+    final encoded = codec.encodeDocument(snapshot.toMutableDocument());
+
+    expect(encoded, hasLength(1));
+    expect(encoded.single, {
+      'id': 'link-1',
+      'type': 'rich_link',
+      'delta': <Map<String, dynamic>>[],
+      'metadata': {
+        'url': 'https://example.com/post',
+        'title': 'Example',
+        'description': 'A safe link',
+        'imageUrl': 'https://example.com/image.jpg',
+        'domain': 'example.com',
+      },
+    });
+  });
+
+  test('accepts a rich link fallback with only URL and domain', () {
+    const codec = NoteDocumentCodec();
+
+    final snapshot = codec.parseSnapshot({
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': 'link-1',
+          'type': 'rich_link',
+          'delta': <Map<String, dynamic>>[],
+          'metadata': {
+            'url': 'https://example.com/post',
+            'domain': 'example.com',
+          },
+        },
+      ],
+    });
+
+    expect(snapshot.blocks.single.metadata, {
+      'url': 'https://example.com/post',
+      'domain': 'example.com',
+    });
+  });
 }
