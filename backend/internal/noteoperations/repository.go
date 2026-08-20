@@ -58,6 +58,10 @@ type Repository interface {
 	WithTx(tx pgx.Tx) Repository
 }
 
+type sharedLinkReservation interface {
+	ReserveSharedLinkIngestion(context.Context, pgtype.UUID, pgtype.UUID, pgtype.UUID, pgtype.UUID) (sqlcgen.SharedLinkIngestion, error)
+}
+
 type repository struct {
 	db   sqlcgen.DBTX
 	pool *pgxpool.Pool
@@ -86,6 +90,18 @@ func (r *repository) WithQuerier(_ sqlcgen.Querier) Repository {
 
 func (r *repository) WithTx(tx pgx.Tx) Repository {
 	return &repository{db: tx, pool: r.pool}
+}
+
+func (r *repository) ReserveSharedLinkIngestion(
+	ctx context.Context,
+	userID pgtype.UUID,
+	shareID pgtype.UUID,
+	noteID pgtype.UUID,
+	operationID pgtype.UUID,
+) (sqlcgen.SharedLinkIngestion, error) {
+	return sqlcgen.New(r.db).ReserveSharedLinkIngestion(ctx, sqlcgen.ReserveSharedLinkIngestionParams{
+		UserID: userID, ShareID: shareID, NoteID: noteID, OperationID: operationID,
+	})
 }
 
 const lockNoteSQL = `SELECT id, revision, document, snapshot_revision FROM notes WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`

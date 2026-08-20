@@ -82,6 +82,17 @@ func appendRichLinkInRepository(
 	}
 
 	opID := mustParseUUID(operationID)
+	if reserver, ok := repo.(sharedLinkReservation); ok {
+		reserved, reserveErr := reserver.ReserveSharedLinkIngestion(
+			ctx, userID, opID, noteID, opID,
+		)
+		if reserveErr != nil {
+			return AppendRichLinkResponse{}, fmt.Errorf("reserve shared link: %w", reserveErr)
+		}
+		if reserved.NoteID != noteID {
+			return AppendRichLinkResponse{}, errors.New("share already assigned to another note")
+		}
+	}
 	if existing, err := repo.GetNoteOperationByOpID(ctx, noteID, opID); err == nil {
 		return AppendRichLinkResponse{
 			Revision:        existing.Revision,

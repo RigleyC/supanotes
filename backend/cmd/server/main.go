@@ -259,7 +259,7 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	noteOpsH := noteoperations.NewHandler(noteOpsSvc)
 	noteOpsH.RegisterRoutes(protected)
 	shareIntakeH := shareintake.NewHandler(
-		shareintake.NewServiceWithPool(linkPreviewSvc, noteOpsSvc, pool),
+		shareintake.NewService(linkPreviewSvc, noteOpsSvc),
 	)
 	protected.POST("/notes/:noteId/shared-links", shareIntakeH.Append)
 
