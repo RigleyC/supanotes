@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:super_editor/super_editor.dart';
-
+import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
@@ -10,7 +9,7 @@ import 'package:supanotes/features/notes/editor/application/note_editor_provider
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
-import 'package:supanotes/core/auth/current_user.dart';
+import 'package:super_editor/super_editor.dart';
 
 class _ReadySyncHandle implements NoteEditorSyncHandle {
   @override

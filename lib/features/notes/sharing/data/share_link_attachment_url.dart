@@ -13,8 +13,6 @@ Uri shareLinkAttachmentUrl(String token, String attachmentId) {
   return base.replace(
     path:
         '${rootPath.isEmpty ? '' : rootPath}/s/${Uri.encodeComponent(token)}/attachments/${Uri.encodeComponent(attachmentId)}',
-    query: null,
-    fragment: null,
   );
 }
 

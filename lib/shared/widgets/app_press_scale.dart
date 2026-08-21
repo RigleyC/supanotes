@@ -9,9 +9,7 @@ import 'package:motor/motor.dart';
 /// it became visible.
 class AppPressScale extends StatefulWidget {
   const AppPressScale({
-    super.key,
-    required this.pressed,
-    required this.child,
+    required this.pressed, required this.child, super.key,
   });
 
   /// Whether the widget is currently pressed. Pass `false` when not

@@ -9,7 +9,7 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
 class ShareListSection extends ConsumerWidget {
-  const ShareListSection({super.key, required this.noteId});
+  const ShareListSection({required this.noteId, super.key});
 
   final String noteId;
 
@@ -23,7 +23,7 @@ class ShareListSection extends ConsumerWidget {
       title: 'Remover compartilhamento?',
       message: 'Esta pessoa não verá mais esta nota.',
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     await ref
         .read(shareNoteControllerProvider(noteId).notifier)
@@ -73,7 +73,7 @@ class ShareListSection extends ConsumerWidget {
                 )
               : ListView.separated(
                   shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: value.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, i) {

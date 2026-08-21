@@ -1,10 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/editor/document/document_projection_applier.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   test('moves a block after a later block', () {
@@ -287,18 +286,18 @@ void main() {
       var resumeCalls = 0;
       var mirrorCalls = 0;
 
-      final before = DocumentSelection(
-        base: const DocumentPosition(
+      const before = DocumentSelection(
+        base: DocumentPosition(
           nodeId: 'block-1',
           nodePosition: TextNodePosition(offset: 8),
         ),
-        extent: const DocumentPosition(
+        extent: DocumentPosition(
           nodeId: 'block-1',
           nodePosition: TextNodePosition(offset: 10),
         ),
       );
       editor.execute([
-        ChangeSelectionRequest(
+        const ChangeSelectionRequest(
           before,
           SelectionChangeType.placeCaret,
           SelectionReason.userInteraction,

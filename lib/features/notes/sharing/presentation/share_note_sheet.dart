@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:supanotes/features/notes/sharing/application/share_list_controller.dart';
 import 'package:supanotes/features/notes/sharing/application/share_note_controller.dart';
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_link_section.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_list_section.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
-import 'share_list_section.dart';
-import 'share_link_section.dart';
 
 class ShareNoteSheet extends ConsumerStatefulWidget {
-  final String noteId;
 
-  const ShareNoteSheet({super.key, required this.noteId});
+  const ShareNoteSheet({required this.noteId, super.key});
+  final String noteId;
 
   @override
   ConsumerState<ShareNoteSheet> createState() => _ShareNoteSheetState();

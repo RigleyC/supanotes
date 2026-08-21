@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:super_editor/super_editor.dart';
-
-import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
-import 'attachment_renderers.dart';
-import 'document_attachment_widget.dart';
+import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_renderers.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/document_attachment_widget.dart';
+import 'package:super_editor/super_editor.dart';
 
 class AttachmentComponentBuilder implements ComponentBuilder {
   const AttachmentComponentBuilder({
@@ -36,7 +35,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
           ? node.metadata['attachmentId'] as String
           : node.id,
       node: node,
-      createdAt: node.metadata[NodeMetadata.createdAt],
+      createdAt: node.metadata[NodeMetadata.createdAt] as DateTime?,
       collapseImages: collapseImages,
       allowInternalNoteLinks: allowInternalNoteLinks,
       fallbackAttachment:
@@ -71,7 +70,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
   ) {
     if (viewModel is! _AttachmentViewModel) return null;
     return switch (viewModel.node) {
-      DocumentAttachmentNode n => DocumentAttachmentWidget(
+      final DocumentAttachmentNode n => DocumentAttachmentWidget(
         componentKey: context.componentKey,
         nodeId: n.id,
         attachmentId: viewModel.attachmentId,
@@ -85,7 +84,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
         deliveryPreference: viewModel.attachmentDeliveryPreference,
         attachmentDelivery: viewModel.attachmentDelivery,
       ),
-      RichLinkNode n => AttachmentRichLinkCard(
+      final RichLinkNode n => AttachmentRichLinkCard(
         componentKey: context.componentKey,
         node: n,
         selection:

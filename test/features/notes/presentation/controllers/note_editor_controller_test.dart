@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   test('default document starts with the canonical init paragraph', () async {
@@ -39,30 +39,29 @@ void main() {
           id: 'task-parent',
           text: AttributedText('Parent task'),
           isComplete: false,
-          indent: 0,
         ),
         TaskNode(
           id: 'task-1',
           text: AttributedText('Nested task'),
           isComplete: false,
           indent: 1,
-          metadata: {'dueDate': '2026-07-31T10:00:00.000Z'},
+          metadata: const {'dueDate': '2026-07-31T10:00:00.000Z'},
         ),
       ],
     );
 
-    expect((controller.document.getNodeById('task-1') as TaskNode).indent, 1);
+    expect((controller.document.getNodeById('task-1')! as TaskNode).indent, 1);
     controller.updateTaskMetadataInEditor('task-1', reminder: '10m');
-    expect((controller.document.getNodeById('task-1') as TaskNode).indent, 1);
+    expect((controller.document.getNodeById('task-1')! as TaskNode).indent, 1);
 
     controller.completeTaskInEditor(
       'task-1',
       now: DateTime.utc(2026, 7, 31, 12),
     );
-    expect((controller.document.getNodeById('task-1') as TaskNode).indent, 1);
+    expect((controller.document.getNodeById('task-1')! as TaskNode).indent, 1);
 
     controller.reopenTaskInEditor('task-1');
-    expect((controller.document.getNodeById('task-1') as TaskNode).indent, 1);
+    expect((controller.document.getNodeById('task-1')! as TaskNode).indent, 1);
     await controller.dispose();
   });
 
@@ -77,7 +76,7 @@ void main() {
             id: 'task-1',
             text: AttributedText('Daily task'),
             isComplete: false,
-            metadata: {
+            metadata: const {
               'dueDate': '2026-07-01T09:00:00.000',
               'hasTime': true,
               'recurrenceRule': 'daily',
@@ -116,7 +115,7 @@ void main() {
             id: 'task-1',
             text: AttributedText('Weekly task'),
             isComplete: false,
-            metadata: {
+            metadata: const {
               'dueDate': '2026-08-12T09:00:00.000',
               'hasTime': true,
               'recurrenceRule': 'weekly',
@@ -151,7 +150,7 @@ void main() {
           id: 'task-1',
           text: AttributedText('One-time task'),
           isComplete: false,
-          metadata: {'dueDate': '2026-08-12T09:00:00.000', 'hasTime': true},
+          metadata: const {'dueDate': '2026-08-12T09:00:00.000', 'hasTime': true},
         ),
       ],
     );
@@ -177,7 +176,7 @@ void main() {
             id: 'task-1',
             text: AttributedText('Weekly task'),
             isComplete: false,
-            metadata: {
+            metadata: const {
               'dueDate': '2026-08-12T09:00:00.000',
               'hasTime': true,
               'recurrenceRule': 'weekly',
@@ -218,7 +217,7 @@ void main() {
             id: 'task-1',
             text: AttributedText('All-day task'),
             isComplete: false,
-            metadata: {
+            metadata: const {
               'dueDate': '2026-08-12T00:00:00.000',
               'hasTime': false,
               'recurrenceRule': 'weekly',

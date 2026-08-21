@@ -267,8 +267,8 @@ void main() {
       'calls /auth/logout with the refresh token and clears storage',
       () async {
         final storage = _MockAuthLocalStorage();
-        when(() => storage.getRefreshToken()).thenAnswer((_) async => 'r-1');
-        when(() => storage.clear()).thenAnswer((_) async {});
+        when(storage.getRefreshToken).thenAnswer((_) async => 'r-1');
+        when(storage.clear).thenAnswer((_) async {});
 
         final adapter = _StubAdapter((options) async {
           expect(options.path, '/auth/logout');
@@ -282,14 +282,14 @@ void main() {
 
         await repo.logout();
         expect(adapter.hits.length, 1);
-        verify(() => storage.clear()).called(1);
+        verify(storage.clear).called(1);
       },
     );
 
     test('still clears storage when /auth/logout fails', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'r-1');
-      when(() => storage.clear()).thenAnswer((_) async {});
+      when(storage.getRefreshToken).thenAnswer((_) async => 'r-1');
+      when(storage.clear).thenAnswer((_) async {});
 
       final adapter = _StubAdapter((_) async {
         return _jsonResponse(500, {'error': 'server down'});
@@ -301,13 +301,13 @@ void main() {
       );
 
       await repo.logout();
-      verify(() => storage.clear()).called(1);
+      verify(storage.clear).called(1);
     });
 
     test('skips the HTTP call when there is no refresh token', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getRefreshToken()).thenAnswer((_) async => null);
-      when(() => storage.clear()).thenAnswer((_) async {});
+      when(storage.getRefreshToken).thenAnswer((_) async => null);
+      when(storage.clear).thenAnswer((_) async {});
 
       final adapter = _StubAdapter((_) async {
         fail('should not reach the backend without a refresh token');
@@ -320,14 +320,14 @@ void main() {
 
       await repo.logout();
       expect(adapter.hits, isEmpty);
-      verify(() => storage.clear()).called(1);
+      verify(storage.clear).called(1);
     });
   });
 
   group('AuthRepository.isAuthenticated', () {
     test('returns true when an access token is present', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
       final repo = AuthRepository(
         apiClient: _apiClient(
           _StubAdapter((_) async => _jsonResponse(200, {})),
@@ -339,7 +339,7 @@ void main() {
 
     test('returns false when no access token is stored', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => null);
+      when(storage.getAccessToken).thenAnswer((_) async => null);
       final repo = AuthRepository(
         apiClient: _apiClient(
           _StubAdapter((_) async => _jsonResponse(200, {})),
@@ -351,7 +351,7 @@ void main() {
 
     test('returns false when the stored access token is empty', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => '');
+      when(storage.getAccessToken).thenAnswer((_) async => '');
       final repo = AuthRepository(
         apiClient: _apiClient(
           _StubAdapter((_) async => _jsonResponse(200, {})),

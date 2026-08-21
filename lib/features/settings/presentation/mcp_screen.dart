@@ -1,14 +1,13 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
 import 'package:supanotes/features/settings/presentation/mcp_configuration.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 
 class McpScreen extends ConsumerStatefulWidget {
   const McpScreen({super.key});
@@ -158,10 +157,10 @@ class _TokenCard extends StatelessWidget {
           ),
         ),
       ),
-      loading: () => Card(
+      loading: () => const Card(
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: const Center(child: CircularProgressIndicator()),
+          padding: EdgeInsets.all(AppSpacing.md),
+          child: Center(child: CircularProgressIndicator()),
         ),
       ),
       error: (err, _) => Card(

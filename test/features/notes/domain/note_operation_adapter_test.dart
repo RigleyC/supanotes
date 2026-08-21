@@ -1,15 +1,13 @@
 import 'dart:async';
-
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:super_editor/super_editor.dart';
 
 class MockSyncService extends Mock implements NoteOperationsSyncService {}
 
@@ -89,9 +87,9 @@ void main() {
       adapter.start();
       await Future.delayed(Duration.zero);
 
-      final pos = DocumentPosition(
+      const pos = DocumentPosition(
         nodeId: 'block-1',
-        nodePosition: const TextNodePosition(offset: 5),
+        nodePosition: TextNodePosition(offset: 5),
       );
       editor.execute([
         InsertTextRequest(
@@ -305,7 +303,7 @@ void main() {
       await Future.delayed(Duration.zero);
       capturedOps = null;
 
-      editor.execute([MoveNodeRequest(nodeId: 'block-2', newIndex: 0)]);
+      editor.execute([const MoveNodeRequest(nodeId: 'block-2', newIndex: 0)]);
 
       await adapter.flushNow();
 
@@ -345,10 +343,10 @@ void main() {
       () async {
         final adapter = createAdapter();
         composer.setSelectionWithReason(
-          DocumentSelection.collapsed(
+          const DocumentSelection.collapsed(
             position: DocumentPosition(
               nodeId: 'block-1',
-              nodePosition: const TextNodePosition(offset: 5),
+              nodePosition: TextNodePosition(offset: 5),
             ),
           ),
         );
@@ -1036,9 +1034,9 @@ void main() {
 
         editor.execute([
           InsertTextRequest(
-            documentPosition: DocumentPosition(
+            documentPosition: const DocumentPosition(
               nodeId: 'block-1',
-              nodePosition: const TextNodePosition(offset: 5),
+              nodePosition: TextNodePosition(offset: 5),
             ),
             textToInsert: ' World',
             attributions: {},
@@ -1047,7 +1045,7 @@ void main() {
 
         final firstFlushFuture = adapter.flushNow();
 
-        bool secondFlushResolved = false;
+        var secondFlushResolved = false;
         final secondFlushFuture = adapter.flushNow().then((_) {
           secondFlushResolved = true;
         });

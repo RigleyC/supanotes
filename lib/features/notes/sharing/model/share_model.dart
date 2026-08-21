@@ -1,12 +1,6 @@
-import 'share_permission.dart';
+import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
 
 class ShareModel {
-  final String id;
-  final String noteId;
-  final String userId;
-  final String email;
-  final String name;
-  final SharePermission permission;
 
   const ShareModel({
     required this.id,
@@ -25,4 +19,10 @@ class ShareModel {
     name: (json['name'] as String?) ?? '',
     permission: SharePermission.fromJson(json['permission'] as String),
   );
+  final String id;
+  final String noteId;
+  final String userId;
+  final String email;
+  final String name;
+  final SharePermission permission;
 }

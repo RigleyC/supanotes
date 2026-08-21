@@ -117,12 +117,11 @@ void main() {
   group('AuthInterceptor.onRequest', () {
     test('attaches Authorization header when a token is stored', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok-1');
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok-1');
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {},
         onRefresh: (_) async => null,
         replay: (_) => throw UnimplementedError('not used in this test'),
@@ -145,12 +144,11 @@ void main() {
 
     test('attaches Authorization header even for /auth/* paths', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok-1');
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok-1');
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {},
         onRefresh: (_) async => null,
         replay: (_) => throw UnimplementedError('not used in this test'),
@@ -173,12 +171,11 @@ void main() {
 
     test('does not attach Authorization when storage is empty', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => null);
+      when(storage.getAccessToken).thenAnswer((_) async => null);
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {},
         onRefresh: (_) async => null,
         replay: (_) => throw UnimplementedError('not used in this test'),
@@ -205,10 +202,10 @@ void main() {
         'the new token', () async {
       final storage = _MockAuthLocalStorage();
       when(
-        () => storage.getAccessToken(),
+        storage.getAccessToken,
       ).thenAnswer((_) async => 'old-access');
       when(
-        () => storage.getRefreshToken(),
+        storage.getRefreshToken,
       ).thenAnswer((_) async => 'old-refresh');
       when(
         () => storage.saveTokens(
@@ -218,7 +215,7 @@ void main() {
       ).thenAnswer((_) async {});
 
       var tokenReadCount = 0;
-      when(() => storage.getAccessToken()).thenAnswer((_) async {
+      when(storage.getAccessToken).thenAnswer((_) async {
         tokenReadCount++;
         return tokenReadCount == 1 ? 'old-access' : 'new-access';
       });
@@ -238,10 +235,9 @@ void main() {
       final cb = _refreshCallbacks(refreshDio);
 
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {},
         onRefresh: cb.onRefresh,
         replay: cb.replay,
@@ -268,10 +264,10 @@ void main() {
     test('refreshes and replays an expired MCP token request', () async {
       final storage = _MockAuthLocalStorage();
       when(
-        () => storage.getAccessToken(),
+        storage.getAccessToken,
       ).thenAnswer((_) async => 'old-access');
       when(
-        () => storage.getRefreshToken(),
+        storage.getRefreshToken,
       ).thenAnswer((_) async => 'old-refresh');
       when(
         () => storage.saveTokens(
@@ -297,8 +293,7 @@ void main() {
       final interceptor = buildTestAuthInterceptor(
         getAccessToken: storage.getAccessToken,
         getRefreshToken: storage.getRefreshToken,
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {},
         onRefresh: callbacks.onRefresh,
         replay: callbacks.replay,
@@ -327,10 +322,10 @@ void main() {
       () async {
         final storage = _MockAuthLocalStorage();
         when(
-          () => storage.getAccessToken(),
+          storage.getAccessToken,
         ).thenAnswer((_) async => 'old-access');
         when(
-          () => storage.getRefreshToken(),
+          storage.getRefreshToken,
         ).thenAnswer((_) async => 'refresh');
         when(
           () => storage.saveTokens(
@@ -344,8 +339,7 @@ void main() {
         final interceptor = buildTestAuthInterceptor(
           getAccessToken: storage.getAccessToken,
           getRefreshToken: storage.getRefreshToken,
-          saveTokens: ({required accessToken, required refreshToken}) => storage
-              .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+          saveTokens: storage.saveTokens,
           onAuthFailure: () async {},
           onRefresh: (_) async {
             refreshCalls++;
@@ -375,9 +369,9 @@ void main() {
     test('on 401 with a failed refresh, invokes onAuthFailure and propagates '
         'the original error', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'old');
+      when(storage.getAccessToken).thenAnswer((_) async => 'old');
       when(
-        () => storage.getRefreshToken(),
+        storage.getRefreshToken,
       ).thenAnswer((_) async => 'old-refresh');
 
       var failureCalls = 0;
@@ -391,10 +385,9 @@ void main() {
       final cb = _refreshCallbacks(refreshDio);
 
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {
           failureCalls++;
         },
@@ -417,15 +410,14 @@ void main() {
 
     test('transient refresh failure does not expire the session', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'old');
-      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'refresh');
+      when(storage.getAccessToken).thenAnswer((_) async => 'old');
+      when(storage.getRefreshToken).thenAnswer((_) async => 'refresh');
 
       var failureCalls = 0;
       final interceptor = buildTestAuthInterceptor(
         getAccessToken: storage.getAccessToken,
         getRefreshToken: storage.getRefreshToken,
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {
           failureCalls++;
         },
@@ -450,12 +442,11 @@ void main() {
     test('a request marked as already retried (extra.retry = true) is passed '
         'through unchanged', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {},
         onRefresh: (_) async {
           fail('refresh should not be called on a retried request');
@@ -483,9 +474,9 @@ void main() {
     test('concurrent 401s share a single refresh and a single onAuthFailure '
         'call when the refresh fails', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'old');
+      when(storage.getAccessToken).thenAnswer((_) async => 'old');
       when(
-        () => storage.getRefreshToken(),
+        storage.getRefreshToken,
       ).thenAnswer((_) async => 'old-refresh');
 
       var refreshHits = 0;
@@ -502,10 +493,9 @@ void main() {
       final cb = _refreshCallbacks(refreshDio);
 
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {
           failureCalls++;
         },
@@ -537,12 +527,11 @@ void main() {
   group('AuthInterceptor.onError (non-401)', () {
     test('non-401 errors are passed through with no refresh attempt', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {},
         onRefresh: (_) async {
           fail('refresh should not be called on a 500');
@@ -568,12 +557,11 @@ void main() {
   group('AuthInterceptor.onError (401 on auth route)', () {
     test('auth route 401s skip refresh and are passed through', () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
       final interceptor = buildTestAuthInterceptor(
-        getAccessToken: () => storage.getAccessToken(),
-        getRefreshToken: () => storage.getRefreshToken(),
-        saveTokens: ({required accessToken, required refreshToken}) => storage
-            .saveTokens(accessToken: accessToken, refreshToken: refreshToken),
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
         onAuthFailure: () async {
           fail('onAuthFailure should not be called for auth-route 401s');
         },

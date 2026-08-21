@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
-import 'snack.dart';
-import 'snack_overlay.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/src/snack.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/src/snack_overlay.dart';
 
 void showExpressiveSnack({
-  BuildContext? context,
-  required String title,
+  required String title, BuildContext? context,
   String? subtitle,
   IconData? icon,
   SnackBarAction? action,

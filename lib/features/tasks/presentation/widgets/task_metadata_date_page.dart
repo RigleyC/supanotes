@@ -1,7 +1,7 @@
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
-import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 
@@ -32,9 +32,7 @@ enum QuickDueDate {
 
 class TaskMetadataDatePage extends StatelessWidget {
   const TaskMetadataDatePage({
-    super.key,
-    required this.selected,
-    required this.onSelected,
+    required this.selected, required this.onSelected, super.key,
   });
 
   final DateTime? selected;

@@ -121,7 +121,7 @@ class HiddenTaskTrailingTapHandler extends ContentTapDelegate {
   }
 
   bool _isTapBelowComponent(DocumentComponent component, Offset globalOffset) {
-    final componentBox = component.context.findRenderObject() as RenderBox;
+    final componentBox = component.context.findRenderObject()! as RenderBox;
     final tapOffset = componentBox.globalToLocal(globalOffset);
     return tapOffset.dy > componentBox.size.height;
   }

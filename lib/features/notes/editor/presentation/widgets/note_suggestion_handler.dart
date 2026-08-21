@@ -1,6 +1,5 @@
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:super_editor/super_editor.dart';
 
 void applyNoteSuggestion({
   required Editor editor,

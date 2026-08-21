@@ -3,10 +3,9 @@ import 'dart:math';
 
 import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 quill.Delta deltaFromOps(List<dynamic> ops) {
   final delta = quill.Delta();
@@ -27,7 +26,7 @@ String deltaToPlainText(quill.Delta delta) {
   final buffer = StringBuffer();
   for (final op in delta.operations) {
     if (op.data is String) {
-      buffer.write(op.data as String);
+      buffer.write(op.data! as String);
     }
   }
   return buffer.toString();
@@ -54,7 +53,6 @@ void main() {
         payloadJson: jsonEncode({'ops': ops}),
         createdAt: DateTime.utc(2026, 7, 22),
         attemptCount: 0,
-        lastAttemptAt: null,
         status: 'pending',
       );
     }
@@ -162,7 +160,7 @@ void main() {
         // Servidor possui 25 operacoes ja comitadas pelo outro usuario
         final remoteOps = <Operation>[];
         var docRemote = quill.Delta()..insert('Inicio ');
-        for (int i = 0; i < 25; i++) {
+        for (var i = 0; i < 25; i++) {
           final toInsert = 'R$i ';
           remoteOps.add(
             makeRemote(
@@ -188,7 +186,7 @@ void main() {
         // Usuario offline acumulou 25 operacoes pendentes locais na fila de sync
         final pendingOps = <PendingNoteOperationData>[];
         var docPending = quill.Delta()..insert('Inicio ');
-        for (int i = 0; i < 25; i++) {
+        for (var i = 0; i < 25; i++) {
           final toInsert = 'L$i ';
           final currentLen = deltaToPlainText(docPending).length;
           pendingOps.add(
@@ -197,8 +195,6 @@ void main() {
               operationId: 'loc-$i',
               blockId: blockId,
               kind: 'text_delta',
-              baseRevision:
-                  0, // Todas criadas localmente quando estava offline no rev 0
               ordinal: i,
               ops: [
                 {'retain': currentLen},
@@ -236,7 +232,7 @@ void main() {
         final text = deltaToPlainText(finalDoc);
 
         // Garante que todas as 25 edicoes locais e 25 edicoes remotas estao presentes
-        for (int i = 0; i < 25; i++) {
+        for (var i = 0; i < 25; i++) {
           expect(
             text.contains('R$i'),
             isTrue,
@@ -276,7 +272,7 @@ void main() {
           final words = clientWords[clientId]!;
           final ops = <PendingNoteOperationData>[];
           var len = 0;
-          for (int i = 0; i < words.length; i++) {
+          for (var i = 0; i < words.length; i++) {
             final textToInsert = '${words[i]} ';
             ops.add(
               makePending(
@@ -284,7 +280,6 @@ void main() {
                 operationId: 'op-$clientId-$i',
                 blockId: blockId,
                 kind: 'text_delta',
-                baseRevision: 0,
                 ordinal: i,
                 ops: [
                   if (len > 0) {'retain': len},

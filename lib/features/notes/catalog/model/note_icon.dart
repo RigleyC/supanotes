@@ -72,7 +72,7 @@ class NoteIcon {
     if (utf8.encode(value).length > maxNoteIconBytes) {
       throw ArgumentError.value(value, 'value', 'Emoji is too long');
     }
-    return NoteIcon._(kind: NoteIconKind.emoji, value: value, colorKey: null);
+    return NoteIcon._(kind: NoteIconKind.emoji, value: value);
   }
 
   factory NoteIcon.catalog({required String id, required String colorKey}) {

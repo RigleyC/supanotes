@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import '../note_lifecycle_policy.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 
 @DataClassName('NoteData')
 class Notes extends Table {

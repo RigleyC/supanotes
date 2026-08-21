@@ -302,7 +302,7 @@ class NoteDocumentCodec {
     }
     return rawMetadata == null
         ? const <String, dynamic>{}
-        : Map<String, dynamic>.from(rawMetadata);
+        : Map<String, dynamic>.from(rawMetadata as Map);
   }
 
   static void _validateMetadata(String type, Map<String, dynamic> metadata) {
@@ -320,6 +320,9 @@ class NoteDocumentCodec {
           'description',
           'imageUrl',
           'domain',
+          'previewStatus',
+          'faviconUrl',
+          'siteName',
         ]) {
           requireType(key, metadata[key] is String);
         }
@@ -652,6 +655,9 @@ class NoteDocumentCodec {
     if (node.description != null) metadata['description'] = node.description;
     if (node.imageUrl != null) metadata['imageUrl'] = node.imageUrl;
     if (node.domain != null) metadata['domain'] = node.domain;
+    if (node.previewStatus != null) metadata['previewStatus'] = node.previewStatus;
+    if (node.faviconUrl != null) metadata['faviconUrl'] = node.faviconUrl;
+    if (node.siteName != null) metadata['siteName'] = node.siteName;
     return (type: 'rich_link', text: AttributedText(), metadata: metadata);
   }
 
@@ -772,6 +778,9 @@ class NoteDocumentCodec {
         description: richLinkMetadata['description'] as String?,
         imageUrl: richLinkMetadata['imageUrl'] as String?,
         domain: richLinkMetadata['domain'] as String?,
+        previewStatus: richLinkMetadata['previewStatus'] as String?,
+        faviconUrl: richLinkMetadata['faviconUrl'] as String?,
+        siteName: richLinkMetadata['siteName'] as String?,
         metadata: richLinkMetadata,
       );
     }

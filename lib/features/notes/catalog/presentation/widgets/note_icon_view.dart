@@ -4,7 +4,7 @@ import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_catalog.dart';
 
 class NoteIconView extends StatelessWidget {
-  const NoteIconView({super.key, required this.icon, this.size = 20});
+  const NoteIconView({required this.icon, super.key, this.size = 20});
 
   final NoteIcon icon;
   final double size;

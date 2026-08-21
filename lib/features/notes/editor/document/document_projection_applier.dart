@@ -1,16 +1,13 @@
 import 'dart:convert';
-import 'package:super_editor/super_editor.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
-import 'note_document_codec.dart';
-import 'note_document_constants.dart';
+import 'package:super_editor/super_editor.dart';
 
 class DocumentProjectionApplier {
-  final MutableDocument _document;
-  final Editor _editor;
-  final NoteDocumentCodec _codec;
 
   DocumentProjectionApplier({
     required MutableDocument document,
@@ -19,6 +16,9 @@ class DocumentProjectionApplier {
   }) : _document = document,
        _editor = editor,
        _codec = codec;
+  final MutableDocument _document;
+  final Editor _editor;
+  final NoteDocumentCodec _codec;
 
   Future<void> rebuildFromSnapshot({
     required Map<String, dynamic> snapshot,
@@ -167,25 +167,18 @@ class DocumentProjectionApplier {
     switch (kind) {
       case NoteOperationWireNames.textDelta:
         _applyTextDelta(blockId, payload);
-        break;
       case NoteOperationWireNames.createBlock:
         _applyCreateBlock(payload);
-        break;
       case NoteOperationWireNames.deleteBlock:
         _applyDeleteBlock(blockId);
-        break;
       case NoteOperationWireNames.moveBlock:
         _applyMoveBlock(blockId, payload);
-        break;
       case NoteOperationWireNames.setBlockType:
         _applySetBlockType(blockId, payload);
-        break;
       case NoteOperationWireNames.setBlockMetadata:
         _applySetBlockMetadata(blockId, payload);
-        break;
       case NoteOperationWireNames.completeTaskOccurrence:
         _applyCompleteTaskOccurrence(blockId, payload);
-        break;
     }
   }
 
@@ -215,7 +208,7 @@ class DocumentProjectionApplier {
     }
 
     final afterBlockId = payload['afterBlockId'] as String?;
-    int insertIndex = _document.nodeCount;
+    var insertIndex = _document.nodeCount;
     if (afterBlockId != null) {
       final targetNode = _document.getNodeById(afterBlockId);
       if (targetNode != null) {
@@ -246,7 +239,7 @@ class DocumentProjectionApplier {
     final sourceIndex = _document.getNodeIndexById(moveBlockId);
     final afterBlockId = payload['afterBlockId'] as String?;
     if (afterBlockId == moveBlockId) return;
-    int targetIndex = _document.nodeCount - 1;
+    var targetIndex = _document.nodeCount - 1;
     if (afterBlockId == null) {
       targetIndex = 0;
     } else {
@@ -271,7 +264,7 @@ class DocumentProjectionApplier {
     if (node == null) return;
 
     final text = (node is TextNode) ? node.text : AttributedText();
-    final isComplete = (node is TaskNode) ? node.isComplete : false;
+    final isComplete = (node is TaskNode) && node.isComplete;
     final newNode = _codec.createNodeFromBlockType(
       nodeId: blockId,
       type: newType,
@@ -359,7 +352,7 @@ class DocumentProjectionApplier {
       }
     }
 
-    return nodes.map((node) => _codec.encodeNode(node)).toList(growable: false);
+    return nodes.map(_codec.encodeNode).toList(growable: false);
   }
 
   void _applyProjectedPayload(
@@ -371,25 +364,18 @@ class DocumentProjectionApplier {
     switch (kind) {
       case NoteOperationWireNames.textDelta:
         _projectTextDelta(nodes, blockId, payload);
-        break;
       case NoteOperationWireNames.createBlock:
         _projectCreateBlock(nodes, payload);
-        break;
       case NoteOperationWireNames.deleteBlock:
         _projectDeleteBlock(nodes, blockId);
-        break;
       case NoteOperationWireNames.moveBlock:
         _projectMoveBlock(nodes, blockId, payload);
-        break;
       case NoteOperationWireNames.setBlockType:
         _projectSetBlockType(nodes, blockId, payload);
-        break;
       case NoteOperationWireNames.setBlockMetadata:
         _projectSetBlockMetadata(nodes, blockId, payload);
-        break;
       case NoteOperationWireNames.completeTaskOccurrence:
         _projectCompleteTaskOccurrence(nodes, blockId, payload);
-        break;
     }
   }
 
@@ -421,7 +407,7 @@ class DocumentProjectionApplier {
     if (nodes.any((existing) => existing.id == node.id)) return;
 
     final afterBlockId = payload['afterBlockId'] as String?;
-    int insertIndex = nodes.length;
+    var insertIndex = nodes.length;
     if (afterBlockId != null) {
       final targetIndex = nodes.indexWhere((existing) => existing.id == afterBlockId);
       if (targetIndex >= 0) {
@@ -453,7 +439,7 @@ class DocumentProjectionApplier {
 
     final afterBlockId = payload['afterBlockId'] as String?;
     if (afterBlockId == moveBlockId) return;
-    int targetIndex = nodes.length - 1;
+    var targetIndex = nodes.length - 1;
     if (afterBlockId == null) {
       targetIndex = 0;
     } else {
@@ -481,7 +467,7 @@ class DocumentProjectionApplier {
 
     final newType = payload['type'] as String? ?? 'paragraph';
     final text = (node is TextNode) ? node.text : AttributedText();
-    final isComplete = (node is TaskNode) ? node.isComplete : false;
+    final isComplete = (node is TaskNode) && node.isComplete;
     nodes[index] = _codec.createNodeFromBlockType(
       nodeId: blockId,
       type: newType,

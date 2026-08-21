@@ -32,8 +32,6 @@ Future<T?> showGlobalSheet<T>({
 
   return FamilyModalSheet.show<T>(
     context: context,
-    isDismissible: true,
-    enableDrag: true,
     contentBackgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
     builder: (sheetContext) {
       if (onDismissed != null && !listenerScheduled) {

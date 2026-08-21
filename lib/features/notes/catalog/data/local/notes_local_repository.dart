@@ -1,12 +1,11 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/database/daos/notes_dao.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/core/database/daos/notes_dao.dart';
-
-final notesLocalRepositoryProvider = Provider.autoDispose<NotesLocalRepository>(
+final Provider<NotesLocalRepository> notesLocalRepositoryProvider = Provider.autoDispose<NotesLocalRepository>(
   (ref) {
     final db = ref.watch(appDatabaseProvider);
     final userId = ref.watch(currentUserIdProvider);

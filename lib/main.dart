@@ -1,26 +1,31 @@
+import 'dart:async';
+
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supanotes/shared/theme/app_theme.dart';
-import 'package:timeago/timeago.dart' as timeago;
-
-import 'core/constants/app_constants.dart';
-import 'core/di/providers.dart';
-import 'shared/widgets/app_snackbar.dart';
-import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
-import 'core/router/app_router.dart';
-import 'core/router/app_link_provider.dart';
-
-import 'package:intl/date_symbol_data_local.dart';
-import 'package:timezone/data/latest.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supanotes/core/constants/app_constants.dart';
+import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/router/app_link_provider.dart';
+import 'package:supanotes/core/router/app_router.dart';
+import 'package:supanotes/core/utils/platform_utils.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
+import 'package:supanotes/features/notes/share/domain/share_strings.dart';
+import 'package:supanotes/features/notes/share/presentation/note_picker_sheet.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
+import 'package:supanotes/shared/theme/app_theme.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:timezone/data/latest.dart';
+import 'package:timezone/timezone.dart' as tz;
 import 'package:window_manager/window_manager.dart';
-import 'core/utils/platform_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +58,7 @@ void main() async {
   );
 
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
-  await initializeDateFormatting('pt_BR', null);
+  await initializeDateFormatting('pt_BR');
   runApp(
     UncontrolledProviderScope(
       container: container,
@@ -65,18 +70,93 @@ void main() async {
   // scheduler, not at app startup.
 }
 
-class SupaNotesApp extends ConsumerWidget {
+class SupaNotesApp extends ConsumerStatefulWidget {
   const SupaNotesApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SupaNotesApp> createState() => _SupaNotesAppState();
+}
+
+class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final coordinator = ref.read(shareIntakeCoordinatorProvider);
+      unawaited(coordinator.onAuthStateChanged(
+        ref.read(authControllerProvider).asData?.value,
+      ));
+      unawaited(_processPendingShare());
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_processPendingShare());
+    }
+  }
+
+  Future<void> _processPendingShare() async {
+    final PendingShareResult result;
+    try {
+      result = await ref
+          .read(shareIntakeCoordinatorProvider)
+          .processPendingShare(pickNote: _pickNote);
+    } catch (error) {
+      debugPrint('Pending shared link delivery failed: $error');
+      AppMessenger.showError(ShareStrings.deliveryFailed);
+      return;
+    }
+    if (!mounted) return;
+    switch (result) {
+      case PendingShareDelivered(:final note):
+        AppMessenger.showSuccess(ShareStrings.linkSavedIn(note.title));
+      case PendingShareInvalidUrl():
+        AppMessenger.showInfo(ShareStrings.sharedTextHasNoUrl);
+      case PendingShareNone() || PendingShareDismissed():
+        break;
+    }
+  }
+
+  Future<NoteModel?> _pickNote(List<NoteModel> notes) {
+    if (!mounted) return Future.value();
+    return showShareNotePickerSheet(context, notes: notes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.listen(taskNotificationSchedulerProvider, (_, _) {});
+    ref.listen(authControllerProvider, (_, next) {
+      // Ignore loading/error transitions: only settled sessions drive the
+      // native bridge and pending-share delivery.
+      next.whenData((user) {
+        final coordinator = ref.read(shareIntakeCoordinatorProvider);
+        unawaited(coordinator.onAuthStateChanged(user));
+        if (user != null) unawaited(_processPendingShare());
+      });
+    });
     ref.listen(noteCatalogSyncProvider, (_, next) {
       next.whenOrNull(
         error: (error, _) {
           debugPrint('Note catalog sync failed: $error');
         },
       );
+    });
+    ref.listen(activeNotesProvider, (_, next) {
+      next.whenData((notes) {
+        unawaited(
+          ref.read(shareIntakeCoordinatorProvider).publishNotesIndex(notes),
+        );
+      });
     });
 
     final router = ref.watch(goRouterProvider);
@@ -101,7 +181,7 @@ class SupaNotesApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       builder: (context, child) {
-        Widget result = child!;
+        var result = child!;
         if (PlatformInfo.isIOS) {
           final brightness = MediaQuery.platformBrightnessOf(context);
           final themeData = brightness == Brightness.dark

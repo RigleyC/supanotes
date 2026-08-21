@@ -1,11 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:super_editor/super_editor.dart';
 
 class MockNoteOperationsDao extends Mock implements NoteOperationsDao {}
 
@@ -25,7 +24,7 @@ void main() {
         ordinal: 0,
         kind: 'fallback',
         payloadJson: '{}',
-        createdAt: DateTime.utc(2026, 1, 1),
+        createdAt: DateTime.utc(2026),
       ),
     );
     registerFallbackValue(
@@ -33,7 +32,7 @@ void main() {
         noteId: 'fallback',
         revision: 0,
         documentJson: '{}',
-        updatedAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026),
       ),
     );
     registerFallbackValue(
@@ -168,8 +167,6 @@ void main() {
           createdAt: DateTime.utc(2026, 7, 20),
           attemptCount: 0,
           status: 'pending',
-          blockId: null,
-          lastAttemptAt: null,
         ),
       ];
       when(
@@ -285,7 +282,6 @@ void main() {
             blockId: op.blockId.value,
             payloadJson: op.payloadJson.value,
             createdAt: op.createdAt.value,
-            lastAttemptAt: null,
             attemptCount: 0,
             status: 'pending',
           ),

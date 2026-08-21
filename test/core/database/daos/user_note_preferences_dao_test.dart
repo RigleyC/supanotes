@@ -129,9 +129,9 @@ void main() {
         'ALTER TABLE user_note_preferences DROP COLUMN collapse_images',
       );
       await db.customStatement(
-        "INSERT INTO notes "
-        "(id, user_id, content, created_at, updated_at, has_remote_copy, "
-        "lifecycle_state, collapse_images) "
+        'INSERT INTO notes '
+        '(id, user_id, content, created_at, updated_at, has_remote_copy, '
+        'lifecycle_state, collapse_images) '
         "VALUES ('migrated-note', 'owner-1', '', strftime('%s', 'now'), "
         "strftime('%s', 'now'), 1, '$materializedLifecycleState', 1)",
       );

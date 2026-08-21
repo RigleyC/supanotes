@@ -21,7 +21,6 @@ import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
 
 class ApiClient {
-  final Dio _dio;
 
   /// Production constructor — builds the [Dio] instance, creates the
   /// [AuthInterceptor] internally, and wires refresh + replay to use the
@@ -65,6 +64,7 @@ class ApiClient {
     : _dio = dio ?? _buildDio() {
     _dio.interceptors.add(authInterceptor);
   }
+  final Dio _dio;
 
   Future<Response<T>> get<T>(
     String path, {

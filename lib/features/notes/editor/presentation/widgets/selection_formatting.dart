@@ -1,6 +1,5 @@
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
+import 'package:super_editor/super_editor.dart';
 
 List<DocumentNode> editorSelectionNodes(
   Document document,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:super_editor/super_editor.dart';
 
-const double noteEditorMarkerTextGap = 8.0;
+const double noteEditorMarkerTextGap = 8;
 
 double noteEditorIndentUnit(TextStyle textStyle) {
   return (textStyle.fontSize ?? 16) * 0.60 * 4;
@@ -112,7 +112,7 @@ Widget _leftAlignedDotBuilder(
             ),
           ],
         ),
-        textScaler: const TextScaler.linear(1.0),
+        textScaler: const TextScaler.linear(1),
       ),
     ),
   );
@@ -155,7 +155,7 @@ double _orderedListMarkerWidth(
   final painter = TextPainter(
     text: TextSpan(text: marker, style: textStyle.copyWith(inherit: false)),
     textDirection: TextDirection.ltr,
-    textScaler: const TextScaler.linear(1.0),
+    textScaler: const TextScaler.linear(1),
   )..layout();
   return painter.width;
 }

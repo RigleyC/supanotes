@@ -19,7 +19,6 @@ class ApiConstants {
 
   static const String _envBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: '',
   );
 
   static const String _prodBaseUrl =

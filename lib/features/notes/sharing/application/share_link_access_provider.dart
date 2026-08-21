@@ -1,18 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:supanotes/core/di/providers.dart';
+import 'package:riverpod/src/providers/future_provider.dart';
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/features/notes/sharing/data/share_link_access_repository.dart';
-import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
+import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
+import 'package:supanotes/features/notes/sharing/data/share_link_access_repository.dart';
 
-final shareLinkAccessResolverProvider =
+final Provider<ShareLinkAccessResolver> shareLinkAccessResolverProvider =
     Provider.autoDispose<ShareLinkAccessResolver>(
       (ref) =>
           ShareLinkAccessResolver(ref.watch(shareLinkAccessRepositoryProvider)),
     );
 
-final shareLinkAccessProvider = FutureProvider.autoDispose
+final FutureProviderFamily<ShareLinkAccessDecision, String> shareLinkAccessProvider = FutureProvider.autoDispose
     .family<ShareLinkAccessDecision, String>((ref, token) async {
       // Wait for auth restoration. A resolved null user is the explicit guest
       // state; an auth error must remain an error instead of silently
@@ -27,7 +27,7 @@ final shareLinkAccessProvider = FutureProvider.autoDispose
 ///
 /// The route only opens after this completes. That keeps the editor's
 /// existing session provider and REST/OT revision path authoritative.
-final shareLinkNoteHydrationProvider = FutureProvider.autoDispose
+final FutureProviderFamily<void, String> shareLinkNoteHydrationProvider = FutureProvider.autoDispose
     .family<void, String>((ref, token) async {
       final userId = ref.watch(currentUserIdProvider);
       if (userId == null) {

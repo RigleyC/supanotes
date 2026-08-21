@@ -31,7 +31,7 @@ class NoteSyncDebug {
   }
 
   static String preview(String text, {int maxLength = 80}) {
-    final normalized = text.replaceAll('\n', '\\n');
+    final normalized = text.replaceAll('\n', r'\n');
     if (normalized.length <= maxLength) return normalized;
     return '${normalized.substring(0, maxLength)}...';
   }
@@ -43,7 +43,7 @@ class NoteSyncDebug {
           final value = block as Map;
           final delta = value['delta'] as List<dynamic>? ?? const [];
           final text = delta
-              .whereType<Map>()
+              .whereType<Map<dynamic, dynamic>>()
               .map((op) => op['insert'] is String ? op['insert'] as String : '')
               .join();
           return '${value['id']}:${value['type']}(chars=${text.length})';

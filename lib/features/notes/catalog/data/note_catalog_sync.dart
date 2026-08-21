@@ -4,15 +4,15 @@ import 'dart:developer' as dev;
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/async/keyed_async_queue.dart';
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
-import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 typedef NoteIconUpdater =
     Future<void> Function(
@@ -45,7 +45,6 @@ final class _RemoteNoteWriteResult {
 enum _NoteIconPushOutcome { completed, retry }
 
 class NoteCatalogSync {
-  static const _pageSize = 100;
 
   NoteCatalogSync({
     required NoteSyncClient syncClient,
@@ -56,6 +55,7 @@ class NoteCatalogSync {
        _database = database,
        _activityTracker = activityTracker,
        _updateNoteIcon = updateNoteIcon;
+  static const _pageSize = 100;
 
   final NoteSyncClient _syncClient;
   final AppDatabase _database;
@@ -207,7 +207,7 @@ class NoteCatalogSync {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map) {
-        throw FormatException('note_icon must be an object or null');
+        throw const FormatException('note_icon must be an object or null');
       }
       return NoteIcon.fromJson(Map<String, dynamic>.from(decoded));
     } on Object catch (error) {
@@ -222,7 +222,6 @@ class NoteCatalogSync {
 
     while (true) {
       final page = await _syncClient.listNotes(
-        limit: _pageSize,
         cursorUpdatedAt: cursorUpdatedAt,
         cursorId: cursorId,
       );
@@ -503,7 +502,7 @@ class NoteCatalogSync {
 }
 
 ({String content, String? excerpt}) _projectContent(List<dynamic> blocks) {
-  final codec = const NoteDocumentCodec();
+  const codec = NoteDocumentCodec();
   final text = StringBuffer();
   for (final block in blocks) {
     if (block is! Map) continue;
@@ -526,7 +525,7 @@ class NoteCatalogSync {
 /// The root app listens to this provider so every catalog page is hydrated in
 /// the background while the UI continues reading Drift. It must stay alive
 /// across widget rebuilds; opening a note never waits for this provider.
-final noteCatalogSyncServiceProvider = Provider.autoDispose<NoteCatalogSync>((
+final Provider<NoteCatalogSync> noteCatalogSyncServiceProvider = Provider.autoDispose<NoteCatalogSync>((
   ref,
 ) {
   if (ref.watch(currentUserIdProvider) == null) {
@@ -553,7 +552,7 @@ final noteCatalogSyncServiceProvider = Provider.autoDispose<NoteCatalogSync>((
   );
 });
 
-final noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
+final StreamProvider<void> noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
   final user = ref.watch(authControllerProvider).asData?.value;
   if (user == null) return;
 

@@ -34,7 +34,6 @@ class AppColors {
   static final ColorScheme lightColorScheme =
       ColorScheme.fromSeed(
         seedColor: primarySeed,
-        brightness: Brightness.light,
       ).copyWith(
         surface: const Color(0xFFFFFFFF),
         onSurface: const Color(0xFF0D0D0D),
@@ -111,13 +110,6 @@ class AppColors {
 /// Semantic color tokens exposed as a [ThemeExtension] so they participate
 /// in the Material 3 theme system and respond to light/dark switching.
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
-  final Color success;
-  final Color warning;
-  final Color info;
-  final Color highlightBackground;
-  final Color highlightForeground;
-  final Color overlay;
-  final Color task;
 
   const AppSemanticColors({
     required this.success,
@@ -128,6 +120,13 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     required this.overlay,
     required this.task,
   });
+  final Color success;
+  final Color warning;
+  final Color info;
+  final Color highlightBackground;
+  final Color highlightForeground;
+  final Color overlay;
+  final Color task;
 
   @override
   AppSemanticColors copyWith({

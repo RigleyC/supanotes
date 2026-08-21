@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import '../database.dart';
-import '../note_lifecycle_policy.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 
 /// Owns atomic local-note lifecycle decisions and aggregate deletion.
 final class NoteLifecycleDao extends DatabaseAccessor<AppDatabase> {

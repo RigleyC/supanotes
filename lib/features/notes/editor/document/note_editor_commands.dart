@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart' show NoteToolbar;
 import 'package:super_editor/super_editor.dart';
 
 /// Pure document-editing helpers used by [NoteToolbar].
@@ -358,9 +359,9 @@ class NoteEditorCommands {
 }
 
 class RandomDividerConversionReaction extends EditReaction {
-  static final _hrPattern = RegExp(r'^(---|—-)\s');
 
   const RandomDividerConversionReaction({this.dividerCount = 35});
+  static final _hrPattern = RegExp(r'^(---|—-)\s');
 
   final int dividerCount;
 

@@ -1,16 +1,13 @@
-library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
-import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
@@ -21,8 +18,17 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+import 'package:super_editor/super_editor.dart';
 
 class NoteEditor extends StatefulWidget {
+
+  const NoteEditor({
+    required this.noteId, required this.session, required this.delegate, super.key,
+    this.hideCompleted = false,
+    this.collapseImages = false,
+    this.attachmentDelivery,
+    this.requestInitialFocus = false,
+  });
   final String noteId;
   final NoteEditorSession session;
   final bool hideCompleted;
@@ -31,24 +37,13 @@ class NoteEditor extends StatefulWidget {
   final bool requestInitialFocus;
   final NoteEditorDelegate delegate;
 
-  const NoteEditor({
-    super.key,
-    required this.noteId,
-    required this.session,
-    this.hideCompleted = false,
-    this.collapseImages = false,
-    this.attachmentDelivery,
-    this.requestInitialFocus = false,
-    required this.delegate,
-  });
-
   @override
   State<NoteEditor> createState() => _NoteEditorState();
 }
 
 class _NoteEditorState extends State<NoteEditor> {
   NoteEditorController? _controller;
-  final _docLayoutKey = GlobalKey();
+  final GlobalKey<State<StatefulWidget>> _docLayoutKey = GlobalKey();
   final _selectionLayerLinks = SelectionLayerLinks();
   final _softwareKeyboardController = SoftwareKeyboardController();
   final _isImeConnected = ValueNotifier<bool>(false);
@@ -112,7 +107,7 @@ class _NoteEditorState extends State<NoteEditor> {
       editor: controller.editor,
       composer: controller.composer,
       documentLayoutResolver: () =>
-          _docLayoutKey.currentState as DocumentLayout,
+          _docLayoutKey.currentState! as DocumentLayout,
       handleColor: editorControlsColor,
     );
 
@@ -278,10 +273,9 @@ class _NoteEditorState extends State<NoteEditor> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final docPadding = EdgeInsets.only(
+        const docPadding = EdgeInsets.only(
           left: 24,
           right: 24,
-          top: 0,
           bottom: 24,
         );
 
@@ -302,9 +296,9 @@ class _NoteEditorState extends State<NoteEditor> {
             editor: controller.editor,
             documentLayoutKey: _docLayoutKey,
             selectionLayerLinks: _selectionLayerLinks,
-            stylesheet: _cachedStylesheet!,
+            stylesheet: _cachedStylesheet,
             selectionStyle: editorSelectionStyle(theme.colorScheme),
-            componentBuilders: _componentBuilders!,
+            componentBuilders: _componentBuilders,
             contentTapDelegateFactory: (readerContext) => NoteLinkTapHandler(
               readerContext.document,
               allowInternalNoteLinks: !_isReadOnly,
@@ -317,7 +311,6 @@ class _NoteEditorState extends State<NoteEditor> {
           controller: _keyboardPanelController,
           isImeConnected: _isImeConnected,
           contentBuilder: (context, _) => PopScope(
-            canPop: true,
             child: Column(
               children: [
                 Expanded(
@@ -338,7 +331,7 @@ class _NoteEditorState extends State<NoteEditor> {
                           isImeConnected: _isImeConnected,
                           documentLayoutKey: _docLayoutKey,
                           selectionLayerLinks: _selectionLayerLinks,
-                          stylesheet: _cachedStylesheet!,
+                          stylesheet: _cachedStylesheet,
                           selectionStyle: editorSelectionStyle(
                             theme.colorScheme,
                           ),
@@ -357,7 +350,7 @@ class _NoteEditorState extends State<NoteEditor> {
                           contentTapDelegateFactories:
                               _contentTapDelegateFactories,
                           keyboardActions: editorKeyboardActions(),
-                          componentBuilders: _componentBuilders!,
+                          componentBuilders: _componentBuilders,
                         ),
                       ),
                     ),
@@ -375,7 +368,7 @@ class _NoteEditorState extends State<NoteEditor> {
           toolbarBuilder: (context, _) => NoteToolbar(
             editor: controller.editor,
             composer: controller.composer,
-            onAttachFile: () => controller.pickAndAttachFile(imageOnly: false),
+            onAttachFile: controller.pickAndAttachFile,
             onAttachImage: () => controller.pickAndAttachFile(imageOnly: true),
           ),
           keyboardPanelBuilder: (_, _) => const SizedBox.shrink(),

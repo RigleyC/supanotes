@@ -1,13 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
-import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
 import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
+import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
 
-final shareLinkAccessRepositoryProvider =
+final Provider<ShareLinkAccessRepository> shareLinkAccessRepositoryProvider =
     Provider.autoDispose<ShareLinkAccessRepository>(
       (ref) => ShareLinkAccessRepository(ref.watch(apiClientProvider)),
     );

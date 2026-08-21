@@ -5,16 +5,10 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 
 class QuickActionFabs extends StatelessWidget {
   const QuickActionFabs({
-    super.key,
-    required this.smallIcon,
-    required this.smallTooltip,
-    required this.onSmallPressed,
+    required this.smallIcon, required this.smallTooltip, required this.onSmallPressed, required this.primaryIcon, required this.primaryTooltip, required this.onPrimaryPressed, super.key,
     this.smallIconSize = 20,
     this.smallFabKey,
     this.smallHeroTag,
-    required this.primaryIcon,
-    required this.primaryTooltip,
-    required this.onPrimaryPressed,
     this.primaryIconSize = 22,
     this.primaryFabKey,
     this.primaryHeroTag,

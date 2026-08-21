@@ -87,11 +87,11 @@ void main() {
                   onPressed: () async {
                     await showGlobalSheet<void>(
                       context: context,
-                      builder: (_) => GlobalSheetPage(
+                      builder: (_) => const GlobalSheetPage(
                         title: 'Página principal',
                         child: Center(
                           child: _PushPageButton(
-                            child: const GlobalSheetPage(
+                            child: GlobalSheetPage(
                               title: 'Página interna',
                               child: SizedBox(height: 40),
                             ),

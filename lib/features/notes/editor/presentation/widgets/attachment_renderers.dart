@@ -1,15 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
-
 class AttachmentUploadingCapsule extends StatelessWidget {
   const AttachmentUploadingCapsule({
-    super.key,
-    required this.fileName,
+    required this.fileName, super.key,
     this.onCancel,
   });
 
@@ -87,8 +85,7 @@ class AttachmentUploadingCapsule extends StatelessWidget {
 
 class AttachmentFailedCapsule extends StatelessWidget {
   const AttachmentFailedCapsule({
-    super.key,
-    required this.fileName,
+    required this.fileName, super.key,
     this.onDelete,
   });
 
@@ -159,11 +156,7 @@ class AttachmentFailedCapsule extends StatelessWidget {
 
 class AttachmentFilePill extends StatelessWidget {
   const AttachmentFilePill({
-    super.key,
-    required this.fileName,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
+    required this.fileName, required this.subtitle, required this.icon, required this.onTap, super.key,
   });
 
   final String fileName;
@@ -229,7 +222,7 @@ class AttachmentFilePill extends StatelessWidget {
 }
 
 class AttachmentExpandedImage extends StatelessWidget {
-  const AttachmentExpandedImage({super.key, required this.url, this.localPath});
+  const AttachmentExpandedImage({required this.url, super.key, this.localPath});
 
   final String url;
   final String? localPath;
@@ -289,11 +282,8 @@ class AttachmentExpandedImage extends StatelessWidget {
 
 class AttachmentRichLinkCard extends StatelessWidget {
   const AttachmentRichLinkCard({
-    super.key,
-    required this.componentKey,
-    required this.node,
+    required this.componentKey, required this.node, required this.selectionColor, super.key,
     this.selection,
-    required this.selectionColor,
     this.allowInternalNoteLinks = true,
   });
 
@@ -306,7 +296,6 @@ class AttachmentRichLinkCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hasPreview = node.title != null || node.description != null;
     final linkUrl = node.url ?? '';
     final parsedLink = Uri.tryParse(linkUrl);
     final canOpenLink =
@@ -334,49 +323,85 @@ class AttachmentRichLinkCard extends StatelessWidget {
                   color: cs.outlineVariant.withValues(alpha: 0.4),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (node.imageUrl != null)
-                    Image.network(
-                      node.imageUrl!,
-                      height: 160,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const SizedBox(),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          node.domain ?? linkUrl,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.labelSmall?.copyWith(color: cs.outline),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (node.imageUrl != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          node.imageUrl!,
+                          height: 88,
+                          width: 88,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            height: 88,
+                            width: 88,
+                            color: cs.surfaceContainer,
+                            child: Icon(Icons.link, color: cs.onSurfaceVariant),
+                          ),
                         ),
-                        if (hasPreview) ...[
-                          if (node.title != null)
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (node.title != null) ...[
                             Text(
                               node.title!,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
-                          if (node.description != null)
-                            Text(
-                              node.description!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            if (node.description != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  node.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                node.siteName ?? node.domain ?? linkUrl,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(color: cs.outline),
+                              ),
                             ),
+                          ] else ...[
+                            Text(
+                              node.domain ?? linkUrl,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            if (node.domain != null && linkUrl.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  linkUrl,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

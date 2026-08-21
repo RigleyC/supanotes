@@ -3,15 +3,15 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/database/database.dart';
 
-import 'note_task_reader.dart';
-import 'task_notification_entry.dart';
+import 'package:supanotes/features/tasks/domain/note_task_reader.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_entry.dart';
 
-final noteTaskNotificationSourceProvider =
+final StreamProvider<List<TaskNotificationEntry>> noteTaskNotificationSourceProvider =
     StreamProvider.autoDispose<List<TaskNotificationEntry>>((ref) {
       final dao = ref.watch(appDatabaseProvider).noteOperationsDao;
       const reader = NoteTaskReader();
       return Stream.multi((controller) {
-        List<LocalNoteDocumentData> latestDocuments = const [];
+        var latestDocuments = const <LocalNoteDocumentData>[];
 
         void emit() {
           controller.add([

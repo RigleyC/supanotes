@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'notes.dart';
+import 'package:supanotes/core/database/tables/notes.dart';
 
 /// Bidirectional link between two notes.
 @DataClassName('NoteLinkData')

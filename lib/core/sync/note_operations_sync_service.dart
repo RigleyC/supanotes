@@ -3,23 +3,16 @@ import 'dart:convert';
 import 'dart:developer' as dev;
 
 import 'package:drift/drift.dart';
+import 'package:supanotes/core/async/keyed_async_queue.dart';
+import 'package:supanotes/core/database/daos/note_operations_dao.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/debug/note_sync_debug.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:supanotes/core/database/daos/note_operations_dao.dart';
-import 'package:supanotes/core/async/keyed_async_queue.dart';
-import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/core/debug/note_sync_debug.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
-
 class SyncResult {
-  final int acceptedCount;
-  final List<String> acceptedOperationIds;
-  final int finalRevision;
-  final List<Operation> remoteOperations;
-  final NoteDocumentResponse? canonicalDocument;
-  final String? blockedReason;
 
   SyncResult({
     required this.acceptedCount,
@@ -29,6 +22,12 @@ class SyncResult {
     this.canonicalDocument,
     this.blockedReason,
   });
+  final int acceptedCount;
+  final List<String> acceptedOperationIds;
+  final int finalRevision;
+  final List<Operation> remoteOperations;
+  final NoteDocumentResponse? canonicalDocument;
+  final String? blockedReason;
 
   bool get isBlocked => blockedReason != null;
 
@@ -49,15 +48,15 @@ class SyncResult {
 }
 
 class SyncError {
-  final String errorCode;
-  final String message;
-  final String? failedOperation;
 
   SyncError({
     required this.errorCode,
     required this.message,
     this.failedOperation,
   });
+  final String errorCode;
+  final String message;
+  final String? failedOperation;
 }
 
 class NoteSyncTelemetrySnapshot {
@@ -75,14 +74,6 @@ class NoteSyncTelemetrySnapshot {
 }
 
 class NoteOperationsSyncService {
-  final NoteSyncClient _syncClient;
-  final NoteOperationsDao _dao;
-  final String _clientId;
-  final String _actorId;
-  final Uuid _uuid = const Uuid();
-  final _syncQueue = KeyedAsyncQueue();
-  final _outboxQueue = KeyedAsyncQueue();
-  late final NoteOperationRebaser _rebaser;
 
   NoteOperationsSyncService({
     required NoteSyncClient syncClient,
@@ -95,6 +86,14 @@ class NoteOperationsSyncService {
        _actorId = actorId {
     _rebaser = NoteOperationRebaser(localActorId: actorId);
   }
+  final NoteSyncClient _syncClient;
+  final NoteOperationsDao _dao;
+  final String _clientId;
+  final String _actorId;
+  final Uuid _uuid = const Uuid();
+  final _syncQueue = KeyedAsyncQueue();
+  final _outboxQueue = KeyedAsyncQueue();
+  late final NoteOperationRebaser _rebaser;
 
   String get clientId => _clientId;
 
@@ -520,7 +519,7 @@ class NoteOperationsSyncService {
           'pending',
           ownerUserId: _actorId,
         );
-        for (int i = 0; i < rebased.length; i++) {
+        for (var i = 0; i < rebased.length; i++) {
           final op = rebased[i];
           await _dao.insertPendingOperation(
             PendingNoteOperationsCompanion(

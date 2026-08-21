@@ -4,16 +4,15 @@ import 'dart:developer' as dev;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
+import 'package:supanotes/features/tasks/domain/note_task_notification_source.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_entry.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_time.dart';
-import 'task_notification_entry.dart';
-import 'note_task_notification_source.dart';
 
-final taskNotificationSchedulerProvider =
+final AsyncNotifierProvider<TaskNotificationScheduler, Map<String, DateTime>> taskNotificationSchedulerProvider =
     AsyncNotifierProvider.autoDispose<
       TaskNotificationScheduler,
       Map<String, DateTime>

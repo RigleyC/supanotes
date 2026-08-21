@@ -8,9 +8,13 @@
 library;
 
 import 'package:dio/dio.dart';
+import 'package:supanotes/core/api/api_client.dart' show ApiClient;
+import 'package:supanotes/core/api/auth_interceptor.dart' show AuthInterceptor;
 
 /// Base class for every API-related error.
 class ApiException implements Exception {
+
+  const ApiException({required this.message, this.statusCode});
   /// Human-readable description of the failure.
   ///
   /// When the backend returned a JSON body of the form
@@ -20,8 +24,6 @@ class ApiException implements Exception {
 
   /// HTTP status code, if the request reached the server.
   final int? statusCode;
-
-  const ApiException({required this.message, this.statusCode});
 
   @override
   String toString() {

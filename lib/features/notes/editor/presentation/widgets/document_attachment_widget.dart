@@ -3,32 +3,26 @@ import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/core/utils/format_utils.dart';
+import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
+import 'package:supanotes/features/notes/attachments/model/attachment_model.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_renderers.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-import 'package:supanotes/core/utils/format_utils.dart';
-import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
-import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
-import 'package:supanotes/features/notes/attachments/model/attachment_model.dart';
-import 'attachment_renderers.dart';
 
 typedef _OpenAttachmentCallback =
     Future<void> Function(String? url, {AttachmentReference? attachment});
 
 class DocumentAttachmentWidget extends StatelessWidget {
   const DocumentAttachmentWidget({
-    super.key,
-    required this.componentKey,
-    required this.nodeId,
-    required this.attachmentId,
+    required this.componentKey, required this.nodeId, required this.attachmentId, required this.collapseImages, required this.selectionColor, super.key,
     this.onDelete,
-    required this.collapseImages,
     this.fallbackAttachment,
     this.deliveryPreference = AttachmentDeliveryPreference.localFirst,
     this.attachmentDelivery,
     this.selection,
-    required this.selectionColor,
   });
 
   final GlobalKey componentKey;

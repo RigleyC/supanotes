@@ -14,11 +14,6 @@ class UserSettings {
     required this.updatedAt,
   });
 
-  final String timezone;
-  final Map<String, dynamic> preferences;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-
   factory UserSettings.fromJson(Map<String, dynamic> json) {
     return UserSettings(
       timezone: json['timezone'] as String,
@@ -27,15 +22,17 @@ class UserSettings {
       updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
     );
   }
+
+  final String timezone;
+  final Map<String, dynamic> preferences;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 }
 
 /// The one-time MCP credential returned when a new token is issued.
 class McpTokenResponse {
-  static const missingTokenMessage = 'MCP token is missing from the response';
 
   const McpTokenResponse({required this.token});
-
-  final String token;
 
   factory McpTokenResponse.fromJson(Map<String, dynamic> json) {
     final token = json['token'];
@@ -44,4 +41,7 @@ class McpTokenResponse {
     }
     return McpTokenResponse(token: token);
   }
+  static const missingTokenMessage = 'MCP token is missing from the response';
+
+  final String token;
 }

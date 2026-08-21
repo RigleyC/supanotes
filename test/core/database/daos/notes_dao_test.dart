@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/note_lifecycle_policy.dart';

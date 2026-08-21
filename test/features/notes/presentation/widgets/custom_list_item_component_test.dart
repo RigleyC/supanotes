@@ -1,7 +1,7 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:super_editor/super_editor.dart';
 

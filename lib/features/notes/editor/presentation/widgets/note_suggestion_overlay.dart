@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:riverpod/src/providers/provider.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_handler.dart';
+import 'package:super_editor/super_editor.dart';
 
-final noteSuggestionsProvider = Provider.family
+final ProviderFamily<List<NoteModel>, ({String currentNoteId, String query})> noteSuggestionsProvider = Provider.family
     .autoDispose<List<NoteModel>, ({String query, String currentNoteId})>((
       ref,
       params,
@@ -23,18 +24,14 @@ final noteSuggestionsProvider = Provider.family
     });
 
 class NoteSuggestionOverlay extends ConsumerStatefulWidget {
+
+  const NoteSuggestionOverlay({
+    required this.editor, required this.composer, required this.currentNoteId, required this.onPersist, super.key,
+  });
   final Editor editor;
   final DocumentComposer composer;
   final String currentNoteId;
   final Future<void> Function() onPersist;
-
-  const NoteSuggestionOverlay({
-    super.key,
-    required this.editor,
-    required this.composer,
-    required this.currentNoteId,
-    required this.onPersist,
-  });
 
   @override
   ConsumerState<NoteSuggestionOverlay> createState() =>
@@ -42,16 +39,16 @@ class NoteSuggestionOverlay extends ConsumerStatefulWidget {
 }
 
 class _NoteMatch {
-  final String query;
-  final String nodeId;
-  final int tagStart;
-  final int tagEnd;
   const _NoteMatch({
     required this.query,
     required this.nodeId,
     required this.tagStart,
     required this.tagEnd,
   });
+  final String query;
+  final String nodeId;
+  final int tagStart;
+  final int tagEnd;
 }
 
 class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {

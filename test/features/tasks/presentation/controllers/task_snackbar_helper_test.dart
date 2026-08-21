@@ -7,7 +7,7 @@ import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart'
 
 void main() {
   setUpAll(() async {
-    await initializeDateFormatting('pt_BR', null);
+    await initializeDateFormatting('pt_BR');
   });
 
   testWidgets(
@@ -21,7 +21,7 @@ void main() {
         ),
       );
 
-      bool completed = false;
+      var completed = false;
 
       await TaskSnackBarHelper.completeTaskWithFeedback(
         onComplete: () async {

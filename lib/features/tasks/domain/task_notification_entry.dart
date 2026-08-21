@@ -1,4 +1,4 @@
-import 'task_schedule_identity.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 class TaskNotificationEntry {
   const TaskNotificationEntry({

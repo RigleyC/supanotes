@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart';
-import '../note_lifecycle_policy.dart';
-import '../../../features/notes/catalog/model/note_strings.dart';
-import '../database.dart';
-import '../tables/notes.dart';
-import '../tables/user_note_preferences.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
+import 'package:supanotes/core/database/tables/notes.dart';
+import 'package:supanotes/core/database/tables/user_note_preferences.dart';
+import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 
 part 'notes_dao.g.dart';
 
@@ -271,8 +271,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   Future<void> updateNoteProjection({
     required String id,
     required String content,
-    String? excerpt,
-    required bool materialized,
+    required bool materialized, String? excerpt,
   }) async {
     final now = DateTime.now();
     await (update(notes)..where((t) => t.id.equals(id))).write(

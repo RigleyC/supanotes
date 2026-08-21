@@ -8,9 +8,6 @@ import 'package:supanotes/features/notes/editor/document/note_document_codec.dar
 final class ShareLinkDocument {
   const ShareLinkDocument({required this.title, required this.snapshot});
 
-  final String title;
-  final NoteDocumentSnapshot snapshot;
-
   factory ShareLinkDocument.fromJson(Map<String, dynamic> json) {
     final rawTitle = json['title'];
     if (rawTitle is! String || rawTitle.trim().isEmpty) {
@@ -27,4 +24,7 @@ final class ShareLinkDocument {
       ),
     );
   }
+
+  final String title;
+  final NoteDocumentSnapshot snapshot;
 }

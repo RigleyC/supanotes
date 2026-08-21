@@ -7,7 +7,7 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/sharing/model/share_model.dart';
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
 
-final sharesRepositoryProvider = Provider.autoDispose<SharesRepository>(
+final Provider<SharesRepository> sharesRepositoryProvider = Provider.autoDispose<SharesRepository>(
   (ref) => SharesRepository(ref.watch(apiClientProvider)),
 );
 
@@ -26,7 +26,7 @@ class SharesRepository {
     required SharePermission permission,
   }) async {
     try {
-      await _api.post(
+      await _api.post<dynamic>(
         '/notes/$noteId/shares',
         data: {'email': email, 'permission': permission.toJson()},
       );
@@ -37,7 +37,7 @@ class SharesRepository {
 
   Future<List<ShareModel>> listShares({required String noteId}) async {
     try {
-      final response = await _api.get('/notes/$noteId/shares');
+      final response = await _api.get<dynamic>('/notes/$noteId/shares');
       final data = response.data as List;
       return data
           .map((j) => ShareModel.fromJson(j as Map<String, dynamic>))
@@ -52,7 +52,7 @@ class SharesRepository {
     required String userId,
   }) async {
     try {
-      await _api.delete('/notes/$noteId/shares/$userId');
+      await _api.delete<dynamic>('/notes/$noteId/shares/$userId');
     } on DioException catch (e) {
       throw fromDioError(e);
     }

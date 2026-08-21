@@ -1,11 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/clipboard_preprocessor.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_clipboard_serializers.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
-
-import 'clipboard_preprocessor.dart';
-import 'rich_clipboard_serializers.dart';
 
 class RichCommonEditorOperations extends CommonEditorOperations {
   RichCommonEditorOperations({

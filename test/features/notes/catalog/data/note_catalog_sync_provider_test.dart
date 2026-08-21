@@ -39,7 +39,7 @@ void main() {
       await database.close();
     });
 
-    when(() => client.listNotes()).thenAnswer(
+    when(client.listNotes).thenAnswer(
       (_) async => [
         {
           'id': 'remote-note',
@@ -77,7 +77,7 @@ void main() {
     expect(note, isNotNull);
     expect(note!.userId, 'user-1');
     expect(note.hasRemoteCopy, isTrue);
-    verify(() => client.listNotes()).called(1);
+    verify(client.listNotes).called(1);
     verify(() => client.getDocument('remote-note')).called(1);
   });
 }

@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_common_editor_operations.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_ios_controls_controller.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:super_editor/super_editor.dart';
 
-import 'rich_common_editor_operations.dart';
-import 'rich_ios_controls_controller.dart';
-import 'rich_keyboard_actions.dart';
-
 class EditorControls {
-  final RichCommonEditorOperations richOps;
-  final RichSuperEditorIosControlsController iosController;
-  final SuperEditorAndroidControlsController androidController;
 
   EditorControls({
     required this.richOps,
     required this.iosController,
     required this.androidController,
   });
+  final RichCommonEditorOperations richOps;
+  final RichSuperEditorIosControlsController iosController;
+  final SuperEditorAndroidControlsController androidController;
 
   void dispose() {
     iosController.dispose();

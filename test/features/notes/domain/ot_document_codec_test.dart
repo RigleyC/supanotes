@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   group('OtDocumentCodec Delta Suffix & Attribution Tests', () {
@@ -69,7 +69,7 @@ void main() {
       final node = ParagraphNode(
         id: 'task-1',
         text: AttributedText('Task'),
-        metadata: {'custom': const NamedAttribution('task')},
+        metadata: const {'custom': NamedAttribution('task')},
       );
 
       final encoded = codec.encodeNode(node);
@@ -85,7 +85,7 @@ void main() {
           id: 'task-123',
           text: AttributedText('Call doctor'),
           isComplete: false,
-          metadata: {
+          metadata: const {
             'dueDate': '2026-07-25T14:30:00.000',
             'hasTime': true,
             'reminder': '15m_before',
@@ -325,7 +325,7 @@ void main() {
           'node': ParagraphNode(
             id: 'header',
             text: AttributedText('Heading'),
-            metadata: {'blockType': header1Attribution},
+            metadata: const {'blockType': header1Attribution},
           ),
           'text': 'Heading',
         },
@@ -334,7 +334,7 @@ void main() {
           'node': ParagraphNode(
             id: 'quote',
             text: AttributedText('Quoted text'),
-            metadata: {'blockType': blockquoteAttribution},
+            metadata: const {'blockType': blockquoteAttribution},
           ),
           'text': 'Quoted text',
         },
@@ -405,12 +405,12 @@ void main() {
         ParagraphNode(
           id: 'header',
           text: AttributedText('Heading'),
-          metadata: {'blockType': header1Attribution},
+          metadata: const {'blockType': header1Attribution},
         ),
         ParagraphNode(
           id: 'quote',
           text: AttributedText('Quoted text'),
-          metadata: {'blockType': blockquoteAttribution},
+          metadata: const {'blockType': blockquoteAttribution},
         ),
       ];
 

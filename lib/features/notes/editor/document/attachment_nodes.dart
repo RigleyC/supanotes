@@ -45,6 +45,9 @@ class RichLinkNode extends AttachmentNode {
     this.description,
     this.imageUrl,
     this.domain,
+    this.previewStatus,
+    this.faviconUrl,
+    this.siteName,
     super.metadata,
   });
 
@@ -55,6 +58,9 @@ class RichLinkNode extends AttachmentNode {
   final String? description;
   final String? imageUrl;
   final String? domain;
+  final String? previewStatus;
+  final String? faviconUrl;
+  final String? siteName;
 
   @override
   DocumentNode copyWithAddedMetadata(Map<String, dynamic> newProperties) =>
@@ -65,6 +71,9 @@ class RichLinkNode extends AttachmentNode {
         description: description,
         imageUrl: imageUrl,
         domain: domain,
+        previewStatus: previewStatus,
+        faviconUrl: faviconUrl,
+        siteName: siteName,
         metadata: {...metadata, ...newProperties},
       );
 
@@ -77,6 +86,9 @@ class RichLinkNode extends AttachmentNode {
         description: description,
         imageUrl: imageUrl,
         domain: domain,
+        previewStatus: previewStatus,
+        faviconUrl: faviconUrl,
+        siteName: siteName,
         metadata: newMetadata,
       );
 
@@ -87,6 +99,9 @@ class RichLinkNode extends AttachmentNode {
     description: description,
     imageUrl: imageUrl,
     domain: domain,
+    previewStatus: previewStatus,
+    faviconUrl: faviconUrl,
+    siteName: siteName,
     metadata: Map.from(metadata),
   );
 }

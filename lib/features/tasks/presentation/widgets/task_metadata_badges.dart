@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-
-import '../../domain/task_recurrence.dart';
 
 class TaskMetadataBadges extends StatelessWidget {
   const TaskMetadataBadges({
@@ -34,7 +33,7 @@ class TaskMetadataBadges extends StatelessWidget {
       clock: now == null ? null : () => now!,
     ).currentScheduledAt(
       anchor: dueDate,
-      recurrence: recurrence!,
+      recurrence: recurrence,
       hasTime: hasTime,
       completedAtByScheduledAt: completions,
     );

@@ -6,22 +6,20 @@ import 'package:supanotes/core/utils/app_haptics.dart';
 /// Keeping icon actions behind the shared widget makes their hit target and
 /// interaction style explicit without forcing them into a text-button layout.
 class AppIconButton extends StatelessWidget {
+
+  const AppIconButton({
+    required this.icon, required this.onPressed, super.key,
+    this.tooltip,
+    this.constraints,
+    this.padding,
+    this.visualDensity,
+  });
   final Widget icon;
   final VoidCallback? onPressed;
   final String? tooltip;
   final BoxConstraints? constraints;
   final EdgeInsetsGeometry? padding;
   final VisualDensity? visualDensity;
-
-  const AppIconButton({
-    super.key,
-    required this.icon,
-    required this.onPressed,
-    this.tooltip,
-    this.constraints,
-    this.padding,
-    this.visualDensity,
-  });
 
   @override
   Widget build(BuildContext context) {

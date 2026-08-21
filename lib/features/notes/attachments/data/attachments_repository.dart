@@ -3,12 +3,12 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:riverpod/src/providers/stream_provider.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/features/notes/attachments/data/local/attachments_local_repository.dart';
 import 'package:supanotes/features/notes/attachments/model/attachment_model.dart';
-import 'local/attachments_local_repository.dart';
 
 class AttachmentsRepository {
   AttachmentsRepository(this._local, this._api);
@@ -68,14 +68,14 @@ class AttachmentsRepository {
   Future<void> delete(String id) => _local.delete(id);
 }
 
-final attachmentsRepositoryProvider =
+final Provider<AttachmentsRepository> attachmentsRepositoryProvider =
     Provider.autoDispose<AttachmentsRepository>((ref) {
       final local = ref.watch(attachmentsLocalRepositoryProvider);
       final api = ref.watch(apiClientProvider);
       return AttachmentsRepository(local, api);
     });
 
-final attachmentByIdProvider = StreamProvider.autoDispose
+final StreamProviderFamily<AttachmentModel?, String> attachmentByIdProvider = StreamProvider.autoDispose
     .family<AttachmentModel?, String>((ref, id) {
       final repo = ref.watch(attachmentsRepositoryProvider);
       return repo.watchById(id);

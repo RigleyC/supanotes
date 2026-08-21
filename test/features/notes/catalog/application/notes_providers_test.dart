@@ -27,7 +27,7 @@ void main() {
       final subscription = container.listen(activeNotesProvider, (_, _) {});
       addTearDown(subscription.close);
 
-      final now = DateTime.utc(2026, 8, 1);
+      final now = DateTime.utc(2026, 8);
       await database.notesDao.createNote(
         NotesCompanion.insert(
           id: 'note-local-1',

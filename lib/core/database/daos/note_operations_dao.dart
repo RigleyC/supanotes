@@ -1,12 +1,12 @@
 import 'package:drift/drift.dart';
 
-import '../database.dart';
-import '../note_lifecycle_policy.dart';
-import '../tables/local_note_documents.dart';
-import '../tables/note_sync_errors.dart';
-import '../tables/notes.dart';
-import '../tables/pending_note_operations.dart';
-import '../tables/sync_sessions.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
+import 'package:supanotes/core/database/tables/local_note_documents.dart';
+import 'package:supanotes/core/database/tables/note_sync_errors.dart';
+import 'package:supanotes/core/database/tables/notes.dart';
+import 'package:supanotes/core/database/tables/pending_note_operations.dart';
+import 'package:supanotes/core/database/tables/sync_sessions.dart';
 
 part 'note_operations_dao.g.dart';
 
@@ -261,7 +261,7 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
         await (update(
           pendingNoteOperations,
         )..where((t) => t.operationId.equals(id))).write(
-          PendingNoteOperationsCompanion(status: const Value('in_flight')),
+          const PendingNoteOperationsCompanion(status: Value('in_flight')),
         );
       }
     });
@@ -301,7 +301,7 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
         deleteQuery.where((t) => t.ownerUserId.equals(ownerUserId));
       }
       await deleteQuery.go();
-      for (int i = 0; i < ops.length; i++) {
+      for (var i = 0; i < ops.length; i++) {
         final op = ops[i];
         await into(pendingNoteOperations).insert(
           PendingNoteOperationsCompanion(

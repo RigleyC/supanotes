@@ -9,28 +9,32 @@ library;
 
 import 'dart:async';
 
+import 'package:dio/dio.dart' show Dio;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
-
 import 'package:supanotes/core/api/api_client.dart';
+import 'package:supanotes/core/api/auth_interceptor.dart' show AuthInterceptor;
 import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
 import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
-import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
+import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
-import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
-import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/notes/share/application/native_share_bridge.dart';
+import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
+import 'package:supanotes/features/notes/share/application/shared_link_delivery.dart';
+import 'package:uuid/uuid.dart';
 
 // ---------------------------------------------------------------------------
 // API client
@@ -80,6 +84,21 @@ final authControllerProvider = AsyncNotifierProvider<AuthController, User?>(
 
 final sessionResetProvider = StateProvider<int>((ref) => 0);
 
+final nativeShareBridgeProvider = Provider<NativeShareBridge>((ref) {
+  return MethodChannelNativeShareBridge();
+});
+
+final sharedLinkDeliveryProvider = Provider<SharedLinkDelivery>((ref) {
+  return SharedLinkDelivery(ref.watch(apiClientProvider));
+});
+
+/// App-lifetime coordinator for native share intake (index publishing,
+/// credential sync and pending-share delivery). Kept alive like [syncService]
+/// because it serializes side effects across the whole app lifecycle.
+final shareIntakeCoordinatorProvider = Provider<ShareIntakeCoordinator>((ref) {
+  return ShareIntakeCoordinator(ref);
+});
+
 // ---------------------------------------------------------------------------
 // Local notification service
 // ---------------------------------------------------------------------------
@@ -98,7 +117,7 @@ final noteOperationsDaoProvider = Provider<NoteOperationsDao>((ref) {
   return ref.watch(appDatabaseProvider).noteOperationsDao;
 });
 
-final noteLifecycleStoreProvider = Provider.autoDispose<NoteLifecycleStore>(
+final Provider<NoteLifecycleStore> noteLifecycleStoreProvider = Provider.autoDispose<NoteLifecycleStore>(
   (ref) => DatabaseNoteLifecycleStore(ref.watch(appDatabaseProvider)),
 );
 
@@ -125,7 +144,7 @@ final noteOperationsSyncServiceProvider = Provider<NoteOperationsSyncService>((
   }
 
   final prefs = ref.watch(sharedPreferencesProvider);
-  String clientId = prefs.getString('note_ops_client_id') ?? '';
+  var clientId = prefs.getString('note_ops_client_id') ?? '';
   if (clientId.isEmpty) {
     clientId = const Uuid().v4();
     prefs.setString('note_ops_client_id', clientId);

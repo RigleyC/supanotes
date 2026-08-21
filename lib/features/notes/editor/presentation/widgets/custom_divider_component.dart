@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:super_editor/super_editor.dart';
 
 class CustomDividerComponentBuilder implements ComponentBuilder {
@@ -18,8 +18,7 @@ class CustomDividerComponentBuilder implements ComponentBuilder {
     return CustomDividerComponentViewModel(
       nodeId: node.id,
       dividerIndex: dividerIndex,
-      createdAt: node.metadata[NodeMetadata.createdAt],
-      selectionColor: const Color(0x00000000),
+      createdAt: node.metadata[NodeMetadata.createdAt] as DateTime?,
       caretColor: const Color(0x00000000),
     );
   }
@@ -50,7 +49,7 @@ class CustomDividerComponentViewModel
     with SelectionAwareViewModelMixin {
   CustomDividerComponentViewModel({
     required super.nodeId,
-    this.dividerIndex,
+    required this.caretColor, this.dividerIndex,
     super.createdAt,
     super.maxWidth,
     super.padding = EdgeInsets.zero,
@@ -58,7 +57,6 @@ class CustomDividerComponentViewModel
     DocumentNodeSelection? selection,
     Color selectionColor = Colors.transparent,
     this.caret,
-    required this.caretColor,
   }) {
     super.selection = selection;
     super.selectionColor = selectionColor;
@@ -87,12 +85,10 @@ class CustomDividerComponentViewModel
 
 class CustomDividerComponent extends StatelessWidget {
   const CustomDividerComponent({
-    super.key,
-    required this.componentKey,
+    required this.componentKey, required this.caretColor, super.key,
     this.dividerIndex,
     this.selectionColor = AppColors.joiBlue,
     this.selection,
-    required this.caretColor,
     this.showCaret = false,
     this.opacity = 1.0,
   });
@@ -121,7 +117,7 @@ class CustomDividerComponent extends StatelessWidget {
           key: componentKey,
           opacity: opacity,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: SizedBox(
               height: 16,
               width: double.infinity,

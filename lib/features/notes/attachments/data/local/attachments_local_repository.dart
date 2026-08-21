@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/attachments_dao.dart';
+import 'package:supanotes/core/database/database.dart';
 
 class AttachmentsLocalRepository {
   AttachmentsLocalRepository(this._dao);
@@ -26,7 +25,7 @@ class AttachmentsLocalRepository {
   Future<void> delete(String id) => _dao.deleteById(id);
 }
 
-final attachmentsLocalRepositoryProvider =
+final Provider<AttachmentsLocalRepository> attachmentsLocalRepositoryProvider =
     Provider.autoDispose<AttachmentsLocalRepository>((ref) {
       final db = ref.watch(appDatabaseProvider);
       return AttachmentsLocalRepository(db.attachmentsDao);

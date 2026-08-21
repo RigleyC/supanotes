@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
+import 'package:super_editor/super_editor.dart';
 
 /// Pumps a bare [NoteToolbar] with the given nodes and initial selection.
 /// Returns the document, composer, and editor for assertions and commands.
@@ -96,7 +96,7 @@ void main() {
 
       final node = harness.document.getNodeById('node-1');
       expect(node, isA<TaskNode>());
-      expect((node as TaskNode).text.toPlainText(), 'Todo');
+      expect((node! as TaskNode).text.toPlainText(), 'Todo');
     });
 
     testWidgets('converts a paragraph to H1', (tester) async {
@@ -114,7 +114,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Título 1'));
       await tester.pumpAndSettle();
 
-      final node = harness.document.getNodeById('node-1') as ParagraphNode;
+      final node = harness.document.getNodeById('node-1')! as ParagraphNode;
       expect(node.getMetadataValue('blockType'), header1Attribution);
     });
 
@@ -133,7 +133,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Título 2'));
       await tester.pumpAndSettle();
 
-      final node = harness.document.getNodeById('node-1') as ParagraphNode;
+      final node = harness.document.getNodeById('node-1')! as ParagraphNode;
       expect(node.getMetadataValue('blockType'), header2Attribution);
     });
 
@@ -154,14 +154,14 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Título 3'));
       await tester.pumpAndSettle();
       expect(
-        (harness.document.getNodeById('node-1') as ParagraphNode).getMetadataValue('blockType'),
+        (harness.document.getNodeById('node-1')! as ParagraphNode).getMetadataValue('blockType'),
         header3Attribution,
       );
 
       await tester.tap(find.bySemanticsLabel('Citação'));
       await tester.pumpAndSettle();
       expect(
-        (harness.document.getNodeById('node-1') as ParagraphNode).getMetadataValue('blockType'),
+        (harness.document.getNodeById('node-1')! as ParagraphNode).getMetadataValue('blockType'),
         blockquoteAttribution,
       );
     });
@@ -174,14 +174,14 @@ void main() {
       await pumpToolbar(
         tester,
         nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-        selection: DocumentSelection(
+        selection: const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 5),
+            nodePosition: TextNodePosition(offset: 5),
           ),
         ),
       );
@@ -234,14 +234,14 @@ void main() {
       await pumpToolbar(
         tester,
         nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-        selection: DocumentSelection(
+        selection: const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 5),
+            nodePosition: TextNodePosition(offset: 5),
           ),
         ),
       );
@@ -299,14 +299,14 @@ void main() {
       final harness = await pumpCommand(
         tester,
         nodes: [ParagraphNode(id: 'node-1', text: AttributedText('Hello'))],
-        selection: DocumentSelection(
+        selection: const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 5),
+            nodePosition: TextNodePosition(offset: 5),
           ),
         ),
       );
@@ -314,7 +314,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Negrito'));
       await tester.pumpAndSettle();
 
-      final text = (harness.document.getNodeById('node-1') as TextNode).text;
+      final text = (harness.document.getNodeById('node-1')! as TextNode).text;
       expect(text.hasAttributionAt(0, attribution: boldAttribution), isTrue);
       expect(text.hasAttributionAt(4, attribution: boldAttribution), isTrue);
     });
@@ -322,14 +322,14 @@ void main() {
     testWidgets('applies italic and strikethrough to the selection', (
       tester,
     ) async {
-      DocumentSelection makeSelection() => DocumentSelection(
+      DocumentSelection makeSelection() => const DocumentSelection(
         base: DocumentPosition(
           nodeId: 'node-1',
-          nodePosition: const TextNodePosition(offset: 0),
+          nodePosition: TextNodePosition(offset: 0),
         ),
         extent: DocumentPosition(
           nodeId: 'node-1',
-          nodePosition: const TextNodePosition(offset: 5),
+          nodePosition: TextNodePosition(offset: 5),
         ),
       );
       final harness = await pumpCommand(
@@ -340,14 +340,14 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Itálico'));
       await tester.pumpAndSettle();
-      var text = (harness.document.getNodeById('node-1') as TextNode).text;
+      var text = (harness.document.getNodeById('node-1')! as TextNode).text;
       expect(text.hasAttributionAt(2, attribution: italicsAttribution), isTrue);
 
       harness.composer.setSelectionWithReason(makeSelection());
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Tachado'));
       await tester.pumpAndSettle();
-      text = (harness.document.getNodeById('node-1') as TextNode).text;
+      text = (harness.document.getNodeById('node-1')! as TextNode).text;
       expect(
         text.hasAttributionAt(2, attribution: strikethroughAttribution),
         isTrue,
@@ -361,14 +361,14 @@ void main() {
         selection: caretSelection('node-1'),
       );
       harness.composer.setSelectionWithReason(
-        DocumentSelection(
+        const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 4),
+            nodePosition: TextNodePosition(offset: 4),
           ),
         ),
       );
@@ -379,7 +379,7 @@ void main() {
 
       final node = harness.document.getNodeById('node-1');
       expect(node, isA<ListItemNode>());
-      expect((node as ListItemNode).type, ListItemType.unordered);
+      expect((node! as ListItemNode).type, ListItemType.unordered);
     });
 
     testWidgets('converts a paragraph to a numbered list', (tester) async {
@@ -389,14 +389,14 @@ void main() {
         selection: caretSelection('node-1'),
       );
       harness.composer.setSelectionWithReason(
-        DocumentSelection(
+        const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 4),
+            nodePosition: TextNodePosition(offset: 4),
           ),
         ),
       );
@@ -407,7 +407,7 @@ void main() {
 
       final node = harness.document.getNodeById('node-1');
       expect(node, isA<ListItemNode>());
-      expect((node as ListItemNode).type, ListItemType.ordered);
+      expect((node! as ListItemNode).type, ListItemType.ordered);
     });
 
     testWidgets('converts a paragraph to a task', (tester) async {
@@ -417,14 +417,14 @@ void main() {
         selection: caretSelection('node-1'),
       );
       harness.composer.setSelectionWithReason(
-        DocumentSelection(
+        const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 4),
+            nodePosition: TextNodePosition(offset: 4),
           ),
         ),
       );
@@ -435,7 +435,7 @@ void main() {
 
       final node = harness.document.getNodeById('node-1');
       expect(node, isA<TaskNode>());
-      expect((node as TaskNode).text.toPlainText(), 'Todo');
+      expect((node! as TaskNode).text.toPlainText(), 'Todo');
     });
 
     testWidgets('indents and unindents a selected task', (tester) async {
@@ -456,14 +456,14 @@ void main() {
         selection: caretSelection('node-2'),
       );
       harness.composer.setSelectionWithReason(
-        DocumentSelection(
+        const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-2',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-2',
-            nodePosition: const TextNodePosition(offset: 5),
+            nodePosition: TextNodePosition(offset: 5),
           ),
         ),
       );
@@ -471,11 +471,11 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Aumentar recuo'));
       await tester.pumpAndSettle();
-      expect((harness.document.getNodeById('node-2') as TaskNode).indent, 1);
+      expect((harness.document.getNodeById('node-2')! as TaskNode).indent, 1);
 
       await tester.tap(find.bySemanticsLabel('Diminuir recuo'));
       await tester.pumpAndSettle();
-      expect((harness.document.getNodeById('node-2') as TaskNode).indent, 0);
+      expect((harness.document.getNodeById('node-2')! as TaskNode).indent, 0);
     });
   });
 
@@ -500,14 +500,14 @@ void main() {
       );
 
       harness.composer.setSelectionWithReason(
-        DocumentSelection(
+        const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 5),
+            nodePosition: TextNodePosition(offset: 5),
           ),
         ),
       );
@@ -543,14 +543,14 @@ void main() {
       expect(find.bySemanticsLabel('Título 1'), findsOneWidget);
 
       harness.composer.setSelectionWithReason(
-        DocumentSelection(
+        const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 0),
+            nodePosition: TextNodePosition(offset: 0),
           ),
           extent: DocumentPosition(
             nodeId: 'node-1',
-            nodePosition: const TextNodePosition(offset: 5),
+            nodePosition: TextNodePosition(offset: 5),
           ),
         ),
       );

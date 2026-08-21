@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:motor/motor.dart';
-
-import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 
 enum ToolbarHaptic { none, controlTap, selectionChange }
 
 class ToolbarButton extends StatefulWidget {
   const ToolbarButton({
-    super.key,
+    required this.isActive, super.key,
     this.icon,
     this.svgAsset,
     this.semanticLabel,
     this.spacious = false,
     this.haptic = ToolbarHaptic.none,
-    required this.isActive,
     this.onPressed,
   }) : assert(
          icon != null || svgAsset != null,
@@ -178,7 +176,7 @@ class _ToolbarButtonVisual extends StatelessWidget {
             minHeight: spacious ? 44 : 36,
           ),
           alignment: Alignment.center,
-          padding: EdgeInsets.all(AppSpacing.xs),
+          padding: const EdgeInsets.all(AppSpacing.xs),
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),

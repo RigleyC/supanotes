@@ -6,14 +6,7 @@ import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 class TaskMetadataSelectionPage<T> extends StatelessWidget {
   const TaskMetadataSelectionPage({
-    super.key,
-    required this.title,
-    required this.selected,
-    required this.options,
-    required this.noneLabel,
-    required this.optionLabel,
-    required this.optionIcon,
-    required this.onSelected,
+    required this.title, required this.selected, required this.options, required this.noneLabel, required this.optionLabel, required this.optionIcon, required this.onSelected, super.key,
   });
 
   final String title;

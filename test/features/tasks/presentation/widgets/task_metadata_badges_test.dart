@@ -6,7 +6,7 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badg
 
 void main() {
   setUpAll(() async {
-    await initializeDateFormatting('pt_BR', null);
+    await initializeDateFormatting('pt_BR');
   });
 
   Widget wrap(Widget child) {
@@ -36,7 +36,7 @@ void main() {
     tester,
   ) async {
     final today = DateTime(2026, 8, 4, 12);
-    final overdue = DateTime(2026, 8, 1);
+    final overdue = DateTime(2026, 8);
 
     await tester.pumpWidget(
       wrap(

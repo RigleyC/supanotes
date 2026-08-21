@@ -2,16 +2,15 @@ import 'dart:math' as math;
 
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
-import 'package:unicode_emojis/unicode_emojis.dart';
-
+import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_catalog.dart';
-import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
+import 'package:unicode_emojis/unicode_emojis.dart';
 
 part 'note_icon_picker_components.dart';
 
@@ -29,9 +28,7 @@ Future<void> showNoteIconPicker({
 
 class NoteIconPickerRootPage extends StatelessWidget {
   const NoteIconPickerRootPage({
-    super.key,
-    required this.note,
-    required this.onSelected,
+    required this.note, required this.onSelected, super.key,
   });
 
   final NoteModel note;
@@ -91,9 +88,8 @@ class NoteIconPickerRootPage extends StatelessWidget {
 
 class NoteEmojiPickerPage extends StatefulWidget {
   const NoteEmojiPickerPage({
-    super.key,
+    required this.onSelected, super.key,
     this.current,
-    required this.onSelected,
     this.dismissOnSelection = false,
   });
 
@@ -164,9 +160,7 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
 
 class NoteCatalogIconPickerPage extends StatefulWidget {
   const NoteCatalogIconPickerPage({
-    super.key,
-    required this.current,
-    required this.onSelected,
+    required this.current, required this.onSelected, super.key,
     this.dismissOnSelection = false,
   });
 

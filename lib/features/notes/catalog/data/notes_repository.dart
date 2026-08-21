@@ -2,15 +2,15 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
-import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/features/notes/catalog/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
-import 'local/notes_local_repository.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart' show NotesListScreen;
 
 /// Presentation-facing facade over the local notes database.
 ///
@@ -54,7 +54,7 @@ class NotesRepository implements INotesRepository {
       source = _local.watchActiveNotes();
     }
     return source.map(
-      (rows) => rows.map((qr) => NoteModel.fromQueryResult(qr)).toList(),
+      (rows) => rows.map(NoteModel.fromQueryResult).toList(),
     );
   }
 
@@ -201,8 +201,8 @@ class NotesRepository implements INotesRepository {
   String? _excerptFrom(String content) {
     if (content.isEmpty) return null;
     final lines = content.split('\n');
-    int firstNonEmptyIdx = -1;
-    for (int i = 0; i < lines.length; i++) {
+    var firstNonEmptyIdx = -1;
+    for (var i = 0; i < lines.length; i++) {
       if (lines[i].trim().isNotEmpty) {
         firstNonEmptyIdx = i;
         break;
@@ -223,7 +223,7 @@ class NotesRepository implements INotesRepository {
 /// of chaining through [notesLocalRepositoryProvider]. This avoids the
 /// 3-level autoDispose cascade that triggers setState() during build when
 /// [NotesListScreen] first mounts and the intermediate provider is dirty.
-final notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
+final Provider<INotesRepository> notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) {
     throw StateError('notesRepositoryProvider: unauthenticated');

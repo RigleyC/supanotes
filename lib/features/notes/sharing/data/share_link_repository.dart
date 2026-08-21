@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:riverpod/src/providers/future_provider.dart';
 import 'package:supanotes/core/api/api_client.dart';
+import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/sharing/model/share_link_model.dart';
 
-final shareLinkRepositoryProvider = Provider.autoDispose<IShareLinkRepository>(
+final Provider<IShareLinkRepository> shareLinkRepositoryProvider = Provider.autoDispose<IShareLinkRepository>(
   (ref) => ShareLinkRepository(ref.watch(apiClientProvider)),
 );
 
@@ -51,7 +51,7 @@ class ShareLinkRepository implements IShareLinkRepository {
   @override
   Future<void> disable(String noteId) async {
     try {
-      await _api.delete('/notes/$noteId/share-link');
+      await _api.delete<dynamic>('/notes/$noteId/share-link');
     } on DioException catch (error) {
       throw fromDioError(error);
     }
@@ -72,7 +72,7 @@ class ShareLinkRepository implements IShareLinkRepository {
   }
 }
 
-final shareLinkStatusProvider = FutureProvider.autoDispose
+final FutureProviderFamily<ShareLinkModel, String> shareLinkStatusProvider = FutureProvider.autoDispose
     .family<ShareLinkModel, String>((ref, noteId) {
       return ref.watch(shareLinkRepositoryProvider).status(noteId);
     });

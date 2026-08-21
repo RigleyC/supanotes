@@ -5,15 +5,15 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 class LocalNotificationService {
-  final FlutterLocalNotificationsPlugin _plugin;
-  final bool? _supportedPlatformOverride;
-  bool _initialized = false;
 
   LocalNotificationService({
     FlutterLocalNotificationsPlugin? plugin,
     bool? supportedPlatform,
   }) : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
        _supportedPlatformOverride = supportedPlatform;
+  final FlutterLocalNotificationsPlugin _plugin;
+  final bool? _supportedPlatformOverride;
+  bool _initialized = false;
 
   bool get isSupportedPlatform =>
       _supportedPlatformOverride ?? (Platform.isAndroid || Platform.isIOS);
@@ -96,6 +96,6 @@ class LocalNotificationService {
   Future<List<PendingNotificationRequest>> getPendingNotificationRequests() async {
     if (!isSupportedPlatform) return [];
     await initialize();
-    return await _plugin.pendingNotificationRequests();
+    return _plugin.pendingNotificationRequests();
   }
 }

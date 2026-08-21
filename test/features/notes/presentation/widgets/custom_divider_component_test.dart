@@ -26,7 +26,6 @@ void main() {
       wrap(
         CustomDividerComponent(
           componentKey: GlobalKey(),
-          dividerIndex: null,
           caretColor: Colors.black,
         ),
       ),

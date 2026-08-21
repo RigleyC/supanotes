@@ -7,8 +7,7 @@ import 'package:supanotes/shared/widgets/app_press_scale.dart';
 /// Shared row for settings and task metadata flows.
 class AppTile extends StatefulWidget {
   const AppTile({
-    super.key,
-    required this.title,
+    required this.title, super.key,
     this.subtitle,
     this.subtitleWidget,
     this.leading,
@@ -131,7 +130,6 @@ class _AppTileState extends State<AppTile> {
             constraints: const BoxConstraints(minHeight: AppSpacing.tileHeight),
             padding: widget.contentPadding,
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 if (leading != null) ...[
                   leading,

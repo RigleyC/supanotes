@@ -2,10 +2,9 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Resolves attachments through the authenticated attachment endpoint.
 ///
@@ -31,7 +30,7 @@ final class AuthenticatedAttachmentDelivery implements AttachmentDelivery {
     if (body == null) throw StateError('Attachment response has no content');
     final directory = await getTemporaryDirectory();
     final safeName = attachment.fileName.replaceAll(
-      RegExp(r'[^A-Za-z0-9._-]'),
+      RegExp('[^A-Za-z0-9._-]'),
       '_',
     );
     final file = File('${directory.path}/supanotes-${attachment.id}-$safeName');

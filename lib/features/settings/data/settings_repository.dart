@@ -129,7 +129,7 @@ class SettingsRepository implements ISettingsRepository {
 
 /// Single shared [SettingsRepository] wired to the app-wide
 /// [apiClientProvider].
-final settingsRepositoryProvider = Provider.autoDispose<ISettingsRepository>((
+final Provider<ISettingsRepository> settingsRepositoryProvider = Provider.autoDispose<ISettingsRepository>((
   ref,
 ) {
   return SettingsRepository(apiClient: ref.watch(apiClientProvider));

@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
+import 'package:super_editor/super_editor.dart';
 
 DocumentSelection caretSelection(String nodeId) {
   return DocumentSelection.collapsed(
     position: DocumentPosition(
       nodeId: nodeId,
-      nodePosition: TextNodePosition(offset: 0),
+      nodePosition: const TextNodePosition(offset: 0),
     ),
   );
 }
@@ -15,11 +15,11 @@ DocumentSelection rangeSelection(String startId, String endId) {
   return DocumentSelection(
     base: DocumentPosition(
       nodeId: startId,
-      nodePosition: TextNodePosition(offset: 0),
+      nodePosition: const TextNodePosition(offset: 0),
     ),
     extent: DocumentPosition(
       nodeId: endId,
-      nodePosition: TextNodePosition(offset: 0),
+      nodePosition: const TextNodePosition(offset: 0),
     ),
   );
 }
@@ -63,7 +63,7 @@ void main() {
         ],
       );
       final composer = MutableDocumentComposer(
-        initialSelection: DocumentSelection(
+        initialSelection: const DocumentSelection(
           base: DocumentPosition(
             nodeId: 'node-1',
             nodePosition: TextNodePosition(offset: 0),
@@ -88,14 +88,14 @@ void main() {
       final node = document.first as TextNode;
       final spans = node.text.getAttributionSpansInRange(
         attributionFilter: (a) => a == boldAttribution,
-        range: SpanRange(0, 5),
+        range: const SpanRange(0, 5),
       );
       expect(spans, isNotEmpty);
       expect(
         node.text
             .getAttributionSpansInRange(
               attributionFilter: (a) => a == boldAttribution,
-              range: SpanRange(4, 5),
+              range: const SpanRange(4, 5),
             )
             .isNotEmpty,
         isTrue,
@@ -179,7 +179,7 @@ void main() {
           ParagraphNode(
             id: 'node-1',
             text: AttributedText('Existing heading'),
-            metadata: {'blockType': header1Attribution},
+            metadata: const {'blockType': header1Attribution},
           ),
           ParagraphNode(id: 'node-2', text: AttributedText('Paragraph')),
         ],
@@ -486,7 +486,7 @@ void main() {
 
       NoteEditorCommands.indentSelectedBlocks(editor, composer);
 
-      expect((document.getNodeById('node-2') as TaskNode).indent, 1);
+      expect((document.getNodeById('node-2')! as TaskNode).indent, 1);
     });
   });
 
@@ -541,7 +541,7 @@ void main() {
 
       NoteEditorCommands.unindentSelectedBlocks(editor, composer);
 
-      expect((document.getNodeById('node-2') as TaskNode).indent, 0);
+      expect((document.getNodeById('node-2')! as TaskNode).indent, 0);
     });
   });
 }

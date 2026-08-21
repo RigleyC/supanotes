@@ -31,6 +31,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/notes"
 	"github.com/RigleyC/supanotes/internal/platformlinks"
 	"github.com/RigleyC/supanotes/internal/settings"
+	"github.com/RigleyC/supanotes/internal/shareintake"
 	"github.com/RigleyC/supanotes/internal/sharelinks"
 	"github.com/RigleyC/supanotes/internal/shares"
 	"github.com/RigleyC/supanotes/internal/shoppinglist"
@@ -257,6 +258,10 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	noteOpsSvc := noteoperations.NewService(noteoperations.NewRepository(pool), pool)
 	noteOpsH := noteoperations.NewHandler(noteOpsSvc)
 	noteOpsH.RegisterRoutes(protected)
+	shareIntakeH := shareintake.NewHandler(
+		shareintake.NewService(linkPreviewSvc, noteOpsSvc),
+	)
+	protected.POST("/notes/:noteId/shared-links", shareIntakeH.Append)
 
 	// External command adapters
 	shoppingListSvc := shoppinglist.NewService(notesSvc, noteOpsSvc)

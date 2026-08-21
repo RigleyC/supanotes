@@ -19,7 +19,6 @@ void main() {
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
         isEmptyDraft: false,
-        sharedByEmail: null,
       );
 
       await tester.pumpWidget(
@@ -88,7 +87,6 @@ void main() {
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
         isEmptyDraft: false,
-        sharedByEmail: null,
       );
 
       await tester.pumpWidget(
@@ -123,7 +121,6 @@ void main() {
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
         isEmptyDraft: false,
-        sharedByEmail: null,
       );
 
       await tester.pumpWidget(
@@ -159,7 +156,6 @@ void main() {
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
         isEmptyDraft: false,
-        sharedByEmail: null,
       );
 
       await tester.pumpWidget(
@@ -196,7 +192,6 @@ void main() {
         updatedAt: DateTime.now(),
         hasRemoteCopy: true,
         isEmptyDraft: false,
-        sharedByEmail: null,
       );
 
       await tester.pumpWidget(
