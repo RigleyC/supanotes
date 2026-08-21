@@ -17,7 +17,9 @@ import UserNotifications
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ShareBridge")
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ShareBridge") else {
+      return
+    }
     let channel = FlutterMethodChannel(
       name: "com.supanotes/share",
       binaryMessenger: registrar.messenger()
