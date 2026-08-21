@@ -14,9 +14,9 @@
 		B10000000000000000000001 /* ShareBridgeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* ShareBridgeStore.swift */; };
 		B10000000000000000000003 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* ShareViewController.swift */; };
 		B10000000000000000000005 /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* ShareView.swift */; };
-		B10000000000000000000007 /* SharedShareStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* SharedShareStore.swift */; };
-B10000000000000000000019 /* ShareAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* ShareAPIClient.swift */; };
-B1000000000000000000001B /* ShareBackgroundUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* ShareBackgroundUploader.swift */; };
+		B10000000000000000000019 /* ShareAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* ShareAPIClient.swift */; };
+		B1000000000000000000001D /* ShareAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* ShareAPIClient.swift */; };
+		B1000000000000000000001B /* ShareBackgroundUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* ShareBackgroundUploader.swift */; };
 		B10000000000000000000017 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
@@ -32,6 +32,13 @@ B1000000000000000000001B /* ShareBackgroundUploader.swift in Sources */ = {isa =
 			proxyType = 1;
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
+		};
+		B1000000000000000000001E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B1000000000000000000000D;
+			remoteInfo = ShareExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -209,6 +216,7 @@ B1000000000000000000001C /* ShareBackgroundUploader.swift */ = {isa = PBXFileRef
 			buildRules = (
 			);
 			dependencies = (
+				B1000000000000000000001F /* PBXTargetDependency */,
 			);
 			name = Runner;
 			packageProductDependencies = (
@@ -249,6 +257,9 @@ B1000000000000000000001C /* ShareBackgroundUploader.swift */ = {isa = PBXFileRef
 					97C146ED1CF9000F007C117D = {
 						CreatedOnToolsVersion = 7.3.1;
 						LastSwiftMigration = 1100;
+					};
+					B1000000000000000000000D = {
+						CreatedOnToolsVersion = 15.0;
 					};
 				};
 			};
@@ -365,7 +376,7 @@ B1000000000000000000001C /* ShareBackgroundUploader.swift */ = {isa = PBXFileRef
 				B10000000000000000000003 /* ShareViewController.swift in Sources */,
 				B10000000000000000000005 /* ShareView.swift in Sources */,
 				B10000000000000000000007 /* SharedShareStore.swift in Sources */,
-				B10000000000000000000019 /* ShareAPIClient.swift in Sources */,
+				B1000000000000000000001D /* ShareAPIClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -376,6 +387,11 @@ B1000000000000000000001C /* ShareBackgroundUploader.swift */ = {isa = PBXFileRef
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
+		};
+		B1000000000000000000001F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B1000000000000000000000D /* ShareExtension */;
+			targetProxy = B1000000000000000000001E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
