@@ -22,7 +22,9 @@ type AppendRichLinkResponse struct {
 }
 
 // AppendRichLink appends one rich_link block after the current last block.
-// operationID is the durable share id, so a retry is idempotent for a note.
+// operationID doubles as the durable share id: the client mints one UUID per
+// share attempt, so retrying the same delivery is idempotent per note, and a
+// second note can never consume the same share.
 func (s *Service) AppendRichLink(
 	ctx context.Context,
 	noteID pgtype.UUID,

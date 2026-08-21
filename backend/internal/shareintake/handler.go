@@ -2,6 +2,7 @@ package shareintake
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -43,7 +44,7 @@ func (h *Handler) Append(c echo.Context) error {
 		case errors.Is(err, noteoperations.ErrNoPermission):
 			return web.JSONError(c, http.StatusForbidden, "FORBIDDEN")
 		default:
-			c.Logger().Error(err)
+			slog.Error("shared link intake failed", "error", err, "note_id", noteID)
 			return web.JSONError(c, http.StatusInternalServerError, "INTERNAL_ERROR")
 		}
 	}

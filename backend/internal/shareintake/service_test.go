@@ -59,11 +59,12 @@ func TestAppendUsesPreviewMetadataAndShareID(t *testing.T) {
 	require.Equal(t, int64(3), result.Revision)
 	require.Equal(t, "550e8400-e29b-41d4-a716-446655440000", appendStub.operationID)
 	require.Equal(t, map[string]any{
-		"url":         "https://example.com/post",
-		"domain":      "example.com",
-		"title":       "Example",
-		"description": "A safe link",
-		"imageUrl":    "https://example.com/image.jpg",
+		"url":           "https://example.com/post",
+		"domain":        "example.com",
+		"title":         "Example",
+		"description":   "A safe link",
+		"imageUrl":      "https://example.com/image.jpg",
+		"previewStatus": "ready",
 	}, appendStub.metadata)
 }
 
@@ -78,8 +79,9 @@ func TestAppendKeepsFallbackWhenPreviewFails(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, map[string]any{
-		"url":    "https://example.com/post",
-		"domain": "example.com",
+		"url":           "https://example.com/post",
+		"domain":        "example.com",
+		"previewStatus": "failed",
 	}, appendStub.metadata)
 }
 

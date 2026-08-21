@@ -31,6 +31,7 @@ import 'package:supanotes/features/notes/editor/sync/note_session_activity_track
 import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
+import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
 import 'package:supanotes/features/notes/share/application/native_share_bridge.dart';
 import 'package:supanotes/features/notes/share/application/shared_link_delivery.dart';
 
@@ -88,6 +89,13 @@ final nativeShareBridgeProvider = Provider<NativeShareBridge>((ref) {
 
 final sharedLinkDeliveryProvider = Provider<SharedLinkDelivery>((ref) {
   return SharedLinkDelivery(ref.watch(apiClientProvider));
+});
+
+/// App-lifetime coordinator for native share intake (index publishing,
+/// credential sync and pending-share delivery). Kept alive like [syncService]
+/// because it serializes side effects across the whole app lifecycle.
+final shareIntakeCoordinatorProvider = Provider<ShareIntakeCoordinator>((ref) {
+  return ShareIntakeCoordinator(ref);
 });
 
 // ---------------------------------------------------------------------------

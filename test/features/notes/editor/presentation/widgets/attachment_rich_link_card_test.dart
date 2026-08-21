@@ -63,4 +63,22 @@ void main() {
     expect(find.byType(Image), findsOneWidget);
     expect(find.text('example.com'), findsOneWidget);
   });
+
+  testWidgets('renders domain and url when previewStatus is failed', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      subject(
+        RichLinkNode(
+          id: 'link-1',
+          url: 'https://example.com/post',
+          domain: 'example.com',
+          previewStatus: 'failed',
+        ),
+      ),
+    );
+
+    expect(find.text('example.com'), findsOneWidget);
+    expect(find.text('https://example.com/post'), findsOneWidget);
+  });
 }

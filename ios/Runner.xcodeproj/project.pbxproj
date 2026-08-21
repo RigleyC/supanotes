@@ -15,6 +15,8 @@
 		B10000000000000000000003 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* ShareViewController.swift */; };
 		B10000000000000000000005 /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* ShareView.swift */; };
 		B10000000000000000000007 /* SharedShareStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* SharedShareStore.swift */; };
+B10000000000000000000019 /* ShareAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* ShareAPIClient.swift */; };
+B1000000000000000000001B /* ShareBackgroundUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* ShareBackgroundUploader.swift */; };
 		B10000000000000000000017 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
@@ -58,6 +60,8 @@
 		B10000000000000000000004 /* ShareViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* ShareView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareView.swift; sourceTree = "<group>"; };
 		B10000000000000000000008 /* SharedShareStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SharedShareStore.swift; sourceTree = "<group>"; };
+B1000000000000000000001A /* ShareAPIClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareAPIClient.swift; sourceTree = "<group>"; };
+B1000000000000000000001C /* ShareBackgroundUploader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareBackgroundUploader.swift; sourceTree = "<group>"; };
 		B10000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B1000000000000000000000A /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		B1000000000000000000000B /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -144,6 +148,7 @@
 				B10000000000000000000004 /* ShareViewController.swift */,
 				B10000000000000000000006 /* ShareView.swift */,
 				B10000000000000000000008 /* SharedShareStore.swift */,
+				B1000000000000000000001A /* ShareAPIClient.swift */,
 				B10000000000000000000009 /* Info.plist */,
 				B1000000000000000000000A /* ShareExtension.entitlements */,
 			);
@@ -162,6 +167,7 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				B10000000000000000000002 /* ShareBridgeStore.swift */,
+				B1000000000000000000001C /* ShareBackgroundUploader.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
@@ -345,6 +351,8 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				B10000000000000000000001 /* ShareBridgeStore.swift in Sources */,
+				B1000000000000000000001B /* ShareBackgroundUploader.swift in Sources */,
+				B10000000000000000000019 /* ShareAPIClient.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 			);
@@ -357,6 +365,7 @@
 				B10000000000000000000003 /* ShareViewController.swift in Sources */,
 				B10000000000000000000005 /* ShareView.swift in Sources */,
 				B10000000000000000000007 /* SharedShareStore.swift in Sources */,
+				B10000000000000000000019 /* ShareAPIClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

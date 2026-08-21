@@ -5,10 +5,9 @@ final class SharedLinkDelivery {
 
   final ApiClient _api;
 
-  Uri? extractUrl(String text) {
-    return extractUrlFromText(text);
-  }
-
+  /// Extracts the first http(s) URL from shared text, trimming trailing
+  /// punctuation that share targets tend to append. The server re-validates
+  /// the result; this is a UX-level pre-filter only.
   static Uri? extractUrlFromText(String text) {
     final match = RegExp(
       r'https?://[^\s<>"“”]+',

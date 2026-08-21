@@ -9,6 +9,9 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     UNUserNotificationCenter.current().delegate = self
+    // Recreating the background session flushes events queued by the system
+    // for uploads started in previous runs.
+    ShareBackgroundUploader.shared.resumePendingDelivery()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -38,6 +41,11 @@ import UserNotifications
         result(ShareBridgeStore.shared.readPendingShare())
       case "clearPendingShare":
         ShareBridgeStore.shared.clearPendingShare()
+        result(nil)
+      case "retryPendingShares":
+        // Drains the durable inbox via a background URLSession owned by the
+        // main app; safe after credential refresh.
+        ShareBackgroundUploader.shared.resumePendingDelivery()
         result(nil)
       default:
         result(FlutterMethodNotImplemented)

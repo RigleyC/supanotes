@@ -3,6 +3,7 @@ package shareintake
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/url"
 	"strings"
 
@@ -63,6 +64,7 @@ func (s *Service) Append(
 	if preview, fetchErr := s.previews.Fetch(ctx, parsed.String()); fetchErr == nil {
 		metadata["url"] = preview.URL
 		metadata["domain"] = preview.Domain
+		metadata["previewStatus"] = "ready"
 		if preview.Title != "" {
 			metadata["title"] = preview.Title
 		}
@@ -71,6 +73,12 @@ func (s *Service) Append(
 		}
 		if preview.ImageURL != "" {
 			metadata["imageUrl"] = preview.ImageURL
+		}
+	} else {
+		metadata["previewStatus"] = "failed"
+		if ctx.Err() == nil {
+			slog.WarnContext(ctx, "link preview fetch failed; storing url metadata only",
+				"error", fetchErr, "url", parsed.String())
 		}
 	}
 

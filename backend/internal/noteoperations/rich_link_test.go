@@ -74,3 +74,32 @@ func TestAppendRichLinkAppendsToLatestDocumentAndDeduplicatesRetry(t *testing.T)
 	require.True(t, second.AlreadyAccepted)
 	require.Equal(t, int64(5), second.Revision)
 }
+
+func TestAppendRichLinkRejectsViewPermission(t *testing.T) {
+	noteID := mustParseUUID("550e8400-e29b-41d4-a716-446655440001")
+	userID := mustParseUUID("550e8400-e29b-41d4-a716-446655440002")
+	repo := &mockRepository{
+		lockNoteFn: func(context.Context, pgtype.UUID) (LockNoteResult, error) {
+			return LockNoteResult{ID: noteID, Revision: 1, Document: []byte(`{"schemaVersion":1,"blocks":[]}`)}, nil
+		},
+		checkNotePermissionFn: func(context.Context, pgtype.UUID, pgtype.UUID) (string, error) {
+			return "view", nil
+		},
+	}
+	svc := NewServiceWithTransactionRunner(repo, immediateTransactionRunner{})
+	_, err := svc.AppendRichLink(context.Background(), noteID, userID, "550e8400-e29b-41d4-a716-446655440003", map[string]any{"url": "https://example.com"})
+	require.ErrorIs(t, err, ErrNoPermission)
+}
+
+func TestAppendRichLinkRejectsMissingNote(t *testing.T) {
+	noteID := mustParseUUID("550e8400-e29b-41d4-a716-446655440001")
+	userID := mustParseUUID("550e8400-e29b-41d4-a716-446655440002")
+	repo := &mockRepository{
+		lockNoteFn: func(context.Context, pgtype.UUID) (LockNoteResult, error) {
+			return LockNoteResult{}, pgx.ErrNoRows
+		},
+	}
+	svc := NewServiceWithTransactionRunner(repo, immediateTransactionRunner{})
+	_, err := svc.AppendRichLink(context.Background(), noteID, userID, "550e8400-e29b-41d4-a716-446655440003", map[string]any{"url": "https://example.com"})
+	require.ErrorIs(t, err, ErrNoteNotFound)
+}

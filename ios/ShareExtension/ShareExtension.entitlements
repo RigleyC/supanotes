@@ -6,5 +6,10 @@
 	<array>
 		<string>group.com.supanotes.shared</string>
 	</array>
+	<key>com.apple.developer.keychain-access-groups</key>
+	<array>
+		<!-- Shared with the Runner app for session credentials only. -->
+		<string>$(AppIdentifierPrefix)com.supanotes.share</string>
+	</array>
 </dict>
 </plist>

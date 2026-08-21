@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -8,6 +10,7 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import 'core/constants/app_constants.dart';
 import 'core/di/providers.dart';
+import 'package:supanotes/features/notes/share/domain/share_strings.dart';
 import 'shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
 import 'core/router/app_router.dart';
@@ -21,7 +24,8 @@ import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
-import 'package:supanotes/features/notes/share/domain/share_note_index.dart';
+import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
+import 'package:supanotes/features/notes/share/presentation/note_picker_sheet.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/utils/platform_utils.dart';
 
@@ -77,14 +81,16 @@ class SupaNotesApp extends ConsumerStatefulWidget {
 
 class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
     with WidgetsBindingObserver {
-  bool _processingPendingShare = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _processPendingShare();
+      final coordinator = ref.read(shareIntakeCoordinatorProvider);
+      unawaited(coordinator.onAuthStateChanged(
+        ref.read(authControllerProvider).asData?.value,
+      ));
+      unawaited(_processPendingShare());
     });
   }
 
@@ -97,86 +103,48 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _processPendingShare();
-    }
-  }
-
-  Future<void> _publishIndex(List<NoteModel> notes) async {
-    final user = ref.read(authControllerProvider).asData?.value;
-    if (user == null) return;
-    try {
-      await ref
-          .read(nativeShareBridgeProvider)
-          .publishNotesIndex(ShareNoteIndex.fromNotes(user.id, notes));
-    } catch (error) {
-      debugPrint('Error publishing native share index: $error');
+      unawaited(_processPendingShare());
     }
   }
 
   Future<void> _processPendingShare() async {
-    if (_processingPendingShare || !mounted) return;
-    final user = ref.read(authControllerProvider).asData?.value;
-    if (user == null) return;
-    _processingPendingShare = true;
+    final PendingShareResult result;
     try {
-      final bridge = ref.read(nativeShareBridgeProvider);
-      final pending = await bridge.readPendingShare();
-      final pendingText = pending?['text'] as String?;
-      final shareId = pending?['shareId'] as String?;
-      if (pendingText == null || pendingText.trim().isEmpty || !mounted) return;
-      if (shareId == null || shareId.isEmpty) return;
-      final delivery = ref.read(sharedLinkDeliveryProvider);
-      final url = delivery.extractUrl(pendingText);
-      if (url == null) {
-        await bridge.clearPendingShare();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('O texto compartilhado não contém uma URL.'),
-            ),
-          );
-        }
-        return;
-      }
-      final notes = await ref.read(activeNotesProvider.future);
-      if (!mounted) return;
-      final targetNoteId = pending?['noteId'] as String?;
-      NoteModel? note;
-      if (targetNoteId == null || targetNoteId.isEmpty) {
-        note = await showDialog<NoteModel>(
-          context: context,
-          builder: (_) => _ShareNotePicker(notes: notes),
-        );
-      } else {
-        for (final candidate in notes) {
-          if (candidate.id == targetNoteId) {
-            note = candidate;
-            break;
-          }
-        }
-      }
-      if (note == null) return;
-      await delivery.appendToNote(noteId: note.id, url: url, shareId: shareId);
-      await bridge.clearPendingShare();
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Link salvo em ${note.title}')));
-      }
+      result = await ref
+          .read(shareIntakeCoordinatorProvider)
+          .processPendingShare(pickNote: _pickNote);
     } catch (error) {
       debugPrint('Pending shared link delivery failed: $error');
-    } finally {
-      _processingPendingShare = false;
+      AppMessenger.showError(ShareStrings.deliveryFailed);
+      return;
     }
+    if (!mounted) return;
+    switch (result) {
+      case PendingShareDelivered(:final note):
+        AppMessenger.showSuccess(ShareStrings.linkSavedIn(note.title));
+      case PendingShareInvalidUrl():
+        AppMessenger.showInfo(ShareStrings.sharedTextHasNoUrl);
+      case PendingShareNone() || PendingShareDismissed():
+        break;
+    }
+  }
+
+  Future<NoteModel?> _pickNote(List<NoteModel> notes) {
+    if (!mounted) return Future.value();
+    return showShareNotePickerSheet(context, notes: notes);
   }
 
   @override
   Widget build(BuildContext context) {
     ref.listen(taskNotificationSchedulerProvider, (_, _) {});
     ref.listen(authControllerProvider, (_, next) {
-      if (next.asData?.value != null) {
-        _processPendingShare();
-      }
+      // Ignore loading/error transitions: only settled sessions drive the
+      // native bridge and pending-share delivery.
+      next.whenData((user) {
+        final coordinator = ref.read(shareIntakeCoordinatorProvider);
+        unawaited(coordinator.onAuthStateChanged(user));
+        if (user != null) unawaited(_processPendingShare());
+      });
     });
     ref.listen(noteCatalogSyncProvider, (_, next) {
       next.whenOrNull(
@@ -186,7 +154,11 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
       );
     });
     ref.listen(activeNotesProvider, (_, next) {
-      next.whenData(_publishIndex);
+      next.whenData((notes) {
+        unawaited(
+          ref.read(shareIntakeCoordinatorProvider).publishNotesIndex(notes),
+        );
+      });
     });
 
     final router = ref.watch(goRouterProvider);
@@ -222,82 +194,6 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
         result = SnackOverlay(child: result);
         return result;
       },
-    );
-  }
-}
-
-class _ShareNotePicker extends StatefulWidget {
-  const _ShareNotePicker({required this.notes});
-
-  final List<NoteModel> notes;
-
-  @override
-  State<_ShareNotePicker> createState() => _ShareNotePickerState();
-}
-
-class _ShareNotePickerState extends State<_ShareNotePicker> {
-  String _query = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final query = _query.trim().toLowerCase();
-    final notes = widget.notes
-        .where((note) => !note.isReadOnly)
-        .where(
-          (note) =>
-              query.isEmpty ||
-              note.title.toLowerCase().contains(query) ||
-              (note.excerpt ?? note.content).toLowerCase().contains(query),
-        )
-        .toList(growable: false);
-    return AlertDialog(
-      title: const Text('Salvar link em'),
-      content: SizedBox(
-        width: 420,
-        height: 420,
-        child: Column(
-          children: [
-            TextField(
-              autofocus: true,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Buscar nota',
-              ),
-              onChanged: (value) => setState(() => _query = value),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: notes.isEmpty
-                  ? const Center(
-                      child: Text('Nenhuma nota editável encontrada.'),
-                    )
-                  : ListView.builder(
-                      itemCount: notes.length,
-                      itemBuilder: (context, index) {
-                        final note = notes[index];
-                        return ListTile(
-                          title: Text(
-                            note.title.isEmpty ? 'Sem título' : note.title,
-                          ),
-                          subtitle: Text(
-                            note.excerpt ?? note.content,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () => Navigator.of(context).pop(note),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-      ],
     );
   }
 }

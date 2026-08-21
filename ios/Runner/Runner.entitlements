@@ -6,6 +6,11 @@
 	<array>
 		<string>group.com.supanotes.shared</string>
 	</array>
+	<key>com.apple.developer.keychain-access-groups</key>
+	<array>
+		<!-- Shared with the Share Extension for session credentials only. -->
+		<string>$(AppIdentifierPrefix)com.supanotes.share</string>
+	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<!-- Override SHARE_LINK_DOMAIN at build time for each environment. -->

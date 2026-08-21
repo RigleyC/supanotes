@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 
 void main() {
@@ -89,6 +90,44 @@ void main() {
     expect(snapshot.blocks.single.metadata, {
       'url': 'https://example.com/post',
       'domain': 'example.com',
+    });
+  });
+
+  test('round-trips rich link with previewStatus, siteName, and faviconUrl', () {
+    const codec = NoteDocumentCodec();
+    final snapshot = codec.parseSnapshot({
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': 'link-2',
+          'type': 'rich_link',
+          'delta': <Map<String, dynamic>>[],
+          'metadata': {
+            'url': 'https://example.com/post',
+            'domain': 'example.com',
+            'title': 'Example Title',
+            'previewStatus': 'ready',
+            'siteName': 'Example Site',
+            'faviconUrl': 'https://example.com/favicon.ico',
+          },
+        },
+      ],
+    });
+
+    final doc = snapshot.toMutableDocument();
+    final node = doc.getNodeById('link-2') as RichLinkNode;
+    expect(node.previewStatus, 'ready');
+    expect(node.siteName, 'Example Site');
+    expect(node.faviconUrl, 'https://example.com/favicon.ico');
+
+    final encoded = codec.encodeDocument(doc);
+    expect(encoded.single['metadata'], {
+      'url': 'https://example.com/post',
+      'domain': 'example.com',
+      'title': 'Example Title',
+      'previewStatus': 'ready',
+      'siteName': 'Example Site',
+      'faviconUrl': 'https://example.com/favicon.ico',
     });
   });
 }

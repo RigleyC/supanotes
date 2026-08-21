@@ -360,34 +360,53 @@ class AttachmentRichLinkCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (node.title != null)
+                          if (node.title != null) ...[
                             Text(
                               node.title!,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
-                          if (node.description != null)
+                            if (node.description != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  node.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              ),
                             Padding(
-                              padding: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.only(top: 6),
                               child: Text(
-                                node.description!,
-                                maxLines: 2,
+                                node.siteName ?? node.domain ?? linkUrl,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant),
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(color: cs.outline),
                               ),
                             ),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
+                          ] else ...[
+                            Text(
                               node.domain ?? linkUrl,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(color: cs.outline),
+                              style: Theme.of(context).textTheme.titleSmall,
                             ),
-                          ),
+                            if (node.domain != null && linkUrl.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  linkUrl,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              ),
+                          ],
                         ],
                       ),
                     ),

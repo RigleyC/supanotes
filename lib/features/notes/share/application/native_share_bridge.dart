@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 
+import '../domain/pending_share.dart';
 import '../domain/share_note_index.dart';
 
 abstract interface class NativeShareBridge {
@@ -9,11 +10,16 @@ abstract interface class NativeShareBridge {
     required String ownerUserId,
     required String accessToken,
     required String refreshToken,
+    required String apiBaseUrl,
   });
 
   Future<void> clearShareSession();
 
-  Future<Map<String, dynamic>?> readPendingShare();
+  /// Asks the native side to resume durable pending deliveries
+  /// (WorkManager on Android; a no-op until iOS background delivery lands).
+  Future<void> retryPendingShares();
+
+  Future<PendingShare?> readPendingShare();
 
   Future<void> clearPendingShare();
 }
@@ -33,21 +39,27 @@ final class MethodChannelNativeShareBridge implements NativeShareBridge {
     required String ownerUserId,
     required String accessToken,
     required String refreshToken,
+    required String apiBaseUrl,
   }) => _channel.invokeMethod('publishSessionCredentials', {
     'ownerUserId': ownerUserId,
     'accessToken': accessToken,
     'refreshToken': refreshToken,
+    'apiBaseUrl': apiBaseUrl,
   });
+
+  @override
+  Future<void> retryPendingShares() =>
+      _channel.invokeMethod('retryPendingShares');
 
   @override
   Future<void> clearShareSession() =>
       _channel.invokeMethod('clearShareSession');
 
   @override
-  Future<Map<String, dynamic>?> readPendingShare() async {
+  Future<PendingShare?> readPendingShare() async {
     final value = await _channel.invokeMethod<dynamic>('readPendingShare');
     if (value is! Map) return null;
-    return Map<String, dynamic>.from(value);
+    return PendingShare.fromMap(Map<String, dynamic>.from(value));
   }
 
   @override
