@@ -14,6 +14,7 @@
 		B10000000000000000000001 /* ShareBridgeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* ShareBridgeStore.swift */; };
 		B10000000000000000000003 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* ShareViewController.swift */; };
 		B10000000000000000000005 /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* ShareView.swift */; };
+		B10000000000000000000007 /* SharedShareStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* SharedShareStore.swift */; };
 		B10000000000000000000019 /* ShareAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* ShareAPIClient.swift */; };
 		B1000000000000000000001D /* ShareAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* ShareAPIClient.swift */; };
 		B1000000000000000000001B /* ShareBackgroundUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* ShareBackgroundUploader.swift */; };
