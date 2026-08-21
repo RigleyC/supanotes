@@ -42,12 +42,7 @@ class MainActivity : FlutterActivity() {
                         val pending = ShareBridgeStore.readPendingShare(this)
                         result.success(
                             if (pending == null) {
-                                mapOf(
-                                    "text" to null,
-                                    "shareId" to null,
-                                    "noteId" to null,
-                                    "ownerUserId" to null,
-                                )
+                                null
                             } else {
                                 mapOf(
                                     "text" to pending.text,

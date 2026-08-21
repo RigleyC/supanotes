@@ -25,7 +25,7 @@ NoteModel note({
 void main() {
   test('filters read-only notes and sorts editable notes by update time', () {
     final index = ShareNoteIndex.fromNotes('user-1', [
-      note(id: 'old', updatedAt: DateTime(2026, 1, 1)),
+      note(id: 'old', updatedAt: DateTime(2026)),
       note(id: 'view', updatedAt: DateTime(2026, 1, 3), permission: 'view'),
       note(id: 'new', updatedAt: DateTime(2026, 1, 2)),
     ]);
@@ -37,7 +37,7 @@ void main() {
 
   test('encodes an account-scoped versioned envelope', () {
     final index = ShareNoteIndex.fromNotes('user-1', [
-      note(id: 'note-1', updatedAt: DateTime.utc(2026, 1, 1)),
+      note(id: 'note-1', updatedAt: DateTime.utc(2026)),
     ]);
 
     expect(index.toJson(), {

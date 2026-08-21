@@ -60,7 +60,7 @@ class _PickerGridContent extends StatelessWidget {
                               .floor(),
                         )
                         .clamp(1, _pickerGridMaxColumns)
-                        .toInt();
+                        ;
                     return SliverGrid(
                       delegate: SliverChildBuilderDelegate(
                         itemBuilder,
@@ -70,7 +70,6 @@ class _PickerGridContent extends StatelessWidget {
                         crossAxisCount: crossAxisCount,
                         mainAxisSpacing: _pickerGridSpacing,
                         crossAxisSpacing: _pickerGridCrossAxisSpacing,
-                        childAspectRatio: 1,
                       ),
                     );
                   },

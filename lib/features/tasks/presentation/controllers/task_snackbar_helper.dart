@@ -24,7 +24,7 @@ class TaskSnackBarHelper {
     final result = await onComplete();
     debugPrint('[TaskSnackBarHelper] onComplete returned');
 
-    final title = 'Concluída!';
+    const title = 'Concluída!';
 
     AppMessenger.showTaskCompletion(
       title: title,

@@ -7,7 +7,7 @@ import 'package:supanotes/features/settings/data/settings_repository.dart';
 ///
 /// Derives `isGridView` from the raw `sessionCacheProvider` so the UI never
 /// touches `Map<String, dynamic>` directly.
-final isGridViewProvider = Provider.autoDispose<bool>((ref) {
+final Provider<bool> isGridViewProvider = Provider.autoDispose<bool>((ref) {
   final settings = ref.watch(sessionCacheProvider).settings;
   final prefs = settings['preferences'] as Map<String, dynamic>? ?? {};
   return prefs['notes_view_mode'] == 'grid';

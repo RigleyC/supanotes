@@ -4,30 +4,28 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supanotes/shared/theme/app_theme.dart';
-import 'package:timeago/timeago.dart' as timeago;
-
-import 'core/constants/app_constants.dart';
-import 'core/di/providers.dart';
-import 'package:supanotes/features/notes/share/domain/share_strings.dart';
-import 'shared/widgets/app_snackbar.dart';
-import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
-import 'core/router/app_router.dart';
-import 'core/router/app_link_provider.dart';
-
-import 'package:intl/date_symbol_data_local.dart';
-import 'package:timezone/data/latest.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
-import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supanotes/core/constants/app_constants.dart';
+import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/router/app_link_provider.dart';
+import 'package:supanotes/core/router/app_router.dart';
+import 'package:supanotes/core/utils/platform_utils.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
+import 'package:supanotes/features/notes/share/domain/share_strings.dart';
 import 'package:supanotes/features/notes/share/presentation/note_picker_sheet.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
+import 'package:supanotes/shared/theme/app_theme.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/expressive_snack.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'package:timezone/data/latest.dart';
+import 'package:timezone/timezone.dart' as tz;
 import 'package:window_manager/window_manager.dart';
-import 'core/utils/platform_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,7 +58,7 @@ void main() async {
   );
 
   timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
-  await initializeDateFormatting('pt_BR', null);
+  await initializeDateFormatting('pt_BR');
   runApp(
     UncontrolledProviderScope(
       container: container,
@@ -183,7 +181,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       builder: (context, child) {
-        Widget result = child!;
+        var result = child!;
         if (PlatformInfo.isIOS) {
           final brightness = MediaQuery.platformBrightnessOf(context);
           final themeData = brightness == Brightness.dark

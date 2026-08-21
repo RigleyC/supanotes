@@ -1,18 +1,13 @@
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
-
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_interaction_policy.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_view.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
-import 'note_icon_view.dart';
-import 'note_icon_interaction_policy.dart';
 
 class NoteCard extends StatelessWidget {
   const NoteCard({
-    super.key,
-    required this.note,
-    required this.onTap,
-    required this.onDelete,
-    required this.onToggleFavorite,
+    required this.note, required this.onTap, required this.onDelete, required this.onToggleFavorite, super.key,
     this.onEditIcon,
   });
 

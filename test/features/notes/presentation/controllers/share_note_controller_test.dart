@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/sharing/application/share_list_controller.dart';
+import 'package:supanotes/features/notes/sharing/application/share_note_controller.dart';
 import 'package:supanotes/features/notes/sharing/data/shares_repository.dart';
 import 'package:supanotes/features/notes/sharing/model/share_model.dart';
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
-import 'package:supanotes/features/notes/sharing/application/share_list_controller.dart';
-import 'package:supanotes/features/notes/sharing/application/share_note_controller.dart';
 
 void main() {
   test('simultaneous share operations are isolated by note', () async {

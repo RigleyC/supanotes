@@ -3,11 +3,7 @@ import 'package:flutter/material.dart';
 
 class NotesMoreMenu extends StatelessWidget {
   const NotesMoreMenu({
-    super.key,
-    required this.isListView,
-    required this.onToggleViewMode,
-    required this.onLogout,
-    required this.onOpenSettings,
+    required this.isListView, required this.onToggleViewMode, required this.onLogout, required this.onOpenSettings, super.key,
   });
 
   final bool isListView;

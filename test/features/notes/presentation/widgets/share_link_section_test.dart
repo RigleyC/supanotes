@@ -42,7 +42,7 @@ Widget _harness(_FakeShareLinkRepository repository) {
         (ref, _) async => repository.current,
       ),
     ],
-    child: MaterialApp(
+    child: const MaterialApp(
       home: Scaffold(body: ShareLinkSection(noteId: 'note-1')),
     ),
   );

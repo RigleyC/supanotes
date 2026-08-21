@@ -3,23 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supanotes/shared/widgets/app_button.dart';
-import 'package:uuid/uuid.dart';
-
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
-import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
-import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_grid_view.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_list_view.dart';
-import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_picker.dart';
-
+import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_more_menu.dart';
+import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-
-import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_more_menu.dart';
+import 'package:uuid/uuid.dart';
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});

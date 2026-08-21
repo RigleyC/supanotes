@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/features/notes/editor/presentation/note_stylesheet.dart';
+import 'package:super_editor/super_editor.dart';
 
 /// Stylesheet entry point for phone and tablet note editing.
 Stylesheet mobileNoteStylesheet(

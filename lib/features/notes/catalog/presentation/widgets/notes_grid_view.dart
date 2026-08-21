@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_card.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'note_card.dart';
 
 /// Grid representation of the notes list.
 ///
@@ -11,12 +10,7 @@ import 'note_card.dart';
 /// layout (e.g. a [Column]) and provides scroll constraints via [Expanded].
 class NotesGridView extends StatelessWidget {
   const NotesGridView({
-    super.key,
-    required this.notes,
-    required this.onTap,
-    required this.onDelete,
-    required this.onToggleFavorite,
-    required this.onEditIcon,
+    required this.notes, required this.onTap, required this.onDelete, required this.onToggleFavorite, required this.onEditIcon, super.key,
   });
 
   final List<NoteModel> notes;

@@ -1,20 +1,19 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:drift/drift.dart' hide isNull, isNotNull;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:super_editor/super_editor.dart';
-
-import 'package:supanotes/main.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/main.dart';
+import 'package:super_editor/super_editor.dart';
 
 class _OfflineClient extends Mock implements NoteSyncClient {}
 

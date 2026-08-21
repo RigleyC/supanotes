@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
-import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
 
 class _RecordingNotesRepository implements INotesRepository {
@@ -31,7 +31,7 @@ class _RecordingNotesRepository implements INotesRepository {
   }
 
   @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 GoRouter _routerFor(Widget screen) {

@@ -10,7 +10,7 @@ void main() {
       'revert: restore previous sync path',
       'feat!: replace task protocol',
       'feat(editor): replace task protocol\n\nBREAKING CHANGE: remove old route',
-      'Merge branch \'master\' into feature/editor',
+      "Merge branch 'master' into feature/editor",
     ]) {
       expect(
         CommitMessageValidator.validate(message).isValid,

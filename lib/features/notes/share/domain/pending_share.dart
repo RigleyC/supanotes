@@ -6,11 +6,6 @@ final class PendingShare {
     this.ownerUserId,
   });
 
-  final String shareId;
-  final String text;
-  final String? noteId;
-  final String? ownerUserId;
-
   factory PendingShare.fromMap(Map<String, dynamic> map) {
     return PendingShare(
       shareId: map['shareId'] as String? ?? '',
@@ -23,6 +18,11 @@ final class PendingShare {
           : map['ownerUserId'] as String?,
     );
   }
+
+  final String shareId;
+  final String text;
+  final String? noteId;
+  final String? ownerUserId;
 
   bool isValidForUser(String currentUserId) {
     if (ownerUserId == null || ownerUserId!.isEmpty) {

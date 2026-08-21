@@ -4,25 +4,24 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
-
-import 'daos/attachments_dao.dart';
-import 'daos/note_links_dao.dart';
-import 'daos/note_lifecycle_dao.dart';
-import 'daos/note_operations_dao.dart';
-import 'daos/notes_dao.dart';
-import 'daos/user_note_preferences_dao.dart';
-import 'tables/attachments.dart';
-import 'tables/local_note_documents.dart';
-import 'tables/note_links.dart';
-import 'tables/note_sync_errors.dart';
-import 'tables/sync_sessions.dart';
-import 'tables/notes.dart';
-import 'tables/pending_note_operations.dart';
-import 'tables/user_note_preferences.dart';
-import 'note_lifecycle_policy.dart';
+import 'package:supanotes/core/database/daos/attachments_dao.dart';
+import 'package:supanotes/core/database/daos/note_lifecycle_dao.dart';
+import 'package:supanotes/core/database/daos/note_links_dao.dart';
+import 'package:supanotes/core/database/daos/note_operations_dao.dart';
+import 'package:supanotes/core/database/daos/notes_dao.dart';
+import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
+import 'package:supanotes/core/database/tables/attachments.dart';
+import 'package:supanotes/core/database/tables/local_note_documents.dart';
+import 'package:supanotes/core/database/tables/note_links.dart';
+import 'package:supanotes/core/database/tables/note_sync_errors.dart';
+import 'package:supanotes/core/database/tables/notes.dart';
+import 'package:supanotes/core/database/tables/pending_note_operations.dart';
+import 'package:supanotes/core/database/tables/sync_sessions.dart';
+import 'package:supanotes/core/database/tables/user_note_preferences.dart';
 
 part 'database.g.dart';
 
@@ -252,9 +251,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _addColumnIfMissing(
     Migrator m,
-    TableInfo table,
+    TableInfo<Table, dynamic> table,
     String tableName,
-    GeneratedColumn column,
+    GeneratedColumn<Object> column,
   ) async {
     if (!await _hasColumn(tableName, column.$name)) {
       await m.addColumn(table, column);

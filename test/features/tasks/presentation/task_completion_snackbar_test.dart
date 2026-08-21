@@ -4,7 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 void main() {
   setUpAll(() async {
-    await initializeDateFormatting('pt_BR', null);
+    await initializeDateFormatting('pt_BR');
   });
 
   testWidgets('minimal snackbar dismiss test', (tester) async {

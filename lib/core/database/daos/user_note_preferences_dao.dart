@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
-import '../database.dart';
-import '../tables/user_note_preferences.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/tables/user_note_preferences.dart';
 
 part 'user_note_preferences_dao.g.dart';
 

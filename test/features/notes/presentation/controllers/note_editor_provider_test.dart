@@ -1,23 +1,22 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' hide isNotNull;
 import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/database/note_lifecycle_policy.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
+import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:super_editor/super_editor.dart';
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 

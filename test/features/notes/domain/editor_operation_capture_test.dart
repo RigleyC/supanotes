@@ -1,8 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
-
-import 'package:supanotes/features/notes/editor/sync/editor_operation_capture.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/sync/editor_operation_capture.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   group('EditorOperationCapture Formatting & Attributed Text Tests', () {
@@ -18,13 +17,13 @@ void main() {
       );
 
       final capturedOps = <OperationRequestData>[];
-      int opIdCounter = 0;
+      var opIdCounter = 0;
 
       final capture = EditorOperationCapture(
         document: doc,
         generateOpId: () => 'op-${++opIdCounter}',
         codec: codec,
-        onOperationsCaptured: (ops) => capturedOps.addAll(ops),
+        onOperationsCaptured: capturedOps.addAll,
       );
 
       capture.start();
@@ -295,7 +294,7 @@ void main() {
             id: 't1',
             text: AttributedText('Recurring Task'),
             isComplete: false,
-            metadata: {'recurrenceRule': 'FREQ=DAILY'},
+            metadata: const {'recurrenceRule': 'FREQ=DAILY'},
           ),
         ],
       );
@@ -305,13 +304,13 @@ void main() {
       );
 
       final capturedOps = <OperationRequestData>[];
-      int opIdCounter = 0;
+      var opIdCounter = 0;
 
       final capture = EditorOperationCapture(
         document: doc,
         generateOpId: () => 'op-${++opIdCounter}',
         codec: codec,
-        onOperationsCaptured: (ops) => capturedOps.addAll(ops),
+        onOperationsCaptured: capturedOps.addAll,
       );
 
       capture.start();
@@ -326,7 +325,7 @@ void main() {
             id: 't1',
             text: AttributedText('Recurring Task'),
             isComplete: false,
-            metadata: {
+            metadata: const {
               'recurrenceRule': 'FREQ=DAILY',
               'completions': {schedAt: compAt},
             },
@@ -353,7 +352,7 @@ void main() {
             id: 't1',
             text: AttributedText('Recurring Task'),
             isComplete: false,
-            metadata: {'recurrenceRule': 'FREQ=DAILY', 'completions': {}},
+            metadata: const {'recurrenceRule': 'FREQ=DAILY', 'completions': {}},
           ),
         ),
       ]);
@@ -374,7 +373,7 @@ void main() {
             id: 't1',
             text: AttributedText('Task'),
             isComplete: false,
-            metadata: {'isCompleted': false},
+            metadata: const {'isCompleted': false},
           ),
         ],
       );
@@ -398,7 +397,7 @@ void main() {
             id: 't1',
             text: AttributedText('Task'),
             isComplete: true,
-            metadata: {'isCompleted': false},
+            metadata: const {'isCompleted': false},
           ),
         ),
       ]);
@@ -419,7 +418,7 @@ void main() {
               id: 't1',
               text: AttributedText('Task with metadata'),
               isComplete: false,
-              metadata: {
+              metadata: const {
                 'dueDate': '2026-07-25T14:30:00.000',
                 'hasTime': true,
                 'recurrenceRule': 'weekly',
@@ -449,7 +448,7 @@ void main() {
               id: 't1',
               text: AttributedText('Task with metadata'),
               isComplete: false,
-              metadata: {},
+              metadata: const {},
             ),
           ),
         ]);
@@ -491,7 +490,7 @@ void main() {
             id: 't1',
             text: AttributedText('New task'),
             isComplete: false,
-            metadata: {'dueDate': '2026-08-04T09:00:00.000Z'},
+            metadata: const {'dueDate': '2026-08-04T09:00:00.000Z'},
           ),
           nodeIndex: 1,
         ),
@@ -562,7 +561,7 @@ void main() {
         onOperationsCaptured: capturedOps.addAll,
       ).start();
 
-      editor.execute([MoveNodeRequest(nodeId: 't1', newIndex: 0)]);
+      editor.execute([const MoveNodeRequest(nodeId: 't1', newIndex: 0)]);
 
       final operation = capturedOps.firstWhere(
         (op) => op.kind == 'move_block' && op.blockId == 't1',
@@ -630,7 +629,7 @@ void main() {
         onOperationsCaptured: capturedOps.addAll,
       ).start();
 
-      editor.execute([MoveNodeRequest(nodeId: 'p2', newIndex: 0)]);
+      editor.execute([const MoveNodeRequest(nodeId: 'p2', newIndex: 0)]);
       expect(capturedOps, isEmpty);
 
       editor.execute([

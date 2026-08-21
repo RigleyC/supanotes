@@ -1,9 +1,9 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/src/providers/notifier.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 
-import 'task_metadata_draft.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 
 class TaskMetadataState {
   const TaskMetadataState({
@@ -63,7 +63,6 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
       hasTime: draft.hasTime,
       recurrence: draft.recurrence,
       reminder: draft.reminder,
-      isSaving: false,
     );
   }
 
@@ -112,7 +111,6 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
     final current = state;
     state = TaskMetadataState(
       dueDate: current.dueDate,
-      hasTime: false,
       recurrence: current.recurrence,
       reminder: state.reminder?.toAllDayFallback(),
       error: current.error,
@@ -161,7 +159,7 @@ class TaskMetadataController extends Notifier<TaskMetadataState> {
   }
 }
 
-final taskMetadataProvider = NotifierProvider.autoDispose
+final NotifierProviderFamily<TaskMetadataController, TaskMetadataState, String> taskMetadataProvider = NotifierProvider.autoDispose
     .family<TaskMetadataController, TaskMetadataState, String>(
       TaskMetadataController.new,
     );

@@ -1,20 +1,18 @@
-library;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
-import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
 import 'package:supanotes/features/notes/editor/document/hidden_task_editing_guard.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
+import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart'
+    show RandomDividerConversionReaction;
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
-import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart'
-    show RandomDividerConversionReaction;
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:super_editor/super_editor.dart';
 
-const int _dividerCount = 35;
 
 class NoteEditorController extends ChangeNotifier {
   NoteEditorController({
@@ -92,7 +90,7 @@ class NoteEditorController extends ChangeNotifier {
       ).complete(snapshot, scheduledAt: scheduledAt);
 
       final updatedMeta = Map<String, dynamic>.from(node.metadata);
-      bool isCompleted = false;
+      var isCompleted = false;
       if (result.completed) {
         isCompleted = true;
         updatedMeta['lastCompletedAt'] = result.completedAt
@@ -251,7 +249,7 @@ class NoteEditorController extends ChangeNotifier {
       (r) => r is HorizontalRuleConversionReaction,
     );
     editor.reactionPipeline.add(
-      const RandomDividerConversionReaction(dividerCount: _dividerCount),
+      const RandomDividerConversionReaction(),
     );
   }
 

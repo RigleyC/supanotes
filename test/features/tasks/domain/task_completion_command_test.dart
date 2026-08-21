@@ -88,7 +88,7 @@ void main() {
         final result = TaskCompletionCommand(() => DateTime(2026, 7, 4, 15))
             .complete(
               TaskSnapshot(
-                dueDate: DateTime(2026, 7, 1),
+                dueDate: DateTime(2026, 7),
                 recurrence: TaskRecurrence.daily,
               ),
             );
@@ -100,7 +100,7 @@ void main() {
     );
 
     test('completes a non-recurring task without a next occurrence', () {
-      final dueDate = DateTime(2026, 7, 1);
+      final dueDate = DateTime(2026, 7);
       final result = TaskCompletionCommand(
         () => DateTime(2026, 7, 4, 15),
       ).complete(TaskSnapshot(dueDate: dueDate));

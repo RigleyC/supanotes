@@ -10,14 +10,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:motor/motor.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_interaction.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/selection_formatting.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-
-import 'note_editor_interaction.dart';
-import 'note_toolbar_button.dart';
-import 'selection_formatting.dart';
+import 'package:super_editor/super_editor.dart';
 
 export 'note_editor_interaction.dart' show noteEditorToolbarTapRegionGroup;
 
@@ -25,9 +23,7 @@ enum _ToolbarMode { normal, contextual }
 
 class NoteToolbar extends StatefulWidget {
   const NoteToolbar({
-    super.key,
-    required this.editor,
-    required this.composer,
+    required this.editor, required this.composer, super.key,
     this.onAttachFile,
     this.onAttachImage,
   });

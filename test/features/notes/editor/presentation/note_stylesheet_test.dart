@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   group('mobileNoteStylesheet theming', () {
@@ -46,12 +46,12 @@ void main() {
           ParagraphNode(
             id: '2',
             text: AttributedText('Header 1'),
-            metadata: {'blockType': header1Attribution},
+            metadata: const {'blockType': header1Attribution},
           ),
           ParagraphNode(
             id: '3',
             text: AttributedText('Quote text'),
-            metadata: {'blockType': blockquoteAttribution},
+            metadata: const {'blockType': blockquoteAttribution},
           ),
           TaskNode(id: '4', text: AttributedText('Task item'), isComplete: false),
         ],

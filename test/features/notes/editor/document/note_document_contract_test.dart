@@ -115,7 +115,7 @@ void main() {
     });
 
     final doc = snapshot.toMutableDocument();
-    final node = doc.getNodeById('link-2') as RichLinkNode;
+    final node = doc.getNodeById('link-2')! as RichLinkNode;
     expect(node.previewStatus, 'ready');
     expect(node.siteName, 'Example Site');
     expect(node.faviconUrl, 'https://example.com/favicon.ico');

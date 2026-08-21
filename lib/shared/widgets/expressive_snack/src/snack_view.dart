@@ -5,13 +5,13 @@ import 'package:motor/motor.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 
-import 'snack.dart';
-import 'snack_overlay.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/src/snack.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/src/snack_overlay.dart';
 
 /// One pill: entry and exit springs, its place in the card stack, drag and
 /// tap to dismiss, and the duplicate message shake.
 class SnackView extends StatefulWidget {
-  const SnackView({super.key, required this.snack, required this.depth});
+  const SnackView({required this.snack, required this.depth, super.key});
 
   final Snack snack;
 
@@ -119,7 +119,7 @@ class SnackViewState extends State<SnackView> with TickerProviderStateMixin {
   }
 
   void _onDragEnd(DragEndDetails details) {
-    final double velocity = details.velocity.pixelsPerSecond.dy;
+    final velocity = details.velocity.pixelsPerSecond.dy;
     if (_drag.value > _dismissOffset || velocity > _dismissVelocity) {
       dismiss();
       return;
@@ -142,7 +142,7 @@ class SnackViewState extends State<SnackView> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final Color shadow = Theme.of(context).colorScheme.shadow;
+    final shadow = Theme.of(context).colorScheme.shadow;
 
     // The outer spring chases the dealt depth (moving back or forward in
     // the stack). The inner spring drives entry and exit. Both use the
@@ -222,8 +222,8 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    final Color dotColor = _dotColor(context);
+    final cs = Theme.of(context).colorScheme;
+    final dotColor = _dotColor(context);
 
     return Material(
       color: cs.surfaceContainerHighest,

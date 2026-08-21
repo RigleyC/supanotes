@@ -1,14 +1,13 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
+import 'package:super_editor/super_editor.dart';
 
 class _ReadySyncHandle implements NoteEditorSyncHandle {
   @override

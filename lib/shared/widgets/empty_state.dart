@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_spacing.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 
 /// Centered empty-state placeholder used across the app.
 ///
@@ -9,9 +9,7 @@ import '../theme/app_spacing.dart';
 /// fill an otherwise-empty screen body.
 class EmptyState extends StatelessWidget {
   const EmptyState({
-    super.key,
-    required this.icon,
-    required this.title,
+    required this.icon, required this.title, super.key,
     this.subtitle,
     this.action,
   });
@@ -31,7 +29,6 @@ class EmptyState extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(
               icon,

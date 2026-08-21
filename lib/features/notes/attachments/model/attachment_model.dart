@@ -17,6 +17,21 @@ class AttachmentModel {
     this.remoteUrl,
   });
 
+  factory AttachmentModel.fromData(AttachmentData d) => AttachmentModel(
+    id: d.id,
+    noteId: d.noteId,
+    localPath: d.localPath,
+    remoteUrl: d.remoteUrl,
+    fileName: d.fileName,
+    mimeType: d.mimeType,
+    fileSize: d.fileSize,
+    status: AttachmentStatus.values.firstWhere(
+      (s) => s.name == d.status,
+      orElse: () => AttachmentStatus.local,
+    ),
+    createdAt: d.createdAt,
+  );
+
   final String id;
   final String noteId;
   final String? localPath;
@@ -34,19 +49,4 @@ class AttachmentModel {
   }
 
   String? get displayUrl => remoteUrl ?? localPath;
-
-  factory AttachmentModel.fromData(AttachmentData d) => AttachmentModel(
-    id: d.id,
-    noteId: d.noteId,
-    localPath: d.localPath,
-    remoteUrl: d.remoteUrl,
-    fileName: d.fileName,
-    mimeType: d.mimeType,
-    fileSize: d.fileSize,
-    status: AttachmentStatus.values.firstWhere(
-      (s) => s.name == d.status,
-      orElse: () => AttachmentStatus.local,
-    ),
-    createdAt: d.createdAt,
-  );
 }

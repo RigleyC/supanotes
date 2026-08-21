@@ -2,15 +2,31 @@ import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:dio/dio.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-
-import 'note_operation_adapter.dart';
+import 'package:super_editor/super_editor.dart';
 
 class NoteSyncSession implements NoteEditorSyncHandle {
+
+  NoteSyncSession({
+    required this.noteId,
+    required this.syncService,
+    required this.document,
+    required Editor editor,
+    this.userId = '',
+    bool captureLocalOperations = true,
+    this.onTransientError,
+    this.onProtocolError,
+  }) : adapter = NoteOperationAdapter(
+         document: document,
+         syncService: syncService,
+         noteId: noteId,
+         editor: editor,
+         captureLocalOperations: captureLocalOperations,
+       ),
+       _captureLocalOperations = captureLocalOperations;
   final String noteId;
   final NoteOperationsSyncService syncService;
   final NoteOperationAdapter adapter;
@@ -72,24 +88,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   @override
   Stream<bool> get captureLocalOperationsChanges => _captureController.stream;
-
-  NoteSyncSession({
-    required this.noteId,
-    required this.syncService,
-    required this.document,
-    required Editor editor,
-    this.userId = '',
-    bool captureLocalOperations = true,
-    this.onTransientError,
-    this.onProtocolError,
-  }) : adapter = NoteOperationAdapter(
-         document: document,
-         syncService: syncService,
-         noteId: noteId,
-         editor: editor,
-         captureLocalOperations: captureLocalOperations,
-       ),
-       _captureLocalOperations = captureLocalOperations;
 
   @override
   void setCaptureLocalOperations(bool captureLocalOperations) {

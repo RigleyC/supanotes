@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'snack_view.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/src/snack_view.dart';
 
 class Snack {
   Snack({
     required this.title,
-    this.subtitle,
-    required this.icon,
-    required this.duration,
+    required this.icon, required this.duration, this.subtitle,
     this.action,
   });
 

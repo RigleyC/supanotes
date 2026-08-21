@@ -2,10 +2,9 @@ import 'dart:convert';
 
 import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 void main() {
   group('Collaborative Typing Test - 2 Pessoas Digitando ao Mesmo Tempo', () {
@@ -33,7 +32,6 @@ void main() {
         payloadJson: jsonEncode({'ops': ops}),
         createdAt: DateTime.utc(2026, 7, 22),
         attemptCount: 0,
-        lastAttemptAt: null,
         status: 'pending',
       );
     }
@@ -78,7 +76,7 @@ void main() {
       final buffer = StringBuffer();
       for (final op in delta.operations) {
         if (op.data is String) {
-          buffer.write(op.data as String);
+          buffer.write(op.data! as String);
         }
       }
       return buffer.toString();
@@ -110,7 +108,6 @@ void main() {
             {'retain': 19},
             {'insert': ' BANANA'},
           ],
-          revision: 1,
         );
 
         // Pessoa 1 recebe a operacao remota da Pessoa 2 e faz o rebase da sua operacao pendente
@@ -122,7 +119,7 @@ void main() {
 
         expect(rebasedPessoa1.length, 1);
         final opsRebasedPessoa1 =
-            (jsonDecode(rebasedPessoa1[0].payloadJson)['ops'] as List);
+            jsonDecode(rebasedPessoa1[0].payloadJson)['ops'] as List;
 
         // Aplica as edicoes ao documento inicial:
         var docDelta = quill.Delta()..insert(initialText);
@@ -184,7 +181,6 @@ void main() {
             {'retain': posRato},
             {'insert': ' grande'},
           ],
-          revision: 1,
         );
 
         // Pessoa 2 rebaseia sua edicao em relacao a Pessoa 1
@@ -195,7 +191,7 @@ void main() {
         );
 
         final opsRebasedPessoa2 =
-            (jsonDecode(rebasedPessoa2[0].payloadJson)['ops'] as List);
+            jsonDecode(rebasedPessoa2[0].payloadJson)['ops'] as List;
 
         // O retain da Pessoa 2 deve ter sido deslocado de 30 para 30 + length(" grande") = 37
         expect(
@@ -230,7 +226,7 @@ void main() {
 
         final posAntigo = initialText.indexOf('antigo'); // index 6
 
-        final posFinal = initialText.length; // index 20 (final da nota)
+        const posFinal = initialText.length; // index 20 (final da nota)
 
         // Pessoa 2 digita " incrível" no final simultaneamente
         final opPessoa2 = makePending(
@@ -251,7 +247,6 @@ void main() {
             {'delete': 6},
             {'insert': 'novo'},
           ],
-          revision: 1,
         );
 
         // Pessoa 2 rebaseia sua operacao remota da Pessoa 1
@@ -262,7 +257,7 @@ void main() {
         );
 
         final opsRebasedPessoa2 =
-            (jsonDecode(rebasedPessoa2[0].payloadJson)['ops'] as List);
+            jsonDecode(rebasedPessoa2[0].payloadJson)['ops'] as List;
 
         // O retain da Pessoa 2 desloca: -6 (delete) + 4 (insert "novo") = -2
         // retain inicial era 20 -> passa a ser 18

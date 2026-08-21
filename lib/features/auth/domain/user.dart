@@ -2,10 +2,6 @@
 class User {
   const User({required this.id, required this.email, required this.name});
 
-  final String id;
-  final String email;
-  final String name;
-
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] as String,
@@ -13,6 +9,10 @@ class User {
       name: json['name'] as String,
     );
   }
+
+  final String id;
+  final String email;
+  final String name;
 
   Map<String, dynamic> toJson() => {'id': id, 'email': email, 'name': name};
 
@@ -34,13 +34,13 @@ class SessionData {
     required this.settings,
   });
 
-  final Map<String, dynamic> settings;
-
   factory SessionData.fromJson(Map<String, dynamic> json) {
     return SessionData(
       settings: json['settings'] as Map<String, dynamic>? ?? const {},
     );
   }
+
+  final Map<String, dynamic> settings;
 }
 
 /// Result of a successful login or register.
@@ -52,11 +52,6 @@ class AuthResult {
     required this.session,
   });
 
-  final User user;
-  final String accessToken;
-  final String refreshToken;
-  final SessionData session;
-
   factory AuthResult.fromJson(Map<String, dynamic> json) {
     return AuthResult(
       user: User.fromJson(json['user'] as Map<String, dynamic>),
@@ -65,4 +60,9 @@ class AuthResult {
       session: SessionData.fromJson(json),
     );
   }
+
+  final User user;
+  final String accessToken;
+  final String refreshToken;
+  final SessionData session;
 }

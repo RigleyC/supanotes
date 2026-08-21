@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
+
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
 func TestAppendRichLinkAppendsToLatestDocumentAndDeduplicatesRetry(t *testing.T) {
@@ -102,4 +104,51 @@ func TestAppendRichLinkRejectsMissingNote(t *testing.T) {
 	svc := NewServiceWithTransactionRunner(repo, immediateTransactionRunner{})
 	_, err := svc.AppendRichLink(context.Background(), noteID, userID, "550e8400-e29b-41d4-a716-446655440003", map[string]any{"url": "https://example.com"})
 	require.ErrorIs(t, err, ErrNoteNotFound)
+}
+
+func TestAppendRichLinkRejectsShareAssignedToAnotherNote(t *testing.T) {
+	noteID := mustParseUUID("550e8400-e29b-41d4-a716-446655440001")
+	otherNoteID := mustParseUUID("550e8400-e29b-41d4-a716-446655440099")
+	userID := mustParseUUID("550e8400-e29b-41d4-a716-446655440002")
+	repo := &mockRepository{
+		lockNoteFn: func(context.Context, pgtype.UUID) (LockNoteResult, error) {
+			return LockNoteResult{ID: noteID, Revision: 1, Document: []byte(`{"schemaVersion":1,"blocks":[]}`)}, nil
+		},
+		reserveSharedLinkIngestionFn: func(ctx context.Context, userID, shareID, noteID, operationID pgtype.UUID) (sqlcgen.SharedLinkIngestion, error) {
+			return sqlcgen.SharedLinkIngestion{
+				UserID:      userID,
+				ShareID:     shareID,
+				NoteID:      otherNoteID,
+				OperationID: operationID,
+			}, nil
+		},
+	}
+	svc := NewServiceWithTransactionRunner(repo, immediateTransactionRunner{})
+	_, err := svc.AppendRichLink(context.Background(), noteID, userID, "550e8400-e29b-41d4-a716-446655440003", map[string]any{"url": "https://example.com"})
+	require.EqualError(t, err, "share already assigned to another note")
+}
+
+func TestAppendRichLinkAppendsToEmptyDocument(t *testing.T) {
+	noteID := mustParseUUID("550e8400-e29b-41d4-a716-446655440001")
+	userID := mustParseUUID("550e8400-e29b-41d4-a716-446655440002")
+	storedDocument := []byte(`{"schemaVersion":1,"blocks":[]}`)
+	storedRevision := int64(0)
+	repo := &mockRepository{
+		lockNoteFn: func(context.Context, pgtype.UUID) (LockNoteResult, error) {
+			return LockNoteResult{ID: noteID, Revision: storedRevision, Document: storedDocument}, nil
+		},
+		updateNoteDocumentFn: func(_ context.Context, params UpdateNoteDocumentParams) error {
+			storedDocument = params.Document
+			storedRevision = params.Revision
+			return nil
+		},
+	}
+	svc := NewServiceWithTransactionRunner(repo, immediateTransactionRunner{})
+	res, err := svc.AppendRichLink(context.Background(), noteID, userID, "550e8400-e29b-41d4-a716-446655440003", map[string]any{"url": "https://example.com"})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), res.Revision)
+	doc, err := UnmarshalDocument(res.Document)
+	require.NoError(t, err)
+	require.Len(t, doc.Blocks, 2)
+	require.Equal(t, string(BlockRichLink), doc.Blocks[1].Type)
 }

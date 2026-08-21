@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -10,8 +10,8 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
@@ -33,7 +33,7 @@ void main() {
     );
     addTearDown(database.close);
 
-    when(() => client.listNotes()).thenAnswer(
+    when(client.listNotes).thenAnswer(
       (_) async => [
         {
           'id': 'task-note',
@@ -152,7 +152,7 @@ void main() {
               noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
             ),
           );
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'active-icon-note',
@@ -202,7 +202,7 @@ void main() {
             noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
           ),
         );
-    when(() => client.listNotes()).thenAnswer(
+    when(client.listNotes).thenAnswer(
       (_) async => [
         {
           'id': 'active-owner-icon',
@@ -254,7 +254,7 @@ void main() {
               noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
             ),
           );
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'remote-wins-icon',
@@ -304,7 +304,7 @@ void main() {
             noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
           ),
         );
-    when(() => client.listNotes()).thenAnswer(
+    when(client.listNotes).thenAnswer(
       (_) async => [
         {
           'id': 'remote-icon-clear',
@@ -354,7 +354,7 @@ void main() {
     );
     addTearDown(database.close);
 
-    when(() => client.listNotes()).thenAnswer(
+    when(client.listNotes).thenAnswer(
       (_) async => [
         {
           'id': 'invalid-remote-icon',
@@ -405,7 +405,7 @@ void main() {
               noteIconJson: Value(jsonEncode({'kind': 'emoji', 'value': '🙂'})),
             ),
           );
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'dirty-icon-content',
@@ -473,7 +473,7 @@ void main() {
               hasRemoteCopy: const Value(true),
             ),
           );
-      when(() => client.listNotes()).thenAnswer((_) async => const []);
+      when(client.listNotes).thenAnswer((_) async => const []);
 
       await sync.pullRemoteNotes('user-a');
 
@@ -729,7 +729,7 @@ void main() {
               hasRemoteCopy: const Value(true),
             ),
           );
-      when(() => client.listNotes()).thenAnswer((_) async => const []);
+      when(client.listNotes).thenAnswer((_) async => const []);
 
       await sync.pullRemoteNotes('user-a');
 
@@ -748,7 +748,7 @@ void main() {
     );
     addTearDown(database.close);
 
-    when(() => client.listNotes()).thenAnswer(
+    when(client.listNotes).thenAnswer(
       (_) async => [
         {
           'id': 'shared-view-note',
@@ -844,7 +844,7 @@ void main() {
         ),
       );
 
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'race-note',
@@ -920,7 +920,7 @@ void main() {
           hasRemoteCopy: const Value(true),
         ),
       );
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'active-during-load',
@@ -974,7 +974,7 @@ void main() {
         updateNoteIcon: _noopNoteIconUpdate,
       );
 
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'offline-reopen-note',
@@ -1050,7 +1050,7 @@ void main() {
               hasRemoteCopy: const Value(true),
             ),
           );
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'active-shared-note',
@@ -1165,7 +1165,7 @@ void main() {
           updatedAt: updatedAt,
         ),
       );
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'permission-refresh-note',
@@ -1227,7 +1227,7 @@ void main() {
         await releaseFetch.future;
         return response;
       });
-      when(() => client.listNotes()).thenAnswer(
+      when(client.listNotes).thenAnswer(
         (_) async => [
           {
             'id': 'serialized-note',
@@ -1298,7 +1298,7 @@ void main() {
         updatedAt: updatedAt,
       ),
     );
-    when(() => client.listNotes()).thenAnswer(
+    when(client.listNotes).thenAnswer(
       (_) async => [
         {
           'id': 'owner-metadata-refresh-note',

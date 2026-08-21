@@ -4,8 +4,7 @@ enum AppTaskCheckboxShape { circle, rounded }
 
 class AppTaskCheckbox extends StatefulWidget {
   const AppTaskCheckbox({
-    super.key,
-    required this.value,
+    required this.value, super.key,
     this.accentColor,
     this.inactiveColor,
     this.size = 22.0,
@@ -146,7 +145,7 @@ class _CheckmarkPaint extends CustomPainter {
 
     final metrics = path.computeMetrics();
     for (final metric in metrics) {
-      final extracted = metric.extractPath(0.0, metric.length * progress);
+      final extracted = metric.extractPath(0, metric.length * progress);
       canvas.drawPath(extracted, paint);
     }
   }

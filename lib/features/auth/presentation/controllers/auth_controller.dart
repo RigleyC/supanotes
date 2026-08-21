@@ -1,13 +1,12 @@
-library;
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/api/auth_interceptor.dart' show AuthInterceptor;
 import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
 import 'package:supanotes/core/auth/auth_token_manager.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';

@@ -22,6 +22,7 @@ type mockRepository struct {
 	getNoteOperationByOpIDFn func(ctx context.Context, noteID pgtype.UUID, operationID pgtype.UUID) (Operation, error)
 	checkNotePermissionFn    func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (string, error)
 	getNoteDocumentFn        func(ctx context.Context, noteID pgtype.UUID) (GetNoteDocumentResult, error)
+	reserveSharedLinkIngestionFn func(ctx context.Context, userID, shareID, noteID, operationID pgtype.UUID) (sqlcgen.SharedLinkIngestion, error)
 }
 
 type immediateTransactionRunner struct{}
@@ -99,6 +100,18 @@ func (m *mockRepository) GetNoteDocument(ctx context.Context, noteID pgtype.UUID
 		return GetNoteDocumentResult{}, err
 	}
 	return GetNoteDocumentResult{Revision: 0, Document: document}, nil
+}
+
+func (m *mockRepository) ReserveSharedLinkIngestion(ctx context.Context, userID, shareID, noteID, operationID pgtype.UUID) (sqlcgen.SharedLinkIngestion, error) {
+	if m.reserveSharedLinkIngestionFn != nil {
+		return m.reserveSharedLinkIngestionFn(ctx, userID, shareID, noteID, operationID)
+	}
+	return sqlcgen.SharedLinkIngestion{
+		UserID:      userID,
+		ShareID:     shareID,
+		NoteID:      noteID,
+		OperationID: operationID,
+	}, nil
 }
 
 func (m *mockRepository) WithQuerier(q sqlcgen.Querier) Repository {

@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
 
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   group('Go-to-Dart Contract Integration Test', () {

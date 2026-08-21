@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import '../database.dart';
-import '../tables/attachments.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/tables/attachments.dart';
 
 part 'attachments_dao.g.dart';
 

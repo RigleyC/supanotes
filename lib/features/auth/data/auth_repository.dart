@@ -1,4 +1,3 @@
-library;
 
 import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
@@ -132,7 +131,7 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> registerDeviceToken(String token) async {
     try {
-      await _api.post(
+      await _api.post<dynamic>(
         '/device-tokens',
         data: {'token': token, 'platform': _getPlatformName()},
       );

@@ -52,7 +52,7 @@ class AuthTokenManager {
   /// serialization, logout could send the parent token while a refresh was
   /// already rotating it, leaving the server and local session out of order.
   Future<String?> getRefreshToken() =>
-      _exclusive(() => _storage.getRefreshToken());
+      _exclusive(_storage.getRefreshToken);
 
   /// Serializes a refresh request with credential replacement and cleanup.
   Future<AuthTokenPair?> refresh(RefreshHandler perform) =>

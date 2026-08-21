@@ -16,7 +16,7 @@ class _StubAuthController extends AuthController {
   _StubAuthController(this.user);
 
   final User user;
-  var logoutCalls = 0;
+  int logoutCalls = 0;
 
   @override
   Future<User?> build() async => user;

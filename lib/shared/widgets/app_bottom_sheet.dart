@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_spacing.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 
 Future<T?> showAppBottomSheet<T>({
   required BuildContext context,
@@ -19,7 +19,7 @@ Future<T?> showAppBottomSheet<T>({
     backgroundColor: isIOS
         ? CupertinoColors.systemBackground.resolveFrom(context)
         : null,
-    shape: RoundedRectangleBorder(
+    shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(
         top: Radius.circular(AppSpacing.radiusXl),
       ),

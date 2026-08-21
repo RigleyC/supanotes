@@ -1,19 +1,19 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
+import 'package:super_editor/super_editor.dart';
 
-const double _taskCheckboxSize = 20.0;
-const double _taskCheckboxFallbackTopInset = 2.0;
+const double _taskCheckboxSize = 20;
+const double _taskCheckboxFallbackTopInset = 2;
 const double _taskCheckboxTextGap = noteEditorMarkerTextGap;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
@@ -73,7 +73,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     return CustomTaskComponentViewModel(
       nodeId: node.id,
-      createdAt: node.metadata[NodeMetadata.createdAt],
+      createdAt: node.metadata[NodeMetadata.createdAt] as DateTime?,
       padding: EdgeInsets.zero,
       indent: node.indent,
       isComplete: node.isComplete,
@@ -131,18 +131,9 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     required super.nodeId,
     required super.createdAt,
     required super.padding,
-    super.opacity = 1.0,
-    required super.indent,
-    required super.isComplete,
-    required super.setComplete,
-    required super.text,
-    required super.textDirection,
-    required super.textAlignment,
-    required super.textStyleBuilder,
-    required super.selectionColor,
+    required super.indent, required super.isComplete, required super.setComplete, required super.text, required super.textDirection, required super.textAlignment, required super.textStyleBuilder, required super.selectionColor, required this.taskMetadata, super.opacity = 1.0,
     this.dueDate,
     this.recurrence,
-    required this.taskMetadata,
   });
 
   final DateTime? dueDate;
@@ -190,8 +181,7 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
 
 class CustomTaskComponent extends StatefulWidget {
   const CustomTaskComponent({
-    super.key,
-    required this.viewModel,
+    required this.viewModel, super.key,
     this.isReadOnly = false,
     this.isRecurring = false,
     this.taskMetadata,
@@ -214,7 +204,7 @@ class CustomTaskComponent extends StatefulWidget {
 
 class _CustomTaskComponentState extends State<CustomTaskComponent>
     with ProxyDocumentComponent<CustomTaskComponent>, ProxyTextComposable {
-  final _textKey = GlobalKey();
+  final GlobalKey<State<StatefulWidget>> _textKey = GlobalKey();
 
   late bool _isComplete;
   bool _isAnimating = false;
@@ -293,7 +283,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
   @override
   TextComposable get childTextComposable =>
-      childDocumentComponentKey.currentState as TextComposable;
+      childDocumentComponentKey.currentState! as TextComposable;
 
   @override
   Rect getRectForPosition(NodePosition nodePosition) {

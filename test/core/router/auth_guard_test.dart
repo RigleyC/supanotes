@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/router/app_routes.dart';
-import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/core/router/auth_guard.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
 
 void main() {
   group('authGuardRedirect', () {
@@ -49,8 +49,8 @@ void main() {
     // ── data: authenticated ────────────────────────────────────────────────
 
     test('redirects from /splash to /home when authenticated', () {
-      final auth = AsyncValue<User?>.data(
-        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      const auth = AsyncValue<User?>.data(
+        User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
       expect(
         authGuardRedirect(
@@ -60,8 +60,8 @@ void main() {
     });
 
     test('lets an authenticated user stay on a protected route', () {
-      final auth = AsyncValue<User?>.data(
-        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      const auth = AsyncValue<User?>.data(
+        User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
       expect(
         authGuardRedirect(
@@ -71,8 +71,8 @@ void main() {
     });
 
     test('redirects to /home when an authenticated user revisits /login', () {
-      final auth = AsyncValue<User?>.data(
-        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      const auth = AsyncValue<User?>.data(
+        User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
       expect(
         authGuardRedirect(
@@ -83,8 +83,8 @@ void main() {
 
     test('redirects to /home when an authenticated user revisits /register',
         () {
-      final auth = AsyncValue<User?>.data(
-        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      const auth = AsyncValue<User?>.data(
+        User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
       expect(
         authGuardRedirect(
@@ -94,8 +94,8 @@ void main() {
     });
 
     test('lets an authenticated user stay on /home', () {
-      final auth = AsyncValue<User?>.data(
-        const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      const auth = AsyncValue<User?>.data(
+        User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
       expect(
         authGuardRedirect(currentLocation: AppRoutes.home, authState: auth),
@@ -106,7 +106,7 @@ void main() {
     // ── data: unauthenticated ──────────────────────────────────────────────
 
     test('redirects from /splash to /login when unauthenticated', () {
-      final unauth = AsyncValue<User?>.data(null);
+      const unauth = AsyncValue<User?>.data(null);
       expect(
         authGuardRedirect(
             currentLocation: AppRoutes.splash, authState: unauth),
@@ -116,7 +116,7 @@ void main() {
 
     test('redirects to /login when unauthenticated user hits a protected route',
         () {
-      final unauth = AsyncValue<User?>.data(null);
+      const unauth = AsyncValue<User?>.data(null);
       expect(
         authGuardRedirect(currentLocation: AppRoutes.home, authState: unauth),
         AppRoutes.login,
@@ -124,7 +124,7 @@ void main() {
     });
 
     test('leaves the user on /login when they are already there', () {
-      final unauth = AsyncValue<User?>.data(null);
+      const unauth = AsyncValue<User?>.data(null);
       expect(
         authGuardRedirect(
             currentLocation: AppRoutes.login, authState: unauth),
@@ -133,7 +133,7 @@ void main() {
     });
 
     test('leaves the user on /register when they are already there', () {
-      final unauth = AsyncValue<User?>.data(null);
+      const unauth = AsyncValue<User?>.data(null);
       expect(
         authGuardRedirect(
             currentLocation: AppRoutes.register, authState: unauth),

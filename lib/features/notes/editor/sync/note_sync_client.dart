@@ -3,10 +3,6 @@ import 'package:dio/dio.dart';
 import 'package:supanotes/core/api/api_client.dart';
 
 class NoteDocumentResponse {
-  final String noteId;
-  final int revision;
-  final Map<String, dynamic> document;
-  final DateTime serverTime;
 
   NoteDocumentResponse({
     required this.noteId,
@@ -23,22 +19,25 @@ class NoteDocumentResponse {
       serverTime: DateTime.parse(json['serverTime'] as String),
     );
   }
+  final String noteId;
+  final int revision;
+  final Map<String, dynamic> document;
+  final DateTime serverTime;
 }
 
 class OperationRequest {
-  final String operationId;
-  final int baseRevision;
-  final String kind;
-  final String? blockId;
-  final Map<String, dynamic> payload;
 
   OperationRequest({
     required this.operationId,
     required this.baseRevision,
     required this.kind,
-    this.blockId,
-    required this.payload,
+    required this.payload, this.blockId,
   });
+  final String operationId;
+  final int baseRevision;
+  final String kind;
+  final String? blockId;
+  final Map<String, dynamic> payload;
 
   Map<String, dynamic> toJson() => {
     'operationId': operationId,
@@ -50,15 +49,15 @@ class OperationRequest {
 }
 
 class SyncRequest {
-  final int knownRevision;
-  final List<OperationRequest> operations;
-  final String clientId;
 
   SyncRequest({
     required this.knownRevision,
     required this.operations,
     required this.clientId,
   });
+  final int knownRevision;
+  final List<OperationRequest> operations;
+  final String clientId;
 
   Map<String, dynamic> toJson() => {
     'knownRevision': knownRevision,
@@ -68,10 +67,6 @@ class SyncRequest {
 }
 
 class AcceptedOperation {
-  final String operationId;
-  final int revision;
-  final String kind;
-  final String? blockId;
 
   AcceptedOperation({
     required this.operationId,
@@ -88,18 +83,13 @@ class AcceptedOperation {
       blockId: json['blockId'] as String?,
     );
   }
+  final String operationId;
+  final int revision;
+  final String kind;
+  final String? blockId;
 }
 
 class Operation {
-  final String operationId;
-  final String noteId;
-  final int revision;
-  final int baseRevision;
-  final String actorId;
-  final String kind;
-  final String? blockId;
-  final Map<String, dynamic> payload;
-  final DateTime createdAt;
 
   Operation({
     required this.operationId,
@@ -108,9 +98,7 @@ class Operation {
     required this.baseRevision,
     required this.actorId,
     required this.kind,
-    this.blockId,
-    required this.payload,
-    required this.createdAt,
+    required this.payload, required this.createdAt, this.blockId,
   });
 
   factory Operation.fromJson(Map<String, dynamic> json) {
@@ -126,21 +114,24 @@ class Operation {
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
+  final String operationId;
+  final String noteId;
+  final int revision;
+  final int baseRevision;
+  final String actorId;
+  final String kind;
+  final String? blockId;
+  final Map<String, dynamic> payload;
+  final DateTime createdAt;
 }
 
 class SyncResponse {
-  final List<AcceptedOperation> accepted;
-  final int finalRevision;
-  final List<Operation> remoteOperations;
-  final Map<String, dynamic>? canonicalDocument;
-  final DateTime serverTime;
 
   SyncResponse({
     required this.accepted,
     required this.finalRevision,
     required this.remoteOperations,
-    this.canonicalDocument,
-    required this.serverTime,
+    required this.serverTime, this.canonicalDocument,
   });
 
   factory SyncResponse.fromJson(Map<String, dynamic> json) {
@@ -162,12 +153,14 @@ class SyncResponse {
       serverTime: DateTime.parse(json['serverTime'] as String),
     );
   }
+  final List<AcceptedOperation> accepted;
+  final int finalRevision;
+  final List<Operation> remoteOperations;
+  final Map<String, dynamic>? canonicalDocument;
+  final DateTime serverTime;
 }
 
 class OperationsListResponse {
-  final List<Operation> operations;
-  final Map<String, dynamic>? document;
-  final int? revision;
 
   OperationsListResponse({
     required this.operations,
@@ -186,27 +179,30 @@ class OperationsListResponse {
       revision: json['revision'] as int?,
     );
   }
+  final List<Operation> operations;
+  final Map<String, dynamic>? document;
+  final int? revision;
 }
 
 class NoteOperationsException implements Exception {
-  final String errorCode;
-  final String message;
-  final int? statusCode;
 
   NoteOperationsException({
     required this.errorCode,
     required this.message,
     this.statusCode,
   });
+  final String errorCode;
+  final String message;
+  final int? statusCode;
 
   @override
   String toString() => 'NoteOperationsException($errorCode): $message';
 }
 
 class NoteSyncClient {
-  final ApiClient _client;
 
   NoteSyncClient({required ApiClient client}) : _client = client;
+  final ApiClient _client;
 
   Future<NoteDocumentResponse> getDocument(String noteId) async {
     try {
@@ -214,7 +210,7 @@ class NoteSyncClient {
         '/notes/$noteId/document',
       );
       return NoteDocumentResponse.fromJson(
-        response.data as Map<String, dynamic>,
+        response.data!,
       );
     } on DioException catch (e) {
       throw _mapError(e);
@@ -269,7 +265,7 @@ class NoteSyncClient {
         queryParameters: {'afterRevision': afterRevision},
       );
       return OperationsListResponse.fromJson(
-        response.data as Map<String, dynamic>,
+        response.data!,
       );
     } on DioException catch (e) {
       throw _mapError(e);
@@ -285,7 +281,7 @@ class NoteSyncClient {
         '/notes/$noteId/operations:sync',
         data: request.toJson(),
       );
-      return SyncResponse.fromJson(response.data as Map<String, dynamic>);
+      return SyncResponse.fromJson(response.data!);
     } on DioException catch (e) {
       throw _mapError(e);
     }

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_spacing.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 
 class AppChoiceChip extends StatelessWidget {
   const AppChoiceChip({
-    super.key,
-    required this.label,
+    required this.label, super.key,
     this.icon,
     this.isSelected = false,
     this.selectedColor,

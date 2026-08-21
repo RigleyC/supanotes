@@ -151,6 +151,6 @@ bool isShareLinkUri(Uri uri) {
       segments.last.isNotEmpty;
 }
 
-final appLinkProvider = StreamProvider.autoDispose<Uri>((ref) {
+final StreamProvider<Uri> appLinkProvider = StreamProvider.autoDispose<Uri>((ref) {
   return AppLinkStream(_PlatformAppLinkSource()).stream();
 });

@@ -54,12 +54,9 @@ type Repository interface {
 	GetNoteOperationByOpID(ctx context.Context, noteID pgtype.UUID, operationID pgtype.UUID) (Operation, error)
 	CheckNotePermission(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (string, error)
 	GetNoteDocument(ctx context.Context, noteID pgtype.UUID) (GetNoteDocumentResult, error)
+	ReserveSharedLinkIngestion(ctx context.Context, userID pgtype.UUID, shareID pgtype.UUID, noteID pgtype.UUID, operationID pgtype.UUID) (sqlcgen.SharedLinkIngestion, error)
 	WithQuerier(q sqlcgen.Querier) Repository
 	WithTx(tx pgx.Tx) Repository
-}
-
-type sharedLinkReservation interface {
-	ReserveSharedLinkIngestion(context.Context, pgtype.UUID, pgtype.UUID, pgtype.UUID, pgtype.UUID) (sqlcgen.SharedLinkIngestion, error)
 }
 
 type repository struct {

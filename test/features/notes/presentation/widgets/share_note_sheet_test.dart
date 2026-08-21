@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/sharing/data/shares_repository.dart';
-import 'package:supanotes/features/notes/sharing/data/share_link_repository.dart';
-import 'package:supanotes/features/notes/sharing/model/share_link_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
+import 'package:supanotes/features/notes/sharing/application/share_list_controller.dart';
+import 'package:supanotes/features/notes/sharing/data/share_link_repository.dart';
+import 'package:supanotes/features/notes/sharing/data/shares_repository.dart';
+import 'package:supanotes/features/notes/sharing/model/share_link_model.dart';
 import 'package:supanotes/features/notes/sharing/model/share_model.dart';
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
-import 'package:supanotes/features/notes/sharing/application/share_list_controller.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 
@@ -191,7 +191,7 @@ void main() {
 
     testWidgets('shows share list with shares', (tester) async {
       final shares = [
-        ShareModel(
+        const ShareModel(
           id: 's-1',
           noteId: 'note-1',
           userId: 'u-1',
@@ -199,7 +199,7 @@ void main() {
           name: 'User One',
           permission: SharePermission.view,
         ),
-        ShareModel(
+        const ShareModel(
           id: 's-2',
           noteId: 'note-1',
           userId: 'u-2',

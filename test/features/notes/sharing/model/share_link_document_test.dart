@@ -1,8 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:supanotes/features/notes/sharing/model/share_link_document.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   test('keeps the canonical block payload and derives its text', () {

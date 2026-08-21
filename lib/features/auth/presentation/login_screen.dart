@@ -14,6 +14,7 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/validators/input_validators.dart';
+import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart' show AuthController;
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
@@ -96,7 +97,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textInputAction: TextInputAction.next,
                       controller: _emailController,
                       prefixIcon: const Icon(Icons.email_outlined),
-                      validator: (v) => EmailValidator.validate(v),
+                      validator: EmailValidator.validate,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppInput(
@@ -108,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onSubmitted: (_) => _submit(),
                       controller: _passwordController,
                       prefixIcon: const Icon(Icons.lock_outline),
-                      validator: (v) => PasswordValidator.validate(v),
+                      validator: PasswordValidator.validate,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppButton(

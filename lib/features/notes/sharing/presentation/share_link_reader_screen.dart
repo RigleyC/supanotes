@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:super_editor/super_editor.dart';
-
+import 'package:riverpod/src/providers/future_provider.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
-import 'package:supanotes/features/notes/sharing/data/share_link_attachment_url.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
+import 'package:supanotes/features/notes/sharing/data/share_link_attachment_url.dart';
 import 'package:supanotes/features/notes/sharing/domain/share_link_strings.dart';
 import 'package:supanotes/features/notes/sharing/model/share_link_document.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:super_editor/super_editor.dart';
 
-final shareLinkDocumentProvider = FutureProvider.autoDispose
+final FutureProviderFamily<ShareLinkDocument, String> shareLinkDocumentProvider = FutureProvider.autoDispose
     .family<ShareLinkDocument, String>((ref, token) async {
       final response = await ref
           .read(apiClientProvider)
@@ -94,7 +94,7 @@ class _ShareLinkDocumentReaderState extends State<_ShareLinkDocumentReader> {
 
   @override
   Widget build(BuildContext context) {
-    final documentPadding = const EdgeInsets.fromLTRB(24, 24, 24, 48);
+    const documentPadding = EdgeInsets.fromLTRB(24, 24, 24, 48);
     final stylesheet = mobileNoteStylesheet(
       context,
       documentPadding: documentPadding,

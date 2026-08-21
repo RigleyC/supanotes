@@ -2,16 +2,16 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:irondash_message_channel/irondash_message_channel.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/clipboard_preprocessor.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_clipboard_serializers.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_common_editor_operations.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/rich_keyboard_actions.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 import 'package:super_native_extensions/src/native/context.dart';
-import 'package:irondash_message_channel/irondash_message_channel.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/rich_keyboard_actions.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/rich_common_editor_operations.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/rich_clipboard_serializers.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/clipboard_preprocessor.dart';
 
 class MockEditor extends Mock implements Editor {}
 
@@ -82,7 +82,7 @@ void main() {
           ParagraphNode(
             id: 'heading',
             text: AttributedText('Título'),
-            metadata: {'blockType': header1Attribution},
+            metadata: const {'blockType': header1Attribution},
           ),
           ListItemNode.unordered(id: 'list-item', text: AttributedText('Item')),
           TaskNode(
@@ -197,8 +197,8 @@ void main() {
         final reader = MockClipboardReader();
         final clipboard = MockClipboard();
 
-        final html = '<ul><li><input type="checkbox"> Tarefa</li></ul>';
-        when(() => clipboard.read()).thenAnswer((_) async => reader);
+        const html = '<ul><li><input type="checkbox"> Tarefa</li></ul>';
+        when(clipboard.read).thenAnswer((_) async => reader);
         when(() => reader.items).thenReturn([htmlItem]);
         _stubNoBitmapFormats(reader);
         when(() => htmlItem.canProvide(Formats.md)).thenReturn(false);
@@ -237,7 +237,7 @@ void main() {
         final reader = MockClipboardReader();
         final clipboard = MockClipboard();
 
-        when(() => clipboard.read()).thenAnswer((_) async => reader);
+        when(clipboard.read).thenAnswer((_) async => reader);
         when(() => reader.items).thenReturn([plainItem]);
         _stubNoBitmapFormats(reader);
         when(() => reader.canProvide(Formats.plainText)).thenReturn(true);
@@ -279,7 +279,7 @@ void main() {
       final clipboard = MockClipboard();
       final uri = Uri.parse('https://example.com/note');
 
-      when(() => clipboard.read()).thenAnswer((_) async => reader);
+      when(clipboard.read).thenAnswer((_) async => reader);
       when(() => reader.items).thenReturn([urlItem]);
       _stubNoBitmapFormats(reader);
       when(() => reader.canProvide(Formats.plainText)).thenReturn(false);
@@ -322,7 +322,7 @@ void main() {
       final reader = MockClipboardReader();
       final clipboard = MockClipboard();
 
-      when(() => clipboard.read()).thenAnswer((_) async => reader);
+      when(clipboard.read).thenAnswer((_) async => reader);
       when(() => reader.items).thenReturn([plainItem]);
       _stubNoBitmapFormats(reader);
       when(() => reader.canProvide(Formats.plainText)).thenReturn(true);
@@ -364,7 +364,7 @@ void main() {
         text: AttributedText('Comprar leite'),
         isComplete: false,
         indent: 2,
-        metadata: {
+        metadata: const {
           'dueDate': '2026-07-30T10:00:00.000',
           'hasTime': true,
           'recurrenceRule': 'daily',
@@ -453,7 +453,7 @@ void main() {
         editor: editor,
         document: document,
         composer: composer,
-        documentLayoutResolver: () => MockDocumentLayout(),
+        documentLayoutResolver: MockDocumentLayout.new,
       );
     });
 
@@ -468,8 +468,8 @@ void main() {
     });
 
     test('copy does not copy when selection is collapsed', () {
-      final selection = DocumentSelection.collapsed(
-        position: const DocumentPosition(
+      const selection = DocumentSelection.collapsed(
+        position: DocumentPosition(
           nodeId: 'node-1',
           nodePosition: TextNodePosition(offset: 0),
         ),
@@ -479,8 +479,8 @@ void main() {
     });
 
     test('cut does not cut when selection is collapsed', () {
-      final selection = DocumentSelection.collapsed(
-        position: const DocumentPosition(
+      const selection = DocumentSelection.collapsed(
+        position: DocumentPosition(
           nodeId: 'node-1',
           nodePosition: TextNodePosition(offset: 0),
         ),
@@ -490,12 +490,12 @@ void main() {
     });
 
     test('copy with non-collapsed selection does not throw', () {
-      final selection = DocumentSelection(
-        base: const DocumentPosition(
+      const selection = DocumentSelection(
+        base: DocumentPosition(
           nodeId: 'node-1',
           nodePosition: TextNodePosition(offset: 0),
         ),
-        extent: const DocumentPosition(
+        extent: DocumentPosition(
           nodeId: 'node-1',
           nodePosition: TextNodePosition(offset: 5),
         ),
@@ -505,12 +505,12 @@ void main() {
     });
 
     test('cut with non-collapsed selection does not throw', () {
-      final selection = DocumentSelection(
-        base: const DocumentPosition(
+      const selection = DocumentSelection(
+        base: DocumentPosition(
           nodeId: 'node-1',
           nodePosition: TextNodePosition(offset: 0),
         ),
-        extent: const DocumentPosition(
+        extent: DocumentPosition(
           nodeId: 'node-1',
           nodePosition: TextNodePosition(offset: 5),
         ),

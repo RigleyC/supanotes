@@ -3,16 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_provider.dart';
 import 'package:supanotes/features/notes/sharing/application/share_link_access_resolver.dart';
+import 'package:supanotes/features/notes/sharing/domain/share_link_strings.dart';
+import 'package:supanotes/features/notes/sharing/model/share_link_document.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_link_access_screen.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_link_reader_screen.dart';
-import 'package:supanotes/features/notes/sharing/model/share_link_document.dart';
-import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
-import 'package:supanotes/features/notes/sharing/domain/share_link_strings.dart';
 
 import '../../../../helpers/auth_interceptor_test_helper.dart';
 

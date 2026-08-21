@@ -6,10 +6,10 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
-import 'package:supanotes/features/auth/data/auth_local_storage.dart';
-import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/features/auth/data/auth_local_storage.dart';
+import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
@@ -104,9 +104,9 @@ void main() {
     test('sets null when no access token is stored', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => null);
-      when(() => storage.getUser()).thenAnswer((_) async => null);
-      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
+      when(storage.getAccessToken).thenAnswer((_) async => null);
+      when(storage.getUser).thenAnswer((_) async => null);
+      when(storage.getSessionData).thenAnswer((_) async => const {});
 
       final container = await makeContainer(
         storage: storage,
@@ -120,8 +120,8 @@ void main() {
     test('sets null when the token is empty', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => '');
-      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
+      when(storage.getAccessToken).thenAnswer((_) async => '');
+      when(storage.getSessionData).thenAnswer((_) async => const {});
 
       final container = await makeContainer(
         storage: storage,
@@ -135,9 +135,9 @@ void main() {
     test('sets User when full session is on disk', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
-      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
-      when(() => storage.getUser()).thenAnswer(
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
+      when(storage.getSessionData).thenAnswer((_) async => const {});
+      when(storage.getUser).thenAnswer(
         (_) async => const User(id: 'u-1', email: 'a@b', name: 'Alice'),
       );
 
@@ -156,10 +156,10 @@ void main() {
     test('wipes storage and sets null on partial session', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'tok');
-      when(() => storage.getUser()).thenAnswer((_) async => null);
-      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
-      when(() => storage.clear()).thenAnswer((_) async {});
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
+      when(storage.getUser).thenAnswer((_) async => null);
+      when(storage.getSessionData).thenAnswer((_) async => const {});
+      when(storage.clear).thenAnswer((_) async {});
 
       final container = await makeContainer(
         storage: storage,
@@ -168,7 +168,7 @@ void main() {
       await waitForBuild(container);
       final user = container.read(authControllerProvider).requireValue;
       expect(user, isNull);
-      verify(() => storage.clear()).called(1);
+      verify(storage.clear).called(1);
     });
   });
 
@@ -277,7 +277,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
-      when(() => repository.logout()).thenAnswer((_) async {});
+      when(repository.logout).thenAnswer((_) async {});
 
       final container = await makeContainer(
         storage: storage,
@@ -288,7 +288,7 @@ void main() {
       await container.read(authControllerProvider.notifier).logout();
       final user = container.read(authControllerProvider).requireValue;
       expect(user, isNull);
-      verify(() => repository.logout()).called(1);
+      verify(repository.logout).called(1);
     });
 
     test('on ApiException, still sets null', () async {
@@ -296,7 +296,7 @@ void main() {
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
       when(
-        () => repository.logout(),
+        repository.logout,
       ).thenThrow(const NetworkException(message: 'offline'));
 
       final container = await makeContainer(
@@ -316,7 +316,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       _stubEmptySession(storage);
-      when(() => storage.clear()).thenAnswer((_) async {});
+      when(storage.clear).thenAnswer((_) async {});
 
       final container = await makeContainer(
         storage: storage,
@@ -327,7 +327,7 @@ void main() {
       await container.read(authControllerProvider.notifier).onSessionExpired();
       final user = container.read(authControllerProvider).requireValue;
       expect(user, isNull);
-      verify(() => storage.clear()).called(1);
+      verify(storage.clear).called(1);
     });
 
     test(
@@ -355,25 +355,25 @@ void main() {
             .read(authControllerProvider.notifier)
             .onSessionExpired();
         await closeStarted.future;
-        verifyNever(() => storage.clear());
+        verifyNever(storage.clear);
 
         releaseClose.complete();
         await expiration;
 
-        verify(() => storage.clear()).called(1);
+        verify(storage.clear).called(1);
       },
     );
 
     test('does not resolve a coordinator during session cleanup', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'access');
-      when(() => storage.getRefreshToken()).thenAnswer((_) async => 'refresh');
-      when(() => storage.getUser()).thenAnswer(
+      when(storage.getAccessToken).thenAnswer((_) async => 'access');
+      when(storage.getRefreshToken).thenAnswer((_) async => 'refresh');
+      when(storage.getUser).thenAnswer(
         (_) async => const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
       );
-      when(() => storage.getSessionData()).thenAnswer((_) async => const {});
-      when(() => storage.clear()).thenAnswer((_) async {});
+      when(storage.getSessionData).thenAnswer((_) async => const {});
+      when(storage.clear).thenAnswer((_) async {});
 
       final container = await makeContainer(
         storage: storage,
@@ -385,7 +385,7 @@ void main() {
       await container.read(authControllerProvider.notifier).onSessionExpired();
 
       expect(container.read(authControllerProvider).requireValue, isNull);
-      verify(() => storage.clear()).called(1);
+      verify(storage.clear).called(1);
     });
 
     test('awaits an opened editor session owned by the registry', () async {
@@ -426,4 +426,4 @@ void main() {
 
 // Suppress unused-import warnings for keys that are only used as labels.
 // ignore: unused_element
-const _ = (_storageKey, _repositoryKey);
+const (String, String) _ = (_storageKey, _repositoryKey);

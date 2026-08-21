@@ -29,9 +29,6 @@ final class ShareNoteIndexEntry {
 final class ShareNoteIndex {
   const ShareNoteIndex({required this.ownerUserId, required this.notes});
 
-  final String ownerUserId;
-  final List<ShareNoteIndexEntry> notes;
-
   factory ShareNoteIndex.fromNotes(
     String ownerUserId,
     Iterable<NoteModel> notes,
@@ -52,6 +49,9 @@ final class ShareNoteIndex {
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return ShareNoteIndex(ownerUserId: ownerUserId, notes: entries);
   }
+
+  final String ownerUserId;
+  final List<ShareNoteIndexEntry> notes;
 
   Map<String, dynamic> toJson() => {
     'schemaVersion': 1,

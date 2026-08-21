@@ -54,8 +54,7 @@ class AppMessenger {
 
   static void showTaskCompletion({
     required String title,
-    String? subtitle,
-    required SnackBarAction action,
+    required SnackBarAction action, String? subtitle,
     Duration? duration,
   }) {
     showExpressiveSnack(

@@ -18,7 +18,7 @@ Future<NoteModel?> showShareNotePickerSheet(
 }
 
 class ShareNotePickerSheet extends StatefulWidget {
-  const ShareNotePickerSheet({super.key, required this.notes});
+  const ShareNotePickerSheet({required this.notes, super.key});
 
   final List<NoteModel> notes;
 

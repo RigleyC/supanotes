@@ -2,10 +2,6 @@ import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 class TaskSnapshot {
-  final DateTime? dueDate;
-  final bool hasTime;
-  final TaskRecurrence? recurrence;
-  final Map<DateTime, DateTime> completions;
 
   const TaskSnapshot({
     this.dueDate,
@@ -13,24 +9,26 @@ class TaskSnapshot {
     this.recurrence,
     this.completions = const {},
   });
+  final DateTime? dueDate;
+  final bool hasTime;
+  final TaskRecurrence? recurrence;
+  final Map<DateTime, DateTime> completions;
 }
 
 class TaskCompletionResult {
+
+  const TaskCompletionResult({
+    required this.completed,
+    required this.completedAt, required this.previousHasTime, this.nextDue,
+    this.previousDue,
+    this.scheduledAt,
+  });
   final bool completed;
   final DateTime? nextDue;
   final DateTime completedAt;
   final DateTime? previousDue;
   final bool previousHasTime;
   final DateTime? scheduledAt;
-
-  const TaskCompletionResult({
-    required this.completed,
-    this.nextDue,
-    required this.completedAt,
-    this.previousDue,
-    required this.previousHasTime,
-    this.scheduledAt,
-  });
 }
 
 class TaskCompletionCommand {

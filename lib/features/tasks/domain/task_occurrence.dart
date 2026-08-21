@@ -1,7 +1,7 @@
 import 'package:supanotes/core/utils/recurrence.dart';
 
-import 'task_recurrence.dart';
-import 'task_schedule_identity.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 enum OccurrenceStatus { pending, overdue, completed }
 
@@ -30,10 +30,8 @@ class TaskOccurrence {
 class TaskOccurrenceTransition {
   const TaskOccurrenceTransition({
     required this.completed,
-    this.nextDue,
-    required this.completedAt,
+    required this.completedAt, required this.previousHasTime, this.nextDue,
     this.previousDue,
-    required this.previousHasTime,
     this.scheduledAt,
   });
 

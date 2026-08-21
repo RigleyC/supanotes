@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   testWidgets('renders a paragraph hydrated from JSON blockType metadata', (

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/shared/widgets/global_sheet.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_selection_page.dart';
+import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 import '../../../../helpers/haptic_test_helper.dart';
 

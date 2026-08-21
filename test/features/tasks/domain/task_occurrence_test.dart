@@ -3,7 +3,7 @@ import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 
 void main() {
-  final now = DateTime(2026, 7, 21, 10, 0);
+  final now = DateTime(2026, 7, 21, 10);
 
   group('buildOccurrences - non-recurring', () {
     test('returns single pending occurrence when dueDate is in future', () {
@@ -67,7 +67,7 @@ void main() {
     test('advances missed occurrences to the current day', () {
       final result = buildOccurrences(
         taskId: 't1',
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
         hasTime: false,
         now: now,
@@ -82,11 +82,11 @@ void main() {
     test('does not keep missed completion history as overdue occurrences', () {
       final result = buildOccurrences(
         taskId: 't1',
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
         hasTime: false,
         now: now,
-        completedScheduledAts: {DateTime(2026, 7, 1), DateTime(2026, 7, 2)},
+        completedScheduledAts: {DateTime(2026, 7), DateTime(2026, 7, 2)},
       );
 
       expect(result, hasLength(1));
@@ -98,7 +98,7 @@ void main() {
       final currentOccurrence = DateTime(2026, 7, 21);
       final result = buildOccurrences(
         taskId: 't1',
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
         hasTime: false,
         now: DateTime(2026, 7, 21, 10),
@@ -113,10 +113,10 @@ void main() {
     test('respects hasTime in date comparison', () {
       final result = buildOccurrences(
         taskId: 't1',
-        anchor: DateTime(2026, 7, 21, 14, 0),
+        anchor: DateTime(2026, 7, 21, 14),
         recurrence: TaskRecurrence.daily,
         hasTime: true,
-        now: DateTime(2026, 7, 21, 10, 0),
+        now: DateTime(2026, 7, 21, 10),
         completedScheduledAts: {},
       );
 
@@ -135,7 +135,7 @@ void main() {
     test('keeps only the latest reached occurrence', () {
       final result = buildOccurrences(
         taskId: 't1',
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.weekly,
         hasTime: false,
         now: now,
@@ -188,7 +188,7 @@ void main() {
         anchor: DateTime(2026, 1, 15),
         recurrence: TaskRecurrence.monthly,
         hasTime: false,
-        now: DateTime(2026, 4, 1),
+        now: DateTime(2026, 4),
         completedScheduledAts: {},
       );
 
@@ -203,7 +203,7 @@ void main() {
         anchor: DateTime(2026, 1, 31),
         recurrence: TaskRecurrence.monthly,
         hasTime: false,
-        now: DateTime(2026, 3, 1),
+        now: DateTime(2026, 3),
         completedScheduledAts: {},
       );
 
@@ -217,7 +217,7 @@ void main() {
         anchor: DateTime(2026, 1, 31),
         recurrence: TaskRecurrence.monthly,
         hasTime: false,
-        now: DateTime(2026, 3, 1),
+        now: DateTime(2026, 3),
         completedScheduledAts: {DateTime(2026, 2, 28)},
       );
 
@@ -267,7 +267,7 @@ void main() {
     test('skips weekends', () {
       final result = buildOccurrences(
         taskId: 't1',
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.weekdays,
         hasTime: false,
         now: DateTime(2026, 7, 6),
@@ -303,7 +303,7 @@ void main() {
     test('limits total occurrences by maxCount', () {
       final result = buildOccurrences(
         taskId: 't1',
-        anchor: DateTime(2026, 1, 1),
+        anchor: DateTime(2026),
         recurrence: TaskRecurrence.daily,
         hasTime: false,
         now: now,

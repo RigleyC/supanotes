@@ -135,8 +135,8 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     Object error,
     StackTrace stack,
   ) async {
-    Object reportedError = error;
-    StackTrace reportedStack = stack;
+    var reportedError = error;
+    var reportedStack = stack;
     try {
       await entry.disposeSessionOnce();
     } catch (disposeError, disposeStack) {

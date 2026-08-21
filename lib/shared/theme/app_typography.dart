@@ -16,29 +16,29 @@ class AppTypography {
     fontFamilyFallback: ['Courier', 'monospace'],
   );
 
-  static const double displayLargeSize = 57.0;
-  static const double displayMediumSize = 45.0;
-  static const double displaySmallSize = 36.0;
-  static const double headlineLargeSize = 32.0;
-  static const double headlineMediumSize = 28.0;
-  static const double headlineSmallSize = 24.0;
-  static const double titleLargeSize = 22.0;
-  static const double titleMediumSize = 18.0;
-  static const double titleSmallSize = 16.0;
-  static const double bodyLargeSize = 16.0;
-  static const double bodyMediumSize = 14.0;
-  static const double bodySmallSize = 12.0;
-  static const double labelLargeSize = 14.0;
-  static const double labelMediumSize = 12.0;
-  static const double labelSmallSize = 11.0;
+  static const double displayLargeSize = 57;
+  static const double displayMediumSize = 45;
+  static const double displaySmallSize = 36;
+  static const double headlineLargeSize = 32;
+  static const double headlineMediumSize = 28;
+  static const double headlineSmallSize = 24;
+  static const double titleLargeSize = 22;
+  static const double titleMediumSize = 18;
+  static const double titleSmallSize = 16;
+  static const double bodyLargeSize = 16;
+  static const double bodyMediumSize = 14;
+  static const double bodySmallSize = 12;
+  static const double labelLargeSize = 14;
+  static const double labelMediumSize = 12;
+  static const double labelSmallSize = 11;
 
   static const FontWeight regular = FontWeight.w400;
   static const FontWeight medium = FontWeight.w500;
   static const FontWeight semibold = FontWeight.w600;
 
   static const double displayLetterSpacing = -0.25;
-  static const double headlineLetterSpacing = 0.0;
-  static const double titleLetterSpacing = 0.0;
+  static const double headlineLetterSpacing = 0;
+  static const double titleLetterSpacing = 0;
   static const double bodyLetterSpacing = 0.5;
   static const double labelLetterSpacing = 0.5;
 

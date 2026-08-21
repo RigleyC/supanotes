@@ -1,4 +1,3 @@
-library;
 
 export 'src/show_expressive_snack.dart';
 export 'src/snack.dart';

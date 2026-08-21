@@ -1,47 +1,55 @@
 import 'package:flutter/foundation.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
+import 'package:super_editor/super_editor.dart';
 
 class OperationRequestData {
-  final String operationId;
-  final String kind;
-  final String? blockId;
-  final Map<String, dynamic> payload;
 
   OperationRequestData({
     required this.operationId,
     required this.kind,
-    this.blockId,
-    required this.payload,
+    required this.payload, this.blockId,
   });
+  final String operationId;
+  final String kind;
+  final String? blockId;
+  final Map<String, dynamic> payload;
 }
 
 class _BlockMirror {
-  AttributedText attributedText;
-  String? blockType;
-  Map<String, dynamic> metadata;
 
   _BlockMirror({
     required this.attributedText,
-    this.blockType,
-    required this.metadata,
+    required this.metadata, this.blockType,
   });
+  AttributedText attributedText;
+  String? blockType;
+  Map<String, dynamic> metadata;
 }
 
 class _DocumentChangeSummary {
-  final Set<String> changedNodeIds;
-  final bool hasStructuralChange;
 
   const _DocumentChangeSummary({
     required this.changedNodeIds,
     required this.hasStructuralChange,
   });
+  final Set<String> changedNodeIds;
+  final bool hasStructuralChange;
 }
 
 class EditorOperationCapture {
+
+  EditorOperationCapture({
+    required MutableDocument document,
+    required String Function() generateOpId,
+    required NoteDocumentCodec codec,
+    required void Function(List<OperationRequestData> requests)
+    onOperationsCaptured,
+  }) : _document = document,
+       _generateOpId = generateOpId,
+       _codec = codec,
+       _onOperationsCaptured = onOperationsCaptured;
   final MutableDocument _document;
   final String Function() _generateOpId;
   final NoteDocumentCodec _codec;
@@ -54,17 +62,6 @@ class EditorOperationCapture {
   bool _hasDeferredStructuralChange = false;
   bool _suppress = false;
   bool _listening = false;
-
-  EditorOperationCapture({
-    required MutableDocument document,
-    required String Function() generateOpId,
-    required NoteDocumentCodec codec,
-    required void Function(List<OperationRequestData> requests)
-    onOperationsCaptured,
-  }) : _document = document,
-       _generateOpId = generateOpId,
-       _codec = codec,
-       _onOperationsCaptured = onOperationsCaptured;
 
   bool get isListening => _listening;
 
@@ -537,14 +534,14 @@ class EditorOperationCapture {
     String oldStr,
     String newStr,
   ) {
-    int prefixLen = 0;
+    var prefixLen = 0;
     while (prefixLen < oldStr.length &&
         prefixLen < newStr.length &&
         oldStr[prefixLen] == newStr[prefixLen]) {
       prefixLen++;
     }
 
-    int suffixLen = 0;
+    var suffixLen = 0;
     while (suffixLen < (oldStr.length - prefixLen) &&
         suffixLen < (newStr.length - prefixLen) &&
         oldStr[oldStr.length - 1 - suffixLen] ==

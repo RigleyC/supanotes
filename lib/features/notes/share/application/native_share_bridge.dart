@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 
-import '../domain/pending_share.dart';
-import '../domain/share_note_index.dart';
+import 'package:supanotes/features/notes/share/domain/pending_share.dart';
+import 'package:supanotes/features/notes/share/domain/share_note_index.dart';
 
 abstract interface class NativeShareBridge {
   Future<void> publishNotesIndex(ShareNoteIndex index);

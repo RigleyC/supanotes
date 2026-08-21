@@ -5,11 +5,7 @@ const Duration _exitAnimationDuration = Duration(milliseconds: 350);
 
 class TaskExitAnimator extends StatefulWidget {
   const TaskExitAnimator({
-    super.key,
-    required this.hideCompleted,
-    required this.isComplete,
-    required this.onAnimationComplete,
-    required this.child,
+    required this.hideCompleted, required this.isComplete, required this.onAnimationComplete, required this.child, super.key,
   });
 
   final bool hideCompleted;
@@ -38,14 +34,14 @@ class _TaskExitAnimatorState extends State<TaskExitAnimator>
       _controller.value = 1.0;
     }
 
-    final curve = Curves.easeInOutCubic;
+    const curve = Curves.easeInOutCubic;
     _fade = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
+      begin: 1,
+      end: 0,
     ).animate(CurvedAnimation(parent: _controller, curve: curve));
     _size = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
+      begin: 1,
+      end: 0,
     ).animate(CurvedAnimation(parent: _controller, curve: curve));
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {

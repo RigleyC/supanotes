@@ -65,7 +65,7 @@ void main() {
         final input = AppTheme.lightTheme.inputDecorationTheme;
         final border = input.border;
         expect(border, isA<OutlineInputBorder>());
-        final outline = border as OutlineInputBorder;
+        final outline = border! as OutlineInputBorder;
         expect(
           outline.borderRadius,
           BorderRadius.circular(AppSpacing.radiusSm),
@@ -76,7 +76,7 @@ void main() {
     test('card theme uses the design-system radius', () async {
       await runGuarded(() {
         final theme = AppTheme.lightTheme;
-        final CardThemeData cardData = theme.cardTheme;
+        final cardData = theme.cardTheme;
         final shape = cardData.shape;
         if (shape is RoundedRectangleBorder) {
           expect(

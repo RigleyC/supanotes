@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
+import 'package:super_editor/super_editor.dart';
 
 class _MockDocumentLayout extends Mock implements DocumentLayout {}
 
@@ -39,7 +38,7 @@ void main() {
       );
       final handler = NoteLinkTapHandler(document, onNoteTap: (_) {});
 
-      final position = DocumentPosition(
+      const position = DocumentPosition(
         nodeId: 'test-node',
         nodePosition: TextNodePosition(offset: 8),
       );
@@ -82,7 +81,7 @@ void main() {
       );
       final handler = NoteLinkTapHandler(document, onNoteTap: (_) {});
 
-      final position = DocumentPosition(
+      const position = DocumentPosition(
         nodeId: 'test-node',
         nodePosition: TextNodePosition(offset: 10),
       );

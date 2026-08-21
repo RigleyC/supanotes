@@ -302,7 +302,7 @@ class NoteDocumentCodec {
     }
     return rawMetadata == null
         ? const <String, dynamic>{}
-        : Map<String, dynamic>.from(rawMetadata);
+        : Map<String, dynamic>.from(rawMetadata as Map);
   }
 
   static void _validateMetadata(String type, Map<String, dynamic> metadata) {

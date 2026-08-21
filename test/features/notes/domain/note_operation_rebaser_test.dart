@@ -1,10 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 void main() {
   group('NoteOperationRebaser.rebase', () {
@@ -32,7 +31,6 @@ void main() {
         payloadJson: jsonEncode(payload),
         createdAt: DateTime.utc(2026, 7, 20),
         attemptCount: 0,
-        lastAttemptAt: null,
         status: 'pending',
       );
     }

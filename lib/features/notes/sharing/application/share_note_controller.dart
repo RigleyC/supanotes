@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:supanotes/features/notes/sharing/data/shares_repository.dart';
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
 
-final shareNoteControllerProvider = StateNotifierProvider.autoDispose
+final StateNotifierProviderFamily<ShareNoteController, AsyncValue<void>, String> shareNoteControllerProvider = StateNotifierProvider.autoDispose
     .family<ShareNoteController, AsyncValue<void>, String>((ref, noteId) {
       return ShareNoteController(
         noteId: noteId,

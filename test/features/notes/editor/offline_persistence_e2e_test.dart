@@ -1,15 +1,14 @@
 import 'dart:convert';
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
+import 'package:super_editor/super_editor.dart';
 
 class _OfflineNoteSyncClient extends Mock implements NoteSyncClient {}
 

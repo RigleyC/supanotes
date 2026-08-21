@@ -2,10 +2,9 @@ import 'dart:convert';
 
 import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 /// Helper to convert payload JSON ops to quill.Delta
 quill.Delta deltaFromOps(List<dynamic> ops) {
@@ -28,7 +27,7 @@ String deltaToPlainText(quill.Delta delta) {
   final buffer = StringBuffer();
   for (final op in delta.operations) {
     if (op.data is String) {
-      buffer.write(op.data as String);
+      buffer.write(op.data! as String);
     }
   }
   return buffer.toString();
@@ -59,7 +58,6 @@ void main() {
         payloadJson: jsonEncode({'ops': ops}),
         createdAt: DateTime.utc(2026, 7, 22),
         attemptCount: 0,
-        lastAttemptAt: null,
         status: 'pending',
       );
     }
@@ -98,7 +96,7 @@ void main() {
         // User 1 gera 5 operacoes encadeadas localmente
         final opsUser1 = <PendingNoteOperationData>[];
         var currentLen1 = 0;
-        for (int i = 0; i < word1.length; i++) {
+        for (var i = 0; i < word1.length; i++) {
           final char = word1[i];
           opsUser1.add(
             makePending(
@@ -119,7 +117,7 @@ void main() {
         // User 2 gera 9 operacoes encadeadas localmente
         final opsUser2 = <PendingNoteOperationData>[];
         var currentLen2 = 0;
-        for (int i = 0; i < word2.length; i++) {
+        for (var i = 0; i < word2.length; i++) {
           final char = word2[i];
           opsUser2.add(
             makePending(
@@ -138,7 +136,7 @@ void main() {
 
         // Servidor aceita as operacoes do User 1 primeiro (Revisoes 1..5)
         final remoteOpsUser1Server = <Operation>[];
-        for (int i = 0; i < opsUser1.length; i++) {
+        for (var i = 0; i < opsUser1.length; i++) {
           final pending = opsUser1[i];
           final payloadMap =
               jsonDecode(pending.payloadJson) as Map<String, dynamic>;
@@ -261,7 +259,7 @@ void main() {
 
         // Servidor ordena e comita as operacoes do User 1 (Revisoes 1..4)
         final remoteOps1 = <Operation>[];
-        for (int i = 0; i < opsUser1.length; i++) {
+        for (var i = 0; i < opsUser1.length; i++) {
           final p = opsUser1[i];
           final payload = jsonDecode(p.payloadJson) as Map<String, dynamic>;
           remoteOps1.add(

@@ -1,9 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 import 'package:super_editor/super_editor.dart';
-
-import '../../domain/task_recurrence.dart';
-import '../../domain/task_reminder_option.dart';
-import '../../domain/task_schedule_identity.dart';
 
 /// The small metadata model shared by the task sheet and editor.
 ///

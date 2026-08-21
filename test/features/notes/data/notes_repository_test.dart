@@ -1,9 +1,9 @@
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:drift/drift.dart' hide isNull, isNotNull;
-import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/catalog/data/local/note_lifecycle_store.dart';
 import 'package:supanotes/features/notes/catalog/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
@@ -310,7 +310,7 @@ class FakeUserNotePreferencesDao implements UserNotePreferencesDao {
 
   @override
   Future<UserNotePreferenceData?> getPreference(String userId, String noteId) =>
-      Future.value(null);
+      Future.value();
 
   @override
   Future<List<UserNotePreferenceData>> getDirtyPreferences() =>

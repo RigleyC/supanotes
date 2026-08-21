@@ -1,16 +1,13 @@
-library;
 
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:supanotes/core/app_version/app_version_provider.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
-
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {

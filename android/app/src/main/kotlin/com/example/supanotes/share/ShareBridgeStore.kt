@@ -164,9 +164,8 @@ object ShareBridgeStore {
         prefs(context).edit()
             .remove(KEY_NOTES_INDEX)
             .remove(KEY_INBOX)
-            .remove(KEY_PENDING_TEXT)
-            .remove(KEY_PENDING_SHARE_ID)
             .apply()
+        clearPendingShare(context)
         clearSessionCredentials(context)
     }
 

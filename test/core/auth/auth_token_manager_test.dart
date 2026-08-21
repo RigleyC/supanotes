@@ -12,12 +12,12 @@ void main() {
     'loads the access token once and then serves the in-memory value',
     () async {
       final storage = _MockAuthLocalStorage();
-      when(() => storage.getAccessToken()).thenAnswer((_) async => 'access-1');
+      when(storage.getAccessToken).thenAnswer((_) async => 'access-1');
       final manager = AuthTokenManager(storage: storage);
 
       expect(await manager.getAccessToken(), 'access-1');
       expect(await manager.getAccessToken(), 'access-1');
-      verify(() => storage.getAccessToken()).called(1);
+      verify(storage.getAccessToken).called(1);
     },
   );
 
@@ -63,7 +63,7 @@ void main() {
         refreshToken: any(named: 'refreshToken'),
       ),
     ).thenAnswer((_) async {});
-    when(() => storage.clear()).thenAnswer((_) async {});
+    when(storage.clear).thenAnswer((_) async {});
     final manager = AuthTokenManager(storage: storage);
 
     await manager.installSession(
@@ -74,21 +74,21 @@ void main() {
     await manager.clearSession();
 
     expect(await manager.getAccessToken(), isNull);
-    verify(() => storage.clear()).called(1);
+    verify(storage.clear).called(1);
   });
 
   test('cleanup wins over a refresh that completes concurrently', () async {
     final storage = _MockAuthLocalStorage();
     final refreshStarted = Completer<void>();
     final releaseRefresh = Completer<void>();
-    when(() => storage.getRefreshToken()).thenAnswer((_) async => 'refresh-1');
+    when(storage.getRefreshToken).thenAnswer((_) async => 'refresh-1');
     when(
       () => storage.saveTokens(
         accessToken: any(named: 'accessToken'),
         refreshToken: any(named: 'refreshToken'),
       ),
     ).thenAnswer((_) async {});
-    when(() => storage.clear()).thenAnswer((_) async {});
+    when(storage.clear).thenAnswer((_) async {});
     final manager = AuthTokenManager(storage: storage);
 
     final refresh = manager.refresh((_) async {
@@ -103,7 +103,7 @@ void main() {
     await Future.wait([refresh, clear]);
 
     expect(await manager.getAccessToken(), isNull);
-    verify(() => storage.clear()).called(1);
+    verify(storage.clear).called(1);
   });
 
   test(
@@ -113,7 +113,7 @@ void main() {
       final refreshStarted = Completer<void>();
       final releaseRefresh = Completer<void>();
       var refreshTokenReads = 0;
-      when(() => storage.getRefreshToken()).thenAnswer((_) async {
+      when(storage.getRefreshToken).thenAnswer((_) async {
         refreshTokenReads++;
         return refreshTokenReads == 1 ? 'refresh-1' : 'refresh-2';
       });
@@ -146,7 +146,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final loadStarted = Completer<void>();
       final releaseLoad = Completer<void>();
-      when(() => storage.getAccessToken()).thenAnswer((_) async {
+      when(storage.getAccessToken).thenAnswer((_) async {
         loadStarted.complete();
         await releaseLoad.future;
         return 'stale-access';

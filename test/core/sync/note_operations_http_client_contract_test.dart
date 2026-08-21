@@ -226,17 +226,17 @@ class RealHttpTestBackend {
 }
 
 class _ServerNoteState {
-  int revision;
-  Map<String, dynamic> document;
-  final Map<String, String> permissions;
-  final List<Map<String, dynamic>> ops = [];
-  final Map<String, Map<String, dynamic>> acceptedByOperationId = {};
 
   _ServerNoteState({
     required this.revision,
     required this.document,
     required this.permissions,
   });
+  int revision;
+  Map<String, dynamic> document;
+  final Map<String, String> permissions;
+  final List<Map<String, dynamic>> ops = [];
+  final Map<String, Map<String, dynamic>> acceptedByOperationId = {};
 }
 
 ApiClient _createTestApiClient(String baseUrl, String userToken) {
@@ -345,13 +345,13 @@ void main() {
       );
 
       // Perform syncPending over real HTTP socket
-      var resultA = await serviceA.syncPending(noteId);
+      final resultA = await serviceA.syncPending(noteId);
       expect(resultA.finalRevision, equals(1));
       expect(resultA.acceptedCount, equals(1));
       expect(resultA.acceptedOperationIds, contains('op-http-1'));
 
       // Client B polls server over HTTP socket
-      var resultB = await serviceB.pollAndReconcile(noteId);
+      final resultB = await serviceB.pollAndReconcile(noteId);
       expect(resultB.finalRevision, equals(1));
       expect(resultB.remoteOperations, hasLength(1));
       expect(resultB.remoteOperations.first.operationId, equals('op-http-1'));

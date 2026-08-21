@@ -13,6 +13,7 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/validators/input_validators.dart';
+import 'package:supanotes/features/auth/presentation/login_screen.dart' show LoginScreen;
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
@@ -100,7 +101,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       textInputAction: TextInputAction.next,
                       controller: _nameController,
                       prefixIcon: const Icon(Icons.person_outline),
-                      validator: (v) => NameValidator.validate(v),
+                      validator: NameValidator.validate,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppInput(
@@ -111,7 +112,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       textInputAction: TextInputAction.next,
                       controller: _emailController,
                       prefixIcon: const Icon(Icons.email_outlined),
-                      validator: (v) => EmailValidator.validate(v),
+                      validator: EmailValidator.validate,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppInput(
@@ -122,8 +123,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       textInputAction: TextInputAction.next,
                       controller: _passwordController,
                       prefixIcon: const Icon(Icons.lock_outline),
-                      validator: (v) =>
-                          PasswordValidator.validate(v, minLength: 8),
+                      validator: PasswordValidator.validate,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppInput(

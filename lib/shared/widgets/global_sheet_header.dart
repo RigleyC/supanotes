@@ -7,7 +7,7 @@ import 'package:supanotes/shared/widgets/app_icon_button.dart';
 /// Fixed page header for a Family sheet page: title plus a close button that
 /// delegates to [FamilyModalSheet.popPage].
 class GlobalSheetHeader extends StatelessWidget {
-  const GlobalSheetHeader({super.key, required this.title});
+  const GlobalSheetHeader({required this.title, super.key});
 
   final String title;
 

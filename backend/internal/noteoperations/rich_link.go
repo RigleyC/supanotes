@@ -84,20 +84,19 @@ func appendRichLinkInRepository(
 	}
 
 	opID := mustParseUUID(operationID)
-	if reserver, ok := repo.(sharedLinkReservation); ok {
-		reserved, reserveErr := reserver.ReserveSharedLinkIngestion(
-			ctx, userID, opID, noteID, opID,
-		)
-		if reserveErr != nil {
-			return AppendRichLinkResponse{}, fmt.Errorf("reserve shared link: %w", reserveErr)
-		}
-		if reserved.NoteID != noteID {
-			return AppendRichLinkResponse{}, errors.New("share already assigned to another note")
-		}
+	reserved, reserveErr := repo.ReserveSharedLinkIngestion(
+		ctx, userID, opID, noteID, opID,
+	)
+	if reserveErr != nil {
+		return AppendRichLinkResponse{}, fmt.Errorf("reserve shared link: %w", reserveErr)
 	}
-	if existing, err := repo.GetNoteOperationByOpID(ctx, noteID, opID); err == nil {
+	if reserved.NoteID != noteID {
+		return AppendRichLinkResponse{}, errors.New("share already assigned to another note")
+	}
+
+	if _, err := repo.GetNoteOperationByOpID(ctx, noteID, opID); err == nil {
 		return AppendRichLinkResponse{
-			Revision:        existing.Revision,
+			Revision:        locked.Revision,
 			Document:        locked.Document,
 			AlreadyAccepted: true,
 		}, nil
@@ -109,8 +108,9 @@ func appendRichLinkInRepository(
 	if err != nil {
 		return AppendRichLinkResponse{}, fmt.Errorf("unmarshal document: %w", err)
 	}
-	if len(doc.Blocks) == 0 {
-		return AppendRichLinkResponse{}, fmt.Errorf("document has no blocks")
+	var afterBlockID string
+	if len(doc.Blocks) > 0 {
+		afterBlockID = doc.Blocks[len(doc.Blocks)-1].ID
 	}
 
 	blockID := "rich-link-" + operationID
@@ -119,7 +119,7 @@ func appendRichLinkInRepository(
 		Type:         string(BlockRichLink),
 		Delta:        []delta.Op{},
 		Metadata:     metadata,
-		AfterBlockID: doc.Blocks[len(doc.Blocks)-1].ID,
+		AfterBlockID: afterBlockID,
 	})
 	if err != nil {
 		return AppendRichLinkResponse{}, fmt.Errorf("marshal rich link: %w", err)

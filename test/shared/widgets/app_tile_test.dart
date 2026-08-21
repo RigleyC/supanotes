@@ -68,7 +68,7 @@ void main() {
 
   testWidgets('marks the tile selected', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(body: AppTile(title: 'Hoje', selected: true)),
       ),
     );
@@ -80,12 +80,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           body: AppTile(
             title: 'Hoje',
             selected: true,
-            leading: const Icon(Icons.calendar_today),
+            leading: Icon(Icons.calendar_today),
           ),
         ),
       ),
@@ -123,11 +123,11 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           body: AppTile(
             title: 'Hoje',
-            leading: const Icon(Icons.calendar_today),
+            leading: Icon(Icons.calendar_today),
             selected: true,
           ),
         ),
@@ -145,11 +145,11 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           body: AppTile(
             title: 'Hoje',
-            leading: const Icon(Icons.calendar_today),
+            leading: Icon(Icons.calendar_today),
           ),
         ),
       ),

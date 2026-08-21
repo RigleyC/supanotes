@@ -155,9 +155,9 @@ class HiddenTaskEditingGuard {
 
   DocumentRange _attributionRange(EditRequest request) {
     return switch (request) {
-      AddTextAttributionsRequest request => request.documentRange,
-      RemoveTextAttributionsRequest request => request.documentRange,
-      ToggleTextAttributionsRequest request => request.documentRange,
+      final AddTextAttributionsRequest request => request.documentRange,
+      final RemoveTextAttributionsRequest request => request.documentRange,
+      final ToggleTextAttributionsRequest request => request.documentRange,
       _ => throw StateError('Unsupported attribution request'),
     };
   }
@@ -175,8 +175,8 @@ class HiddenTaskEditingGuard {
 
   DocumentPosition _insertionPosition(EditRequest request) {
     return switch (request) {
-      InsertTextRequest request => request.documentPosition,
-      InsertAttributedTextRequest request => request.documentPosition,
+      final InsertTextRequest request => request.documentPosition,
+      final InsertAttributedTextRequest request => request.documentPosition,
       _ => throw StateError('Unsupported text insertion request'),
     };
   }
@@ -246,18 +246,18 @@ class HiddenTaskEditingGuard {
 
   bool _requestTargetsHiddenTask(Document document, EditRequest request) {
     final nodeId = switch (request) {
-      ChangeParagraphAlignmentRequest request => request.nodeId,
-      ChangeParagraphBlockTypeRequest request => request.nodeId,
-      IndentParagraphRequest request => request.nodeId,
-      UnIndentParagraphRequest request => request.nodeId,
-      SetParagraphIndentRequest request => request.nodeId,
-      ConvertParagraphToTaskRequest request => request.nodeId,
-      ConvertTaskToParagraphRequest request => request.nodeId,
-      SplitExistingTaskRequest request => request.existingNodeId,
-      IndentTaskRequest request => request.nodeId,
-      UnIndentTaskRequest request => request.nodeId,
-      SetTaskIndentRequest request => request.nodeId,
-      ChangeListItemTypeRequest request => request.nodeId,
+      final ChangeParagraphAlignmentRequest request => request.nodeId,
+      final ChangeParagraphBlockTypeRequest request => request.nodeId,
+      final IndentParagraphRequest request => request.nodeId,
+      final UnIndentParagraphRequest request => request.nodeId,
+      final SetParagraphIndentRequest request => request.nodeId,
+      final ConvertParagraphToTaskRequest request => request.nodeId,
+      final ConvertTaskToParagraphRequest request => request.nodeId,
+      final SplitExistingTaskRequest request => request.existingNodeId,
+      final IndentTaskRequest request => request.nodeId,
+      final UnIndentTaskRequest request => request.nodeId,
+      final SetTaskIndentRequest request => request.nodeId,
+      final ChangeListItemTypeRequest request => request.nodeId,
       _ => null,
     };
 

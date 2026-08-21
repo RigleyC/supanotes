@@ -50,8 +50,9 @@ class ShareIntakeCoordinator {
   final Ref _ref;
   Future<void> _tail = Future<void>.value();
 
-  /// User id whose credentials are currently published to the native side.
+  /// User id and access token currently published to the native side.
   String? _publishedForUserId;
+  String? _publishedAccessToken;
 
   /// Best-effort refresh of the note index exposed to the share extension.
   /// A stale index only affects what the extension suggests; failures are
@@ -69,15 +70,16 @@ class ShareIntakeCoordinator {
   }
 
   /// Keeps the native credential store in sync with the auth session:
-  /// publishes tokens on sign-in and clears them on sign-out/expiry.
+  /// publishes tokens on sign-in / refresh and clears them on sign-out/expiry.
   Future<void> onAuthStateChanged(User? user) =>
       _serialize(() => _onAuthStateChanged(user));
 
   Future<void> _onAuthStateChanged(User? user) async {
     final bridge = _ref.read(nativeShareBridgeProvider);
     if (user == null) {
-      if (_publishedForUserId == null) return;
+      if (_publishedForUserId == null && _publishedAccessToken == null) return;
       _publishedForUserId = null;
+      _publishedAccessToken = null;
       try {
         await bridge.clearShareSession();
       } catch (error) {
@@ -85,12 +87,13 @@ class ShareIntakeCoordinator {
       }
       return;
     }
-    if (_publishedForUserId == user.id) return;
     final tokens = _ref.read(authTokenManagerProvider);
     final access = await tokens.getAccessToken();
     final refresh = await tokens.getRefreshToken();
     if (access == null || refresh == null) return;
+    if (_publishedForUserId == user.id && _publishedAccessToken == access) return;
     _publishedForUserId = user.id;
+    _publishedAccessToken = access;
     try {
       await bridge.publishSessionCredentials(
         ownerUserId: user.id,
@@ -145,7 +148,7 @@ class ShareIntakeCoordinator {
     NoteModel? note;
     if (targetNoteId != null && targetNoteId.isNotEmpty) {
       for (final candidate in notes) {
-        if (candidate.id == targetNoteId) {
+        if (candidate.id == targetNoteId && !candidate.isReadOnly) {
           note = candidate;
           break;
         }

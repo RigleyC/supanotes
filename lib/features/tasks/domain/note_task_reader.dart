@@ -1,12 +1,11 @@
 import 'dart:convert';
 
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
-
-import 'task_occurrence.dart';
-import 'task_recurrence.dart';
-import 'task_schedule_identity.dart';
-import 'task_notification_entry.dart';
-import 'task_notification_time.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_entry.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_time.dart';
+import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 class NoteTaskReader {
   const NoteTaskReader({this.clock});

@@ -1,8 +1,7 @@
 import 'package:drift/drift.dart';
+import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/tables/note_links.dart';
 import 'package:uuid/uuid.dart';
-
-import '../database.dart';
-import '../tables/note_links.dart';
 
 part 'note_links_dao.g.dart';
 

@@ -2,15 +2,15 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
-import 'package:supanotes/features/notes/preferences/data/user_note_preferences_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
+import 'package:supanotes/features/notes/preferences/data/user_note_preferences_repository.dart';
 
 void main() {
   test(
     'two fast toggles keep the newest value when the older write fails',
     () async {
-      final notes = _FakeNotesRepository(_note(hideCompleted: false));
+      final notes = _FakeNotesRepository(_note());
       final preferences = _FakePreferencesRepository(notes);
       final controller = _controller(notes, preferences);
       final firstWrite = Completer<void>();
@@ -50,7 +50,7 @@ void main() {
     'rollback changes only the failed field and preserves newer fields',
     () async {
       final notes = _FakeNotesRepository(
-        _note(hideCompleted: false, collapseImages: false),
+        _note(),
       );
       final preferences = _FakePreferencesRepository(notes);
       final controller = _controller(notes, preferences);
@@ -72,7 +72,7 @@ void main() {
   test(
     'retry clears the old error and returns to idle after success',
     () async {
-      final notes = _FakeNotesRepository(_note(hideCompleted: false));
+      final notes = _FakeNotesRepository(_note());
       final preferences = _FakePreferencesRepository(notes);
       final controller = _controller(notes, preferences);
 
@@ -97,7 +97,7 @@ void main() {
     'concurrent mutations where first fails and second succeeds end with idle status and no error',
     () async {
       final notes = _FakeNotesRepository(
-        _note(hideCompleted: false, collapseImages: false),
+        _note(),
       );
       final preferences = _FakePreferencesRepository(notes);
       final controller = _controller(notes, preferences);
@@ -196,7 +196,7 @@ class _FakePreferencesRepository implements UserNotePreferencesRepository {
   }
 
   @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeNotesRepository implements INotesRepository {
@@ -238,5 +238,5 @@ class _FakeNotesRepository implements INotesRepository {
   }
 
   @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

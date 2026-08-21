@@ -1,24 +1,21 @@
-library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-import 'package:supanotes/core/router/app_routes.dart';
-import 'package:supanotes/features/auth/domain/user.dart';
-
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/router/auth_guard.dart';
+import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/login_screen.dart';
 import 'package:supanotes/features/auth/presentation/register_screen.dart';
 import 'package:supanotes/features/auth/presentation/splash_screen.dart';
-import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
-import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
 import 'package:supanotes/features/notes/attachments/data/authenticated_attachment_delivery.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
+import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
+import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
+import 'package:supanotes/features/notes/sharing/presentation/share_link_access_screen.dart';
 import 'package:supanotes/features/settings/presentation/mcp_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
-import 'package:supanotes/features/notes/sharing/presentation/share_link_access_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ValueNotifier<AsyncValue<User?>>(
@@ -32,7 +29,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   final router = GoRouter(
     initialLocation: AppRoutes.splash,
-    debugLogDiagnostics: false,
     refreshListenable: notifier,
     routes: [
       GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),

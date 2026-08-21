@@ -6,10 +6,7 @@ import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 class TaskMetadataTimePage extends StatefulWidget {
   const TaskMetadataTimePage({
-    super.key,
-    required this.currentDueDate,
-    required this.hasTime,
-    required this.onSelected,
+    required this.currentDueDate, required this.hasTime, required this.onSelected, super.key,
   });
 
   final DateTime currentDueDate;
@@ -57,7 +54,6 @@ class _TaskMetadataTimePageState extends State<TaskMetadataTimePage> {
                 height: 200,
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.time,
-                  use24hFormat: false,
                   initialDateTime: _selectedTime,
                   onDateTimeChanged: (d) => setState(() => _selectedTime = d),
                 ),

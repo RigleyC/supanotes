@@ -6,8 +6,6 @@ enum ShareLinkAccessMode { editor, viewer, guest }
 class ShareLinkTarget {
   const ShareLinkTarget({required this.noteId});
 
-  final String noteId;
-
   factory ShareLinkTarget.fromJson(Map<String, dynamic> json) {
     final noteId = json['note_id'];
     if (noteId is! String || noteId.isEmpty) {
@@ -15,6 +13,8 @@ class ShareLinkTarget {
     }
     return ShareLinkTarget(noteId: noteId);
   }
+
+  final String noteId;
 }
 
 class ShareLinkAccessDecision {

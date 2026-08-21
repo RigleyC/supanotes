@@ -1,41 +1,37 @@
-library;
 
 import 'dart:async';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:super_editor/super_editor.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:supanotes/core/router/app_routes.dart';
-import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
-import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
-import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
-import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor.dart';
+import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
 import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.dart';
-import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
+import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:super_editor/super_editor.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
-  final String noteId;
-  final AttachmentDelivery? attachmentDelivery;
 
   const NoteEditorScreen({
-    super.key,
-    required this.noteId,
+    required this.noteId, super.key,
     this.attachmentDelivery,
   });
+  final String noteId;
+  final AttachmentDelivery? attachmentDelivery;
 
   @override
   ConsumerState<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -156,7 +152,7 @@ class _NoteEditorMenuButton extends ConsumerWidget {
     );
     switch (value) {
       case 'share':
-        await showAppBottomSheet(
+        await showAppBottomSheet<void>(
           context: context,
           builder: (_) => ShareNoteSheet(noteId: noteId),
         );
@@ -341,7 +337,7 @@ class _NoteEditorDocument extends StatelessWidget {
     return noteAsync.when(
       data: (note) {
         if (note == null) {
-          return Center(child: Text(NoteStrings.errorNotFound));
+          return const Center(child: Text(NoteStrings.errorNotFound));
         }
         return _NoteEditorSessionContent(
           noteId: noteId,

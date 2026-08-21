@@ -43,9 +43,9 @@ void main() {
 
   testWidgets('emits no haptic when its callback is disabled', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
-          body: AppIconButton(icon: const Icon(Icons.close), onPressed: null),
+          body: AppIconButton(icon: Icon(Icons.close), onPressed: null),
         ),
       ),
     );

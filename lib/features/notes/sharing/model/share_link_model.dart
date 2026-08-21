@@ -1,9 +1,6 @@
 class ShareLinkModel {
   const ShareLinkModel({required this.active, this.url});
 
-  final bool active;
-  final String? url;
-
   factory ShareLinkModel.fromJson(Map<String, dynamic> json) {
     final active = json['active'];
     if (active is! bool) {
@@ -20,6 +17,9 @@ class ShareLinkModel {
     }
     return ShareLinkModel(active: active, url: url);
   }
+
+  final bool active;
+  final String? url;
 
   @override
   bool operator ==(Object other) {

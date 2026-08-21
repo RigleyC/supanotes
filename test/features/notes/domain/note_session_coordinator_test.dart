@@ -197,7 +197,7 @@ void main() {
 
     test('snapshots active sessions', () async {
       final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
-      await coordinator.open('note-1', () => _FakeSessionHandle());
+      await coordinator.open('note-1', _FakeSessionHandle.new);
 
       final snap = coordinator.snapshot();
       expect(snap.activeCount, 1);

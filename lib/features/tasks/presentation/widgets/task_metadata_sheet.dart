@@ -4,21 +4,19 @@ import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_controller.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_date_page.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_selection_page.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_time_page.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
-
-import '../controllers/task_metadata_controller.dart';
-import '../controllers/task_metadata_draft.dart';
-import 'task_metadata_date_page.dart';
-import 'task_metadata_selection_page.dart';
-import 'task_metadata_time_page.dart';
 
 Future<void> showTaskMetadataSheet({
   required BuildContext context,
@@ -70,7 +68,7 @@ Future<void> showTaskMetadataSheet({
 }
 
 class TaskMetadataSheetBody extends ConsumerWidget {
-  const TaskMetadataSheetBody({super.key, required this.taskId});
+  const TaskMetadataSheetBody({required this.taskId, super.key});
 
   final String taskId;
 

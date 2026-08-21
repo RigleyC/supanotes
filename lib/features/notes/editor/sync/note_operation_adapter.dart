@@ -2,22 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as dev;
 
-import 'package:super_editor/super_editor.dart';
-
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
-import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/document/document_projection_applier.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/sync/editor_operation_capture.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-
-import 'editor_operation_capture.dart';
+import 'package:super_editor/super_editor.dart';
 
 class _RebuildRequest {
+  _RebuildRequest({required this.snapshot, this.ops});
   final Map<String, dynamic> snapshot;
   final List<PendingNoteOperationData>? ops;
-  _RebuildRequest({required this.snapshot, this.ops});
 }
 
 class NoteOperationAdapter {
@@ -40,7 +38,7 @@ class NoteOperationAdapter {
     );
     _capture = EditorOperationCapture(
       document: document,
-      generateOpId: () => _syncService.generateOperationId(),
+      generateOpId: _syncService.generateOperationId,
       codec: _codec,
       onOperationsCaptured: _onOperationsCaptured,
     );

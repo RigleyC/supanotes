@@ -1,8 +1,9 @@
 import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 void main() {
   group('NoteOperationRebaser Integration', () {
@@ -175,7 +176,7 @@ void main() {
           ),
         ];
 
-        final List<AcceptedOperation> acceptedOps = [
+        final acceptedOps = <AcceptedOperation>[
           AcceptedOperation(
             operationId: 'op1',
             revision: 11, // P1 was accepted at 11

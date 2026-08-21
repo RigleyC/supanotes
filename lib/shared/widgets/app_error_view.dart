@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_spacing.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 
 class AppErrorView extends StatelessWidget {
   const AppErrorView({
-    super.key,
-    required this.title,
+    required this.title, super.key,
     this.subtitle,
     this.onRetry,
   });
@@ -24,7 +23,6 @@ class AppErrorView extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(Icons.error_outline_rounded, size: 64, color: scheme.error),
             const SizedBox(height: AppSpacing.md),

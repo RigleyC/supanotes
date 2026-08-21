@@ -8,7 +8,7 @@ void main() {
       final result = enumerateOccurrences(
         anchor: null,
         recurrence: TaskRecurrence.daily,
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         to: DateTime(2026, 7, 10),
       );
       expect(result, isEmpty);
@@ -16,9 +16,9 @@ void main() {
 
     test('returns empty list when recurrence is null', () {
       final result = enumerateOccurrences(
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: null,
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         to: DateTime(2026, 7, 10),
       );
       expect(result, isEmpty);
@@ -26,13 +26,13 @@ void main() {
 
     test('daily: enumerates all days in range', () {
       final result = enumerateOccurrences(
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         to: DateTime(2026, 7, 5),
       );
       expect(result, hasLength(5));
-      expect(result[0], DateTime(2026, 7, 1));
+      expect(result[0], DateTime(2026, 7));
       expect(result[4], DateTime(2026, 7, 5));
     });
 
@@ -40,20 +40,20 @@ void main() {
       final result = enumerateOccurrences(
         anchor: DateTime(2026, 6, 28),
         recurrence: TaskRecurrence.daily,
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         to: DateTime(2026, 7, 3),
       );
       expect(result, hasLength(3));
-      expect(result[0], DateTime(2026, 7, 1));
+      expect(result[0], DateTime(2026, 7));
       expect(result[2], DateTime(2026, 7, 3));
     });
 
     test('weekdays: skips weekends', () {
       // 2026-07-01 is a Wednesday
       final result = enumerateOccurrences(
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.weekdays,
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         to: DateTime(2026, 7, 6), // Monday
       );
       // July 1 (Wed), 2 (Thu), 3 (Fri), 6 (Mon) — Jul 4-5 are Sat-Sun
@@ -66,14 +66,14 @@ void main() {
 
     test('weekly: enumerates weekly', () {
       final result = enumerateOccurrences(
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.weekly,
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         to: DateTime(2026, 7, 22),
       );
       // Jul 1, 8, 15, 22
       expect(result, hasLength(4));
-      expect(result[0], DateTime(2026, 7, 1));
+      expect(result[0], DateTime(2026, 7));
       expect(result[3], DateTime(2026, 7, 22));
     });
 
@@ -110,7 +110,7 @@ void main() {
       final result = enumerateOccurrences(
         anchor: DateTime(2026, 7, 1, 14, 30),
         recurrence: TaskRecurrence.daily,
-        from: DateTime(2026, 7, 1, 0, 0),
+        from: DateTime(2026, 7),
         to: DateTime(2026, 7, 3, 23, 59),
       );
       expect(result, hasLength(3));
@@ -122,10 +122,10 @@ void main() {
 
     test('to before from returns empty list', () {
       final result = enumerateOccurrences(
-        anchor: DateTime(2026, 7, 1),
+        anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
         from: DateTime(2026, 7, 10),
-        to: DateTime(2026, 7, 1),
+        to: DateTime(2026, 7),
       );
       expect(result, isEmpty);
     });
@@ -134,7 +134,7 @@ void main() {
   group('advanceRecurringDueDate', () {
     test('daily recurrence moves to today after missed days', () {
       final result = advanceRecurringDueDate(
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
         hasTime: false,
         now: DateTime(2026, 7, 4, 15),
@@ -145,13 +145,13 @@ void main() {
 
     test('weekly recurrence moves only when the next week starts', () {
       final beforeNext = advanceRecurringDueDate(
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         recurrence: TaskRecurrence.weekly,
         hasTime: false,
         now: DateTime(2026, 7, 21),
       );
       final atNext = advanceRecurringDueDate(
-        from: DateTime(2026, 7, 1),
+        from: DateTime(2026, 7),
         recurrence: TaskRecurrence.weekly,
         hasTime: false,
         now: DateTime(2026, 7, 22),
@@ -188,7 +188,7 @@ void main() {
         from: DateTime(2026, 1, 31),
         recurrence: TaskRecurrence.monthly,
         hasTime: false,
-        now: DateTime(2026, 3, 1),
+        now: DateTime(2026, 3),
       );
 
       expect(result, DateTime(2026, 2, 28));
@@ -197,7 +197,7 @@ void main() {
         from: result,
         recurrence: TaskRecurrence.monthly,
         hasTime: false,
-        now: DateTime(2026, 4, 1),
+        now: DateTime(2026, 4),
         anchor: DateTime(2026, 1, 31),
       );
 

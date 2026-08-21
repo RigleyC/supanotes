@@ -12,7 +12,7 @@ import '../../../../helpers/haptic_test_helper.dart';
 
 void main() {
   setUpAll(() async {
-    await initializeDateFormatting('pt_BR', null);
+    await initializeDateFormatting('pt_BR');
   });
 
   testWidgets('renders metadata pickers for existing task', (tester) async {

@@ -164,9 +164,7 @@ class AppTheme {
         ),
       ),
       extensions: [
-        brightness == Brightness.light
-            ? AppSemanticColors.light
-            : AppSemanticColors.dark,
+        if (brightness == Brightness.light) AppSemanticColors.light else AppSemanticColors.dark,
       ],
     );
   }

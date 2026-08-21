@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'snack.dart';
-import 'snack_view.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/src/snack.dart';
+import 'package:supanotes/shared/widgets/expressive_snack/src/snack_view.dart';
 
 class SnackOverlay extends StatefulWidget {
   SnackOverlay({required this.child}) : super(key: _key);

@@ -7,34 +7,21 @@ import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dar
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 class NoteOp {
-  final String operationId;
-  final String actorId;
-  final int? revision;
-  final String kind;
-  final String? blockId;
-  final Map<String, dynamic> payload;
-  final quill.Delta? cachedDelta;
 
   NoteOp({
     required this.operationId,
     required this.actorId,
-    this.revision,
-    required this.kind,
-    required this.blockId,
-    required this.payload,
+    required this.kind, required this.blockId, required this.payload, this.revision,
     this.cachedDelta,
   });
 
   factory NoteOp.fromData({
     required String operationId,
     required String actorId,
-    int? revision,
-    required String kind,
-    required String? blockId,
-    required Map<String, dynamic> payload,
+    required String kind, required String? blockId, required Map<String, dynamic> payload, int? revision,
     quill.Delta? cachedDelta,
   }) {
-    quill.Delta? delta = cachedDelta;
+    var delta = cachedDelta;
     if (delta == null &&
         kind == NoteOperationKind.textDelta.wireName &&
         payload.containsKey('ops')) {
@@ -53,20 +40,24 @@ class NoteOp {
       cachedDelta: delta,
     );
   }
+  final String operationId;
+  final String actorId;
+  final int? revision;
+  final String kind;
+  final String? blockId;
+  final Map<String, dynamic> payload;
+  final quill.Delta? cachedDelta;
 }
 
 class NoteOperationRebaser {
-  final String localActorId;
 
   NoteOperationRebaser({required this.localActorId});
+  final String localActorId;
 
   /// Pure rebase: transforms [pending] ops against [remote] ops, assigns
   /// sequential baseRevisions from [finalRevision], and omits no-ops.
   List<PendingNoteOperationData> rebase({
-    List<PendingNoteOperationData>? inFlight,
-    required List<PendingNoteOperationData> pending,
-    required List<Operation> remote,
-    required int finalRevision,
+    required List<PendingNoteOperationData> pending, required List<Operation> remote, required int finalRevision, List<PendingNoteOperationData>? inFlight,
     List<AcceptedOperation>? acceptedOps,
   }) {
     final acceptedRevisions = _acceptedRevisions(acceptedOps);

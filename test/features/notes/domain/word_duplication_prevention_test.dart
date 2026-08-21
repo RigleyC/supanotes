@@ -2,10 +2,9 @@ import 'dart:convert';
 
 import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
+import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 quill.Delta deltaFromOps(List<dynamic> ops) {
   final delta = quill.Delta();
@@ -26,7 +25,7 @@ String deltaToPlainText(quill.Delta delta) {
   final buffer = StringBuffer();
   for (final op in delta.operations) {
     if (op.data is String) {
-      buffer.write(op.data as String);
+      buffer.write(op.data! as String);
     }
   }
   return buffer.toString();
@@ -57,7 +56,6 @@ void main() {
         payloadJson: jsonEncode({'ops': ops}),
         createdAt: DateTime.utc(2026, 7, 22),
         attemptCount: 0,
-        lastAttemptAt: null,
         status: 'pending',
       );
     }
@@ -88,7 +86,7 @@ void main() {
       const wordToInsert = 'Banana ';
 
       // O usuario digita "Banana " otimisticamente no documento local
-      var localDoc = quill.Delta()..insert(wordToInsert);
+      final localDoc = quill.Delta()..insert(wordToInsert);
 
       // Operacao pendente no outbox
       final op1 = makePending(
@@ -214,7 +212,7 @@ void main() {
       expect(rebaseRun1[1].payloadJson, equals(rebaseRun2[1].payloadJson));
 
       // Aplica o resultado de rebaseRun1
-      var doc1 = quill.Delta()..insert('Outro ')..insert('Primeira ')..insert('Segunda ');
+      final doc1 = quill.Delta()..insert('Outro ')..insert('Primeira ')..insert('Segunda ');
       final text1 = deltaToPlainText(doc1);
 
       // Valida que cada palavra aparece exatamente 1 vez

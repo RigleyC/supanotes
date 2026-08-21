@@ -32,9 +32,8 @@ final class ShareBackgroundUploader: NSObject {
     }
     request.timeoutInterval = 60
 
-    let configuration = URLSessionConfiguration.background(withIdentifier: sessionIdentifier)
-    configuration.sharedContainerIdentifier = "group.com.supanotes.shared"
-    configuration.isDiscretionary = false
+    let configuration = URLSessionConfiguration.default
+    configuration.timeoutIntervalForRequest = 30
     session = URLSession(
       configuration: configuration,
       delegate: self,

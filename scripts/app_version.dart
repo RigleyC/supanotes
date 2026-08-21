@@ -7,10 +7,6 @@ enum VersionBump { none, patch, minor, major }
 class AppVersion {
   const AppVersion(this.major, this.minor, this.patch);
 
-  final int major;
-  final int minor;
-  final int patch;
-
   factory AppVersion.parse(String value) {
     final match = RegExp(r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$')
         .firstMatch(value);
@@ -23,6 +19,10 @@ class AppVersion {
       int.parse(match.group(3)!),
     );
   }
+
+  final int major;
+  final int minor;
+  final int patch;
 
   AppVersion bump(VersionBump bump) => switch (bump) {
     VersionBump.none => this,

@@ -1,15 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
-
 class AttachmentUploadingCapsule extends StatelessWidget {
   const AttachmentUploadingCapsule({
-    super.key,
-    required this.fileName,
+    required this.fileName, super.key,
     this.onCancel,
   });
 
@@ -87,8 +85,7 @@ class AttachmentUploadingCapsule extends StatelessWidget {
 
 class AttachmentFailedCapsule extends StatelessWidget {
   const AttachmentFailedCapsule({
-    super.key,
-    required this.fileName,
+    required this.fileName, super.key,
     this.onDelete,
   });
 
@@ -159,11 +156,7 @@ class AttachmentFailedCapsule extends StatelessWidget {
 
 class AttachmentFilePill extends StatelessWidget {
   const AttachmentFilePill({
-    super.key,
-    required this.fileName,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
+    required this.fileName, required this.subtitle, required this.icon, required this.onTap, super.key,
   });
 
   final String fileName;
@@ -229,7 +222,7 @@ class AttachmentFilePill extends StatelessWidget {
 }
 
 class AttachmentExpandedImage extends StatelessWidget {
-  const AttachmentExpandedImage({super.key, required this.url, this.localPath});
+  const AttachmentExpandedImage({required this.url, super.key, this.localPath});
 
   final String url;
   final String? localPath;
@@ -289,11 +282,8 @@ class AttachmentExpandedImage extends StatelessWidget {
 
 class AttachmentRichLinkCard extends StatelessWidget {
   const AttachmentRichLinkCard({
-    super.key,
-    required this.componentKey,
-    required this.node,
+    required this.componentKey, required this.node, required this.selectionColor, super.key,
     this.selection,
-    required this.selectionColor,
     this.allowInternalNoteLinks = true,
   });
 

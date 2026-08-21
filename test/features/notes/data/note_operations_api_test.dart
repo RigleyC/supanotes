@@ -54,9 +54,9 @@ void main() {
         ),
       ).thenThrow(
         DioException(
-          requestOptions: RequestOptions(path: ''),
+          requestOptions: RequestOptions(),
           response: Response(
-            requestOptions: RequestOptions(path: ''),
+            requestOptions: RequestOptions(),
             statusCode: 400,
             data: {'error': 'INVALID_DELTA', 'message': 'Bad delta'},
           ),

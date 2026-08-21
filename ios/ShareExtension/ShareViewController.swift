@@ -86,25 +86,21 @@ final class ShareViewController: UIViewController {
           )
     else { return }
     request.timeoutInterval = 15
-    let semaphore = DispatchSemaphore(value: 0)
-    var status = -1
-    let task = URLSession.shared.dataTask(with: request) { _, response, _ in
-      status = (response as? HTTPURLResponse)?.statusCode ?? -1
-      semaphore.signal()
+    let task = URLSession.shared.dataTask(with: request) { [weak store] _, response, _ in
+      let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+      switch ShareAPIClient.classify(status: status) {
+      case .confirmed, .droppedTerminal:
+        store?.clearInboxItem()
+      case .retryLater, .waitForFreshCredentials:
+        break // inbox item kept; main app retries with fresh credentials
+      }
     }
     ProcessInfo.processInfo.performExpiringActivity(
       withReason: "Enviando link ao SupaNotes",
     ) { expired in
       if !expired {
         task.resume()
-        semaphore.wait()
       }
-    }
-    switch ShareAPIClient.classify(status: status) {
-    case .confirmed, .droppedTerminal:
-      store.clearInboxItem()
-    case .retryLater, .waitForFreshCredentials:
-      break // inbox item kept; main app retries with fresh credentials
     }
   }
 
