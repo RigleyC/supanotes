@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ShareView: View {
   let notes: [SharedShareNote]
+  let onCancel: () -> Void
   let onSelect: (SharedShareNote) -> Void
 
   @State private var query = ""
@@ -17,6 +18,14 @@ struct ShareView: View {
         }
       }
       .navigationTitle("Salvar link em")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancelar") {
+            onCancel()
+          }
+        }
+      }
     }
   }
 

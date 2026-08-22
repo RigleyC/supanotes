@@ -40,8 +40,13 @@ final class ShareViewController: UIViewController {
 
     let credentials = store.sessionCredentials()
     let notes = store.notes(forOwnerUserId: credentials?.ownerUserId)
-    if let credentials, !notes.isEmpty {
-      presentPicker(url: url, credentials: credentials, notes: notes)
+    if !notes.isEmpty {
+      let activeCredentials = credentials ?? SharedShareStore.SessionCredentials(
+        ownerUserId: store.ownerUserIdFromIndex() ?? "",
+        accessToken: "",
+        apiBaseUrl: "https://supanotes.fly.dev"
+      )
+      presentPicker(url: url, credentials: activeCredentials, notes: notes)
     } else {
       // No usable session/index yet: queue for the in-app picker so the link
       // survives until login — never silently discard (spec).
@@ -55,9 +60,15 @@ final class ShareViewController: UIViewController {
     credentials: SharedShareStore.SessionCredentials,
     notes: [SharedShareNote],
   ) {
-    let view = ShareView(notes: notes) { [weak self] note in
-      self?.deliver(url: url, note: note, ownerUserId: credentials.ownerUserId)
-    }
+    let view = ShareView(
+      notes: notes,
+      onCancel: { [weak self] in
+        self?.extensionContext?.completeRequest(returningItems: nil)
+      },
+      onSelect: { [weak self] note in
+        self?.deliver(url: url, note: note, ownerUserId: credentials.ownerUserId)
+      }
+    )
     host(view)
   }
 
@@ -71,6 +82,7 @@ final class ShareViewController: UIViewController {
       ownerUserId: ownerUserId,
     )
     store.writeInboxItem(item)
+    store.savePending(text: url, noteId: note.noteId, ownerUserId: ownerUserId)
     attemptImmediateDelivery(item)
     extensionContext?.completeRequest(returningItems: nil)
   }

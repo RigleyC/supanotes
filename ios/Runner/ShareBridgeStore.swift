@@ -37,6 +37,7 @@ final class ShareBridgeStore {
 
   func saveSession(_ value: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: value) else { return }
+    defaults.set(data, forKey: "session_credentials")
     SecItemDelete(baseKeychainQuery as CFDictionary)
     var query = baseKeychainQuery
     query[kSecValueData as String] = data
@@ -45,6 +46,17 @@ final class ShareBridgeStore {
   }
 
   func sessionCredentials() -> ShareSessionCredentials? {
+    if let data = defaults.data(forKey: "session_credentials"),
+       let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let ownerUserId = payload["ownerUserId"] as? String,
+       let accessToken = payload["accessToken"] as? String,
+       let apiBaseUrl = payload["apiBaseUrl"] as? String {
+      return ShareSessionCredentials(
+        ownerUserId: ownerUserId,
+        accessToken: accessToken,
+        apiBaseUrl: apiBaseUrl
+      )
+    }
     var query = baseKeychainQuery
     query[kSecReturnData as String] = true
     query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -62,7 +74,7 @@ final class ShareBridgeStore {
     return ShareSessionCredentials(
       ownerUserId: ownerUserId,
       accessToken: accessToken,
-      apiBaseUrl: apiBaseUrl,
+      apiBaseUrl: apiBaseUrl
     )
   }
 
@@ -98,6 +110,7 @@ final class ShareBridgeStore {
     defaults.removeObject(forKey: "pending_shared_note_id")
     defaults.removeObject(forKey: "pending_shared_owner_user_id")
     defaults.removeObject(forKey: "pending_shared_id")
+    defaults.removeObject(forKey: "session_credentials")
     defaults.removeObject(forKey: Self.inboxKey)
     SecItemDelete(baseKeychainQuery as CFDictionary)
   }

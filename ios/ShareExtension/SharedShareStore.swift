@@ -21,13 +21,21 @@ final class SharedShareStore {
   private let keychainAccessGroup = "com.supanotes.share"
   private static let inboxKey = "share_inbox"
 
+  func ownerUserIdFromIndex() -> String? {
+    guard let data = defaults.data(forKey: "notes_index"),
+          let index = try? JSONDecoder().decode(SharedShareIndex.self, from: data)
+    else { return nil }
+    return index.ownerUserId
+  }
+
   func notes(forOwnerUserId ownerUserId: String?) -> [SharedShareNote] {
     guard let data = defaults.data(forKey: "notes_index"),
           let index = try? JSONDecoder().decode(SharedShareIndex.self, from: data),
-          index.schemaVersion == 1,
-          let ownerUserId,
-          index.ownerUserId == ownerUserId
+          index.schemaVersion == 1
     else { return [] }
+    if let ownerUserId, !ownerUserId.isEmpty, index.ownerUserId != ownerUserId {
+      return []
+    }
     return index.notes.filter(\.canEdit)
   }
 
@@ -72,6 +80,17 @@ final class SharedShareStore {
   }
 
   func sessionCredentials() -> SessionCredentials? {
+    if let data = defaults.data(forKey: "session_credentials"),
+       let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let ownerUserId = payload["ownerUserId"] as? String,
+       let accessToken = payload["accessToken"] as? String,
+       let apiBaseUrl = payload["apiBaseUrl"] as? String {
+      return SessionCredentials(
+        ownerUserId: ownerUserId,
+        accessToken: accessToken,
+        apiBaseUrl: apiBaseUrl
+      )
+    }
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: keychainService,
@@ -91,7 +110,7 @@ final class SharedShareStore {
     return SessionCredentials(
       ownerUserId: ownerUserId,
       accessToken: accessToken,
-      apiBaseUrl: apiBaseUrl,
+      apiBaseUrl: apiBaseUrl
     )
   }
 }
