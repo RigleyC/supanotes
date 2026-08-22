@@ -45,7 +45,7 @@ final class ShareViewController: UIViewController {
     } else {
       // No usable session/index yet: queue for the in-app picker so the link
       // survives until login — never silently discard (spec).
-      store.savePending(text: text, noteId: "")
+      store.savePending(text: text, noteId: "", ownerUserId: credentials?.ownerUserId)
       presentMessage("Abra o SupaNotes para escolher a nota.")
     }
   }

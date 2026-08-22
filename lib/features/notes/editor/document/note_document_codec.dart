@@ -1002,4 +1002,22 @@ class NoteDocumentCodec {
     if (name == 'quote') return blockquoteAttribution;
     return null;
   }
+
+  ({String content, String? excerpt}) projectContent(List<dynamic> blocks) {
+    final text = StringBuffer();
+    for (final block in blocks) {
+      if (block is! Map) continue;
+      final rawDelta = block['delta'] ?? block['content'];
+      if (rawDelta is! List) continue;
+      final plain = attributedFromDelta(rawDelta).toPlainText();
+      if (plain.isNotEmpty) text.writeln(plain);
+    }
+    final content = text.toString().trimRight();
+    return (
+      content: content,
+      excerpt: content.isEmpty
+          ? null
+          : content.substring(0, content.length > 200 ? 200 : content.length),
+    );
+  }
 }

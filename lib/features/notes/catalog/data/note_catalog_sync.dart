@@ -502,22 +502,7 @@ class NoteCatalogSync {
 }
 
 ({String content, String? excerpt}) _projectContent(List<dynamic> blocks) {
-  const codec = NoteDocumentCodec();
-  final text = StringBuffer();
-  for (final block in blocks) {
-    if (block is! Map) continue;
-    final rawDelta = block['delta'] ?? block['content'];
-    if (rawDelta is! List) continue;
-    final plain = codec.attributedFromDelta(rawDelta).toPlainText();
-    if (plain.isNotEmpty) text.writeln(plain);
-  }
-  final content = text.toString().trimRight();
-  return (
-    content: content,
-    excerpt: content.isEmpty
-        ? null
-        : content.substring(0, content.length > 200 ? 200 : content.length),
-  );
+  return const NoteDocumentCodec().projectContent(blocks);
 }
 
 /// App-scoped catalog synchronization.

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import 'package:supanotes/core/database/database.dart';
@@ -7,6 +9,7 @@ import 'package:supanotes/core/database/tables/note_sync_errors.dart';
 import 'package:supanotes/core/database/tables/notes.dart';
 import 'package:supanotes/core/database/tables/pending_note_operations.dart';
 import 'package:supanotes/core/database/tables/sync_sessions.dart';
+import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 
 part 'note_operations_dao.g.dart';
 
@@ -69,18 +72,44 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
             materializedUpdatedAt: Value(updatedAt),
           ),
         );
-    if (changed != 0) return;
-    await into(localNoteDocuments).insert(
-      LocalNoteDocumentsCompanion.insert(
-        noteId: noteId,
-        revision: 0,
-        documentJson: '{"schemaVersion":1,"blocks":[]}',
-        updatedAt: updatedAt,
-        materializedDocumentJson: Value(documentJson),
-        materializedUpdatedAt: Value(updatedAt),
-      ),
-      mode: InsertMode.insertOrReplace,
-    );
+    if (changed == 0) {
+      await into(localNoteDocuments).insert(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: noteId,
+          revision: 0,
+          documentJson: '{"schemaVersion":1,"blocks":[]}',
+          updatedAt: updatedAt,
+          materializedDocumentJson: Value(documentJson),
+          materializedUpdatedAt: Value(updatedAt),
+        ),
+        mode: InsertMode.insertOrReplace,
+      );
+    }
+    await _projectToNotesTable(noteId, documentJson, updatedAt: updatedAt);
+  }
+
+  Future<void> _projectToNotesTable(
+    String noteId,
+    String documentJson, {
+    DateTime? updatedAt,
+  }) async {
+    try {
+      final decoded = jsonDecode(documentJson);
+      if (decoded is Map && decoded['blocks'] is List) {
+        final projection = const NoteDocumentCodec().projectContent(
+          decoded['blocks'] as List<dynamic>,
+        );
+        await attachedDatabase.notesDao.updateNoteProjection(
+          id: noteId,
+          content: projection.content,
+          excerpt: projection.excerpt,
+          materialized: projection.content.isNotEmpty,
+          updatedAt: updatedAt,
+        );
+      }
+    } catch (_) {
+      // Best-effort projection
+    }
   }
 
   Future<void> deleteNoteDocument(String noteId) async {

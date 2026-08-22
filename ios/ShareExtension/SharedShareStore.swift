@@ -31,14 +31,18 @@ final class SharedShareStore {
     return index.notes.filter(\.canEdit)
   }
 
-  func savePending(text: String, noteId: String) {
+  func savePending(text: String, noteId: String, ownerUserId: String? = nil) {
     defaults.set(text, forKey: "pending_shared_text")
     defaults.set(noteId, forKey: "pending_shared_note_id")
+    if let ownerUserId {
+      defaults.set(ownerUserId, forKey: "pending_shared_owner_user_id")
+    }
   }
 
   func clearPending() {
     defaults.removeObject(forKey: "pending_shared_text")
     defaults.removeObject(forKey: "pending_shared_note_id")
+    defaults.removeObject(forKey: "pending_shared_owner_user_id")
     defaults.removeObject(forKey: "pending_shared_id")
   }
 

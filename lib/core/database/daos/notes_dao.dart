@@ -267,18 +267,19 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     });
   }
 
-  /// Updates content, excerpt and updatedAt for a projected note in SQLite.
+  /// Updates content, excerpt and optionally updatedAt for a projected note in SQLite.
   Future<void> updateNoteProjection({
     required String id,
     required String content,
-    required bool materialized, String? excerpt,
+    required bool materialized,
+    String? excerpt,
+    DateTime? updatedAt,
   }) async {
-    final now = DateTime.now();
     await (update(notes)..where((t) => t.id.equals(id))).write(
       NotesCompanion(
         content: Value(content),
         excerpt: Value(excerpt),
-        updatedAt: Value(now),
+        updatedAt: updatedAt != null ? Value(updatedAt) : const Value.absent(),
         lifecycleState: materialized
             ? const Value(materializedLifecycleState)
             : const Value.absent(),

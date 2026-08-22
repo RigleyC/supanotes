@@ -89,6 +89,37 @@ void main() {
       await db.close();
     });
 
+    test('updateMaterializedDocument projects content and excerpt to notes table', () async {
+      final db = AppDatabase.test();
+      final now = DateTime.utc(2026, 7, 20);
+
+      await db.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'note-1',
+          userId: 'user-1',
+          content: '',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      const docJson = '{"schemaVersion":1,"blocks":[{"id":"b1","type":"header1","delta":[{"insert":"Lista de Mercado"}]},{"id":"b2","type":"task","delta":[{"insert":"Comprar leite"}]}]}';
+
+      await db.noteOperationsDao.updateMaterializedDocument(
+        noteId: 'note-1',
+        documentJson: docJson,
+        updatedAt: now,
+      );
+
+      final note = await db.notesDao.getNoteWithPrefsById('note-1', 'user-1');
+      expect(note, isNotNull);
+      expect(note!.note.content, contains('Lista de Mercado'));
+      expect(note.title, 'Lista de Mercado');
+      expect(note.note.lifecycleState, materializedLifecycleState);
+
+      await db.close();
+    });
+
     test('insert and watch pending operations ordered by ordinal', () async {
       final db = AppDatabase.test();
       final now = DateTime.utc(2026, 7, 20);
