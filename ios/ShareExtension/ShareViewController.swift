@@ -106,7 +106,6 @@ final class ShareViewController: UIViewController {
       ownerUserId: ownerUserId,
     )
     store.writeInboxItem(item)
-    store.savePending(text: url, noteId: note.noteId, ownerUserId: ownerUserId, shareId: shareId)
     attemptImmediateDelivery(item)
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
       self?.extensionContext?.completeRequest(returningItems: nil)

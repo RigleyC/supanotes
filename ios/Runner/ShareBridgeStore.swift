@@ -124,6 +124,12 @@ final class ShareBridgeStore {
 
   func readPendingShare() -> [String: String]? {
     guard let text = defaults.string(forKey: "pending_shared_text"), !text.isEmpty else { return nil }
+    // A targeted pending item belongs to the old Flutter completion path.
+    // Native iOS selections are delivered from the durable inbox only.
+    if let noteId = defaults.string(forKey: "pending_shared_note_id"), !noteId.isEmpty {
+      clearPendingShare()
+      return nil
+    }
     let shareId = defaults.string(forKey: "pending_shared_id") ?? UUID().uuidString.lowercased()
     defaults.set(shareId, forKey: "pending_shared_id")
     defaults.synchronize()
