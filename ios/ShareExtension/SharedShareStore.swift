@@ -4,8 +4,17 @@ import Security
 struct SharedShareNote: Decodable {
   let noteId: String
   let title: String
-  let preview: String
+  let preview: String?
   let canEdit: Bool
+
+  var displayTitle: String {
+    let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    return t.isEmpty ? "Sem título" : t
+  }
+
+  var displayPreview: String {
+    preview?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+  }
 }
 
 struct SharedShareIndex: Decodable {
@@ -39,12 +48,14 @@ final class SharedShareStore {
     return index.notes.filter(\.canEdit)
   }
 
-  func savePending(text: String, noteId: String, ownerUserId: String? = nil) {
+  func savePending(text: String, noteId: String, ownerUserId: String? = nil, shareId: String? = nil) {
     defaults.set(text, forKey: "pending_shared_text")
     defaults.set(noteId, forKey: "pending_shared_note_id")
+    defaults.set(shareId ?? UUID().uuidString.lowercased(), forKey: "pending_shared_id")
     if let ownerUserId {
       defaults.set(ownerUserId, forKey: "pending_shared_owner_user_id")
     }
+    defaults.synchronize()
   }
 
   func clearPending() {
@@ -52,6 +63,7 @@ final class SharedShareStore {
     defaults.removeObject(forKey: "pending_shared_note_id")
     defaults.removeObject(forKey: "pending_shared_owner_user_id")
     defaults.removeObject(forKey: "pending_shared_id")
+    defaults.synchronize()
   }
 
   // MARK: - Durable inbox (shared with the main app)

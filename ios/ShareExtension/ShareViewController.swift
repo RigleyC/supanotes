@@ -12,29 +12,53 @@ final class ShareViewController: UIViewController {
 
   private func loadSharedText() {
     guard let item = extensionContext?.inputItems.first as? NSExtensionItem,
-          let provider = item.attachments?.first
+          let attachments = item.attachments, !attachments.isEmpty
     else {
       cancel(code: 1)
       return
     }
-    let type = provider.hasItemConformingToTypeIdentifier("public.plain-text")
-      ? "public.plain-text"
-      : "public.url"
-    provider.loadItem(forTypeIdentifier: type, options: nil) { [weak self] item, _ in
+
+    if let urlProvider = attachments.first(where: { $0.hasItemConformingToTypeIdentifier("public.url") }) {
+      urlProvider.loadItem(forTypeIdentifier: "public.url", options: nil) { [weak self] loadedItem, _ in
+        DispatchQueue.main.async {
+          self?.handleSharedItem(loadedItem)
+        }
+      }
+      return
+    }
+
+    if let textProvider = attachments.first(where: { $0.hasItemConformingToTypeIdentifier("public.plain-text") }) {
+      textProvider.loadItem(forTypeIdentifier: "public.plain-text", options: nil) { [weak self] loadedItem, _ in
+        DispatchQueue.main.async {
+          self?.handleSharedItem(loadedItem)
+        }
+      }
+      return
+    }
+
+    attachments.first?.loadItem(forTypeIdentifier: "public.item", options: nil) { [weak self] loadedItem, _ in
       DispatchQueue.main.async {
-        self?.handleSharedItem(item)
+        self?.handleSharedItem(loadedItem)
       }
     }
   }
 
   private func handleSharedItem(_ item: Any?) {
-    let text = (item as? String) ?? (item as? URL)?.absoluteString
-    guard let text else {
-      cancel(code: 2)
-      return
+    let text: String?
+    if let str = item as? String {
+      text = str
+    } else if let url = item as? URL {
+      text = url.absoluteString
+    } else if let nsUrl = item as? NSURL {
+      text = nsUrl.absoluteString
+    } else if let data = item as? Data, let str = String(data: data, encoding: .utf8) {
+      text = str
+    } else {
+      text = nil
     }
-    guard let url = ShareAPIClient.extractUrl(from: text) else {
-      presentMessage("O texto compartilhado não contém uma URL.")
+
+    guard let text, let url = ShareAPIClient.extractUrl(from: text) else {
+      presentMessage("O texto compartilhado não contém uma URL válida.")
       return
     }
 
@@ -44,14 +68,14 @@ final class ShareViewController: UIViewController {
       let activeCredentials = credentials ?? SharedShareStore.SessionCredentials(
         ownerUserId: store.ownerUserIdFromIndex() ?? "",
         accessToken: "",
-        apiBaseUrl: "https://supanotes.fly.dev"
+        apiBaseUrl: "https://backend-winter-waterfall-5807.fly.dev/api/v1"
       )
       presentPicker(url: url, credentials: activeCredentials, notes: notes)
     } else {
       // No usable session/index yet: queue for the in-app picker so the link
       // survives until login — never silently discard (spec).
       store.savePending(text: text, noteId: "", ownerUserId: credentials?.ownerUserId)
-      presentMessage("Abra o SupaNotes para escolher a nota.")
+      presentMessage("Abra o SupaNotes para sincronizar suas notas.")
     }
   }
 
@@ -73,24 +97,27 @@ final class ShareViewController: UIViewController {
   }
 
   private func deliver(url: String, note: SharedShareNote, ownerUserId: String) {
-    // Durable persistence BEFORE any confirmation (spec).
+    let shareId = UUID().uuidString.lowercased()
     let item = SharedInboxItem(
-      shareId: UUID().uuidString.lowercased(),
+      shareId: shareId,
       url: url,
       createdAt: ISO8601DateFormatter().string(from: Date()),
       noteId: note.noteId,
       ownerUserId: ownerUserId,
     )
     store.writeInboxItem(item)
-    store.savePending(text: url, noteId: note.noteId, ownerUserId: ownerUserId)
+    store.savePending(text: url, noteId: note.noteId, ownerUserId: ownerUserId, shareId: shareId)
     attemptImmediateDelivery(item)
-    extensionContext?.completeRequest(returningItems: nil)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+      self?.extensionContext?.completeRequest(returningItems: nil)
+    }
   }
 
   /// Best-effort upload while the extension still has runtime. On failure the
   /// inbox item stays queued for the main app's background uploader.
   private func attemptImmediateDelivery(_ item: SharedInboxItem) {
     guard let credentials = store.sessionCredentials(),
+          !credentials.accessToken.isEmpty,
           var request = ShareAPIClient.makeRequest(
             baseURL: credentials.apiBaseUrl,
             accessToken: credentials.accessToken,
@@ -103,8 +130,9 @@ final class ShareViewController: UIViewController {
       switch ShareAPIClient.classify(status: status) {
       case .confirmed, .droppedTerminal:
         store?.clearInboxItem()
+        store?.clearPending()
       case .retryLater, .waitForFreshCredentials:
-        break // inbox item kept; main app retries with fresh credentials
+        break // inbox item and pending share kept; main app retries with fresh credentials
       }
     }
     ProcessInfo.processInfo.performExpiringActivity(

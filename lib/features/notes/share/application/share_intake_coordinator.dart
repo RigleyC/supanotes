@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
@@ -91,21 +92,28 @@ class ShareIntakeCoordinator {
     final access = await tokens.getAccessToken();
     final refresh = await tokens.getRefreshToken();
     if (access == null || refresh == null) return;
-    if (_publishedForUserId == user.id && _publishedAccessToken == access) return;
-    _publishedForUserId = user.id;
-    _publishedAccessToken = access;
-    try {
-      await bridge.publishSessionCredentials(
-        ownerUserId: user.id,
-        accessToken: access,
-        refreshToken: refresh,
-        apiBaseUrl: ApiConstants.baseUrl,
-      );
-      // Fresh credentials make previously-queued durable deliveries viable.
-      unawaited(bridge.retryPendingShares());
-    } catch (error) {
-      debugPrint('Error publishing native share session: $error');
+    if (_publishedForUserId != user.id || _publishedAccessToken != access) {
+      _publishedForUserId = user.id;
+      _publishedAccessToken = access;
+      try {
+        await bridge.publishSessionCredentials(
+          ownerUserId: user.id,
+          accessToken: access,
+          refreshToken: refresh,
+          apiBaseUrl: ApiConstants.baseUrl,
+        );
+        // Fresh credentials make previously-queued durable deliveries viable.
+        unawaited(bridge.retryPendingShares());
+      } catch (error) {
+        debugPrint('Error publishing native share session: $error');
+      }
     }
+    try {
+      final currentNotes = _ref.read(activeNotesProvider).asData?.value;
+      if (currentNotes != null && currentNotes.isNotEmpty) {
+        await publishNotesIndex(currentNotes);
+      }
+    } catch (_) {}
   }
 
   /// Reads and delivers at most one pending shared link. Concurrent calls
@@ -157,11 +165,22 @@ class ShareIntakeCoordinator {
     note ??= await pickNote(notes.where((n) => !n.isReadOnly).toList());
     if (note == null) return const PendingShareDismissed();
 
-    // On failure the pending share stays queued so the next trigger retries
-    // delivery; the error propagates to the caller for surfacing.
-    await _ref
-        .read(sharedLinkDeliveryProvider)
-        .appendToNote(noteId: note.id, url: url, shareId: pending.shareId);
+    final shareId = pending.shareId.isNotEmpty
+        ? pending.shareId
+        : const Uuid().v4();
+
+    try {
+      await _ref
+          .read(sharedLinkDeliveryProvider)
+          .appendToNote(noteId: note.id, url: url, shareId: shareId);
+    } catch (_) {
+      // If delivery failed (e.g. shareId was already reserved for a different note), retry with a fresh UUID
+      final freshShareId = const Uuid().v4();
+      await _ref
+          .read(sharedLinkDeliveryProvider)
+          .appendToNote(noteId: note.id, url: url, shareId: freshShareId);
+    }
+
     await bridge.clearPendingShare();
     return PendingShareDelivered(note);
   }

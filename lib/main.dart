@@ -88,6 +88,10 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
       unawaited(coordinator.onAuthStateChanged(
         ref.read(authControllerProvider).asData?.value,
       ));
+      final notes = ref.read(activeNotesProvider).asData?.value;
+      if (notes != null && notes.isNotEmpty) {
+        unawaited(coordinator.publishNotesIndex(notes));
+      }
       unawaited(_processPendingShare());
     });
   }
@@ -101,6 +105,11 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      final coordinator = ref.read(shareIntakeCoordinatorProvider);
+      final notes = ref.read(activeNotesProvider).asData?.value;
+      if (notes != null && notes.isNotEmpty) {
+        unawaited(coordinator.publishNotesIndex(notes));
+      }
       unawaited(_processPendingShare());
     }
   }

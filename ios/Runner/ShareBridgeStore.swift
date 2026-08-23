@@ -23,6 +23,7 @@ final class ShareBridgeStore {
     guard let value else { return }
     if let data = try? JSONSerialization.data(withJSONObject: value) {
       defaults.set(data, forKey: "notes_index")
+      defaults.synchronize()
     }
   }
 
@@ -38,6 +39,7 @@ final class ShareBridgeStore {
   func saveSession(_ value: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: value) else { return }
     defaults.set(data, forKey: "session_credentials")
+    defaults.synchronize()
     SecItemDelete(baseKeychainQuery as CFDictionary)
     var query = baseKeychainQuery
     query[kSecValueData as String] = data
@@ -83,6 +85,7 @@ final class ShareBridgeStore {
   func writeInboxItem(_ item: SharedInboxItem) {
     guard let data = try? JSONEncoder().encode(item) else { return }
     defaults.set(data, forKey: Self.inboxKey)
+    defaults.synchronize()
   }
 
   func readInboxItem() -> SharedInboxItem? {
@@ -92,16 +95,19 @@ final class ShareBridgeStore {
 
   func clearInboxItem() {
     defaults.removeObject(forKey: Self.inboxKey)
+    defaults.synchronize()
   }
 
   // MARK: - Pending share (Flutter fallback path)
 
-  func savePendingShare(text: String, noteId: String, ownerUserId: String? = nil) {
+  func savePendingShare(text: String, noteId: String, ownerUserId: String? = nil, shareId: String? = nil) {
     defaults.set(text, forKey: "pending_shared_text")
     defaults.set(noteId, forKey: "pending_shared_note_id")
+    defaults.set(shareId ?? UUID().uuidString.lowercased(), forKey: "pending_shared_id")
     if let ownerUserId {
       defaults.set(ownerUserId, forKey: "pending_shared_owner_user_id")
     }
+    defaults.synchronize()
   }
 
   func clear() {
@@ -112,13 +118,15 @@ final class ShareBridgeStore {
     defaults.removeObject(forKey: "pending_shared_id")
     defaults.removeObject(forKey: "session_credentials")
     defaults.removeObject(forKey: Self.inboxKey)
+    defaults.synchronize()
     SecItemDelete(baseKeychainQuery as CFDictionary)
   }
 
   func readPendingShare() -> [String: String]? {
-    guard let text = defaults.string(forKey: "pending_shared_text") else { return nil }
+    guard let text = defaults.string(forKey: "pending_shared_text"), !text.isEmpty else { return nil }
     let shareId = defaults.string(forKey: "pending_shared_id") ?? UUID().uuidString.lowercased()
     defaults.set(shareId, forKey: "pending_shared_id")
+    defaults.synchronize()
     var result = [
       "text": text,
       "noteId": defaults.string(forKey: "pending_shared_note_id") ?? "",
@@ -135,5 +143,6 @@ final class ShareBridgeStore {
     defaults.removeObject(forKey: "pending_shared_note_id")
     defaults.removeObject(forKey: "pending_shared_owner_user_id")
     defaults.removeObject(forKey: "pending_shared_id")
+    defaults.synchronize()
   }
 }

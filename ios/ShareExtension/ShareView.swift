@@ -6,13 +6,21 @@ struct ShareView: View {
   let onSelect: (SharedShareNote) -> Void
 
   @State private var query = ""
+  @State private var selectedNoteId: String?
 
   var body: some View {
     NavigationView {
       Group {
         if notes.isEmpty {
-          Text("Nenhuma nota editável encontrada.")
-            .foregroundColor(.secondary)
+          VStack(spacing: 12) {
+            Image(systemName: "note.text")
+              .font(.system(size: 40))
+              .foregroundColor(.secondary)
+            Text("Nenhuma nota encontrada.")
+              .font(.headline)
+              .foregroundColor(.secondary)
+          }
+          .padding()
         } else {
           list
         }
@@ -27,24 +35,54 @@ struct ShareView: View {
         }
       }
     }
+    .navigationViewStyle(.stack)
+  }
+
+  private var filteredNotes: [SharedShareNote] {
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+      return notes
+    }
+    return notes.filter { note in
+      note.displayTitle.localizedCaseInsensitiveContains(trimmed) ||
+      note.displayPreview.localizedCaseInsensitiveContains(trimmed)
+    }
   }
 
   private var list: some View {
     List {
-      TextField("Buscar nota", text: $query)
-      ForEach(
-        notes.filter {
-          query.isEmpty || $0.title.localizedCaseInsensitiveContains(query)
-        },
-        id: \.noteId,
-      ) { note in
-        Button {
-          onSelect(note)
-        } label: {
-          VStack(alignment: .leading) {
-            Text(note.title.isEmpty ? "Sem título" : note.title)
-            Text(note.preview).lineLimit(2).font(.caption).foregroundColor(.secondary)
+      Section {
+        TextField("Buscar nota...", text: $query)
+      }
+
+      Section {
+        ForEach(filteredNotes, id: \.noteId) { note in
+          Button {
+            selectedNoteId = note.noteId
+            onSelect(note)
+          } label: {
+            HStack {
+              VStack(alignment: .leading, spacing: 4) {
+                Text(note.displayTitle)
+                  .font(.body)
+                  .fontWeight(.medium)
+                  .foregroundColor(.primary)
+                if !note.displayPreview.isEmpty {
+                  Text(note.displayPreview)
+                    .lineLimit(2)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+              }
+              Spacer()
+              if selectedNoteId == note.noteId {
+                Image(systemName: "checkmark.circle.fill")
+                  .foregroundColor(.accentColor)
+              }
+            }
+            .contentShape(Rectangle())
           }
+          .buttonStyle(.plain)
         }
       }
     }
@@ -66,6 +104,8 @@ struct ShareResultView: View {
           .buttonStyle(.borderedProminent)
       }
       .navigationTitle("SupaNotes")
+      .navigationBarTitleDisplayMode(.inline)
     }
+    .navigationViewStyle(.stack)
   }
 }
