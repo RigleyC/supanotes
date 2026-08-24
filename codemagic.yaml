@@ -78,11 +78,37 @@ workflows:
             build
       - name: Package Unsigned IPA
         script: |
+          set -eu
           APP_PATH=$(find DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
             echo "Error: Could not find .app"
             exit 1
           fi
+
+          # Impactor provisions capabilities from entitlements embedded in the
+          # executable. CODE_SIGNING_ALLOWED=NO leaves no entitlement blob, so
+          # add a replaceable ad-hoc signature before packaging the IPA.
+          EXTENSION_PATH="$APP_PATH/PlugIns/ShareExtension.appex"
+          if [ ! -d "$EXTENSION_PATH" ]; then
+            echo "Error: Could not find ShareExtension.appex"
+            exit 1
+          fi
+          codesign --force --sign - \
+            --entitlements ios/ImpactorBootstrap.entitlements \
+            "$EXTENSION_PATH"
+          codesign --force --sign - \
+            --entitlements ios/ImpactorBootstrap.entitlements \
+            "$APP_PATH"
+
+          for BUNDLE_PATH in "$APP_PATH" "$EXTENSION_PATH"; do
+            ENTITLEMENTS=$(codesign --display --entitlements :- "$BUNDLE_PATH" 2>/dev/null)
+            APP_GROUP=$(printf '%s' "$ENTITLEMENTS" | plutil -extract com.apple.security.application-groups.0 raw -o - -)
+            if [ "$APP_GROUP" != "group.com.supanotes.shared" ]; then
+              echo "Error: $BUNDLE_PATH does not embed the shared App Group"
+              exit 1
+            fi
+          done
+
           mkdir -p build/Payload
           cp -R "$APP_PATH" build/Payload/
           cd build
