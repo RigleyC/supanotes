@@ -102,8 +102,7 @@ workflows:
 
           for BUNDLE_PATH in "$APP_PATH" "$EXTENSION_PATH"; do
             ENTITLEMENTS=$(codesign --display --entitlements :- "$BUNDLE_PATH" 2>/dev/null)
-            APP_GROUP=$(printf '%s' "$ENTITLEMENTS" | plutil -extract com.apple.security.application-groups.0 raw -o - -)
-            if [ "$APP_GROUP" != "group.com.supanotes.shared" ]; then
+            if ! printf '%s' "$ENTITLEMENTS" | grep -Fq '<string>group.com.supanotes.shared</string>'; then
               echo "Error: $BUNDLE_PATH does not embed the shared App Group"
               exit 1
             fi
