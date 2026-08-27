@@ -224,4 +224,41 @@ void main() {
       expect(json['clientId'], 'client-1');
     });
   });
+
+  test('sends and parses a complete preference row', () async {
+    final response = MockResponse<Map<String, dynamic>>();
+    when(() => response.data).thenReturn({
+      'favorite': true,
+      'archived': false,
+      'hide_completed': true,
+      'collapse_images': false,
+      'updated_at': '2026-07-20T12:00:00Z',
+    });
+    when(
+      () => apiClient.patch<Map<String, dynamic>>(
+        '/notes/note-1/preferences',
+        data: {
+          'favorite': true,
+          'archived': false,
+          'hide_completed': true,
+          'collapse_images': false,
+        },
+        queryParameters: any(named: 'queryParameters'),
+        options: any(named: 'options'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => response);
+
+    final result = await noteApi.updatePreferences(
+      noteId: 'note-1',
+      favorite: true,
+      archived: false,
+      hideCompleted: true,
+      collapseImages: false,
+    );
+
+    expect(result.favorite, isTrue);
+    expect(result.hideCompleted, isTrue);
+    expect(result.updatedAt, DateTime.utc(2026, 7, 20, 12));
+  });
 }

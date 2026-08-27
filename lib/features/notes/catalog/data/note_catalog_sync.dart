@@ -94,6 +94,34 @@ class NoteCatalogSync {
     }
   }
 
+  Future<void> pushDirtyPreferences() async {
+    final dirty = await _database.userNotePreferencesDao.getDirtyPreferences();
+    for (final preference in dirty) {
+      await _remoteNoteQueue.run(
+        preference.noteId,
+        () async {
+          final pushedAt = preference.updatedAt;
+          final response = await _syncClient.updatePreferences(
+            noteId: preference.noteId,
+            favorite: preference.favorite,
+            archived: preference.archived,
+            hideCompleted: preference.hideCompleted,
+            collapseImages: preference.collapseImages,
+          );
+          await _database.userNotePreferencesDao.clearDirtyFlag(
+            preference.userId,
+            preference.noteId,
+            pushedAt,
+          );
+          dev.log(
+            '[NoteCatalogSync] Pushed preferences ${preference.noteId} '
+            '(remote ${response.updatedAt.toIso8601String()})',
+          );
+        },
+      );
+    }
+  }
+
   Future<void> _pushDirtyNoteIcon(String noteId) async {
     for (var attempt = 0; attempt < 3; attempt++) {
       final outcome = await _tryPushDirtyNoteIcon(noteId);
@@ -304,6 +332,7 @@ class NoteCatalogSync {
             result.fetchedRevision != null &&
             current.localDocument!.revision >= result.fetchedRevision!) {
           await _updateRemoteMetadata(
+            userId: userId,
             catalog: metadata,
             shouldReadRemoteIcon: current.shouldReadRemoteIcon,
           );
@@ -331,6 +360,7 @@ class NoteCatalogSync {
 
     if (_activityTracker.isActive(catalog.id)) {
       await _updateRemoteMetadata(
+        userId: userId,
         catalog: catalog,
         shouldReadRemoteIcon: local.shouldReadRemoteIcon,
       );
@@ -344,6 +374,7 @@ class NoteCatalogSync {
                 local.localDocument != null &&
                 !catalog.updatedAt.isAfter(local.existing!.updatedAt)))) {
       await _updateRemoteMetadata(
+        userId: userId,
         catalog: catalog,
         shouldReadRemoteIcon: local.shouldReadRemoteIcon,
       );
@@ -373,6 +404,7 @@ class NoteCatalogSync {
   }
 
   Future<void> _updateRemoteMetadata({
+    required String userId,
     required RemoteNoteMetadata catalog,
     required bool shouldReadRemoteIcon,
   }) async {
@@ -382,6 +414,15 @@ class NoteCatalogSync {
       sharedByEmail: _sharedByEmailValueFor(catalog),
       sharedByName: _sharedByNameValueFor(catalog),
       noteIconJson: _noteIconValue(catalog, apply: shouldReadRemoteIcon),
+    );
+    await _database.userNotePreferencesDao.applyRemotePreference(
+      userId: userId,
+      noteId: catalog.id,
+      favorite: catalog.favorite,
+      archived: catalog.archived,
+      hideCompleted: catalog.hideCompleted,
+      collapseImages: catalog.collapseImages,
+      remoteUpdatedAt: catalog.updatedAt,
     );
   }
 
@@ -480,6 +521,15 @@ class NoteCatalogSync {
         fetchedRevision: documentResponse.revision,
       );
     }
+    await _database.userNotePreferencesDao.applyRemotePreference(
+      userId: userId,
+      noteId: catalog.id,
+      favorite: catalog.favorite,
+      archived: catalog.archived,
+      hideCompleted: catalog.hideCompleted,
+      collapseImages: catalog.collapseImages,
+      remoteUpdatedAt: catalog.updatedAt,
+    );
     dev.log('[NoteCatalogSync] Hydrated $id from remote snapshot');
     return const _RemoteNoteWriteResult(_RemoteNoteWriteOutcome.applied);
   }
@@ -495,6 +545,7 @@ class NoteCatalogSync {
       );
     }
     await _updateRemoteMetadata(
+      userId: userId,
       catalog: metadata,
       shouldReadRemoteIcon: local.shouldReadRemoteIcon,
     );
@@ -545,6 +596,7 @@ final StreamProvider<void> noteCatalogSyncProvider = StreamProvider.autoDispose<
   while (true) {
     try {
       await sync.pushDeletedNotes();
+      await sync.pushDirtyPreferences();
       await sync.pullRemoteNotes(user.id);
       await sync.pushDirtyNoteIcons();
       yield null;

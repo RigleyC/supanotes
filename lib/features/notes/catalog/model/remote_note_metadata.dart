@@ -14,6 +14,9 @@ final class RemoteNoteMetadata {
     required this.id,
     required this.createdAt,
     required this.updatedAt,
+    this.favorite = false,
+    this.archived = false,
+    this.hideCompleted = false,
     required this.collapseImages,
     required this.access,
     required this.sharedByEmail,
@@ -27,6 +30,9 @@ final class RemoteNoteMetadata {
       id: id,
       createdAt: _requiredDateTime(json, 'created_at'),
       updatedAt: _requiredDateTime(json, 'updated_at'),
+      favorite: _optionalBool(json, 'favorite') ?? false,
+      archived: _optionalBool(json, 'archived') ?? false,
+      hideCompleted: _optionalBool(json, 'hide_completed') ?? false,
       collapseImages: _optionalBool(json, 'collapse_images') ?? false,
       access: _parseAccess(_optionalString(json, 'permission')),
       sharedByEmail: _optionalString(json, 'shared_by_email'),
@@ -38,6 +44,9 @@ final class RemoteNoteMetadata {
   final String id;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool favorite;
+  final bool archived;
+  final bool hideCompleted;
   final bool collapseImages;
   final RemoteNoteAccess access;
   final String? sharedByEmail;

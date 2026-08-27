@@ -199,6 +199,32 @@ class NoteOperationsException implements Exception {
   String toString() => 'NoteOperationsException($errorCode): $message';
 }
 
+class NotePreferencesResponse {
+  const NotePreferencesResponse({
+    required this.favorite,
+    required this.archived,
+    required this.hideCompleted,
+    required this.collapseImages,
+    required this.updatedAt,
+  });
+
+  factory NotePreferencesResponse.fromJson(Map<String, dynamic> json) {
+    return NotePreferencesResponse(
+      favorite: json['favorite'] as bool,
+      archived: json['archived'] as bool,
+      hideCompleted: json['hide_completed'] as bool,
+      collapseImages: json['collapse_images'] as bool,
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+    );
+  }
+
+  final bool favorite;
+  final bool archived;
+  final bool hideCompleted;
+  final bool collapseImages;
+  final DateTime updatedAt;
+}
+
 class NoteSyncClient {
 
   NoteSyncClient({required ApiClient client}) : _client = client;
@@ -249,6 +275,29 @@ class NoteSyncClient {
   Future<void> deleteNote(String noteId) async {
     try {
       await _client.delete<void>('/notes/$noteId');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<NotePreferencesResponse> updatePreferences({
+    required String noteId,
+    required bool favorite,
+    required bool archived,
+    required bool hideCompleted,
+    required bool collapseImages,
+  }) async {
+    try {
+      final response = await _client.patch<Map<String, dynamic>>(
+        '/notes/$noteId/preferences',
+        data: {
+          'favorite': favorite,
+          'archived': archived,
+          'hide_completed': hideCompleted,
+          'collapse_images': collapseImages,
+        },
+      );
+      return NotePreferencesResponse.fromJson(response.data!);
     } on DioException catch (e) {
       throw _mapError(e);
     }

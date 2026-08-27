@@ -763,6 +763,17 @@ class CharacterizationNoteSyncClient implements NoteSyncClient {
   }
 
   @override
+  Future<NotePreferencesResponse> updatePreferences({
+    required String noteId,
+    required bool favorite,
+    required bool archived,
+    required bool hideCompleted,
+    required bool collapseImages,
+  }) {
+    throw UnimplementedError('updatePreferences is not used by these tests');
+  }
+
+  @override
   Future<OperationsListResponse> getOperationsSince(
     String noteId,
     int afterRevision,
@@ -912,6 +923,17 @@ class SharedBackendNoteSyncClient implements NoteSyncClient {
   @override
   Future<void> deleteNote(String noteId) {
     throw UnimplementedError('deleteNote is not used by these tests');
+  }
+
+  @override
+  Future<NotePreferencesResponse> updatePreferences({
+    required String noteId,
+    required bool favorite,
+    required bool archived,
+    required bool hideCompleted,
+    required bool collapseImages,
+  }) {
+    throw UnimplementedError('updatePreferences is not used by these tests');
   }
 
   @override

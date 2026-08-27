@@ -1317,4 +1317,115 @@ void main() {
     expect(note.sharedByEmail, isNull);
     verifyNever(() => client.getDocument('owner-metadata-refresh-note'));
   });
+
+  test('pushes the complete dirty preference row and clears its matching version', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+    final timestamp = DateTime.utc(2026, 8, 10, 12);
+    await database.notesDao.createNote(
+      NotesCompanion.insert(
+        id: 'preference-note',
+        userId: 'owner-user',
+        content: 'content',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      ),
+    );
+    await database.userNotePreferencesDao.setPreferences(
+      userId: 'owner-user',
+      noteId: 'preference-note',
+      favorite: true,
+      archived: false,
+      hideCompleted: true,
+      collapseImages: true,
+    );
+    when(
+      () => client.updatePreferences(
+        noteId: 'preference-note',
+        favorite: true,
+        archived: false,
+        hideCompleted: true,
+        collapseImages: true,
+      ),
+    ).thenAnswer(
+      (_) async => NotePreferencesResponse(
+        favorite: true,
+        archived: false,
+        hideCompleted: true,
+        collapseImages: true,
+        updatedAt: timestamp,
+      ),
+    );
+
+    await sync.pushDirtyPreferences();
+
+    verify(
+      () => client.updatePreferences(
+        noteId: 'preference-note',
+        favorite: true,
+        archived: false,
+        hideCompleted: true,
+        collapseImages: true,
+      ),
+    ).called(1);
+    expect(
+      (await database.userNotePreferencesDao.getPreference(
+        'owner-user',
+        'preference-note',
+      ))!.isDirty,
+      isFalse,
+    );
+  });
+
+  test('keeps dirty preferences when the remote push fails', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+    await database.notesDao.createNote(
+      NotesCompanion.insert(
+        id: 'failed-preference-note',
+        userId: 'owner-user',
+        content: 'content',
+        createdAt: DateTime.utc(2026, 8, 10),
+        updatedAt: DateTime.utc(2026, 8, 10),
+      ),
+    );
+    await database.userNotePreferencesDao.setFavorite(
+      'owner-user',
+      'failed-preference-note',
+      true,
+    );
+    when(
+      () => client.updatePreferences(
+        noteId: 'failed-preference-note',
+        favorite: true,
+        archived: false,
+        hideCompleted: false,
+        collapseImages: false,
+      ),
+    ).thenThrow(StateError('offline'));
+
+    expect(sync.pushDirtyPreferences, throwsStateError);
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      (await database.userNotePreferencesDao.getPreference(
+        'owner-user',
+        'failed-preference-note',
+      ))!.isDirty,
+      isTrue,
+    );
+  });
 }
