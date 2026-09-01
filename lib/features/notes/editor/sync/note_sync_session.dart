@@ -9,7 +9,6 @@ import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:super_editor/super_editor.dart';
 
 class NoteSyncSession implements NoteEditorSyncHandle {
-
   NoteSyncSession({
     required this.noteId,
     required this.syncService,
@@ -17,6 +16,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     required Editor editor,
     this.userId = '',
     bool captureLocalOperations = true,
+    this.networkCoalescingWindow = const Duration(milliseconds: 350),
     this.onTransientError,
     this.onProtocolError,
   }) : adapter = NoteOperationAdapter(
@@ -27,16 +27,19 @@ class NoteSyncSession implements NoteEditorSyncHandle {
          captureLocalOperations: captureLocalOperations,
        ),
        _captureLocalOperations = captureLocalOperations;
+
   final String noteId;
   final NoteOperationsSyncService syncService;
   final NoteOperationAdapter adapter;
   final MutableDocument document;
   final String userId;
+  final Duration networkCoalescingWindow;
   bool _captureLocalOperations;
   final void Function(Object error)? onTransientError;
   final void Function(Object error)? onProtocolError;
 
   Timer? _pollTimer;
+  Timer? _networkSyncTimer;
   bool _isClosing = false;
   bool _isPolling = false;
   bool _disposed = false;
@@ -97,6 +100,9 @@ class NoteSyncSession implements NoteEditorSyncHandle {
       return;
     }
     _captureLocalOperations = captureLocalOperations;
+    if (!captureLocalOperations) {
+      _cancelScheduledNetworkSync();
+    }
     adapter.setCaptureLocalOperations(captureLocalOperations);
     _captureController.add(captureLocalOperations);
   }
@@ -113,6 +119,8 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         _setStatus(NoteSessionStatus.ready);
       }
 
+      // Startup keeps its eager retry semantics so a reopened note can clear
+      // durable work immediately instead of waiting for the edit debounce.
       if (_captureLocalOperations) {
         unawaited(_onLocalOps());
       }
@@ -125,7 +133,21 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   void _handleLocalOperations(List<OperationRequest> _) {
     if (_isClosing || _disposed || !_captureLocalOperations) return;
-    unawaited(_onLocalOps());
+    _scheduleNetworkSync();
+  }
+
+  void _scheduleNetworkSync() {
+    if (_isClosing || _disposed || !_captureLocalOperations) return;
+    _networkSyncTimer?.cancel();
+    _networkSyncTimer = Timer(networkCoalescingWindow, () {
+      _networkSyncTimer = null;
+      unawaited(_onLocalOps());
+    });
+  }
+
+  void _cancelScheduledNetworkSync() {
+    _networkSyncTimer?.cancel();
+    _networkSyncTimer = null;
   }
 
   Future<void> _onLocalOps() async {
@@ -154,6 +176,9 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     if (_isClosing || _disposed || _protocolFailed || _isPolling) return;
     _isPolling = true;
     try {
+      // Polling is already an explicit network opportunity. Consume a pending
+      // debounce so it cannot fire again immediately after this pass.
+      _cancelScheduledNetworkSync();
       await _runSyncOperation('pollNow', () async {
         if (_captureLocalOperations) {
           await _syncPending();
@@ -235,9 +260,15 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   @override
   Future<void> flushNow() async {
     if (_disposed) return;
+    _cancelScheduledNetworkSync();
     await adapter.flushNow();
-    if (_captureLocalOperations) {
-      await _onLocalOps();
+    // adapter.flushNow() may have emitted a freshly durable batch and thereby
+    // scheduled the normal debounce. An explicit flush supersedes that timer.
+    _cancelScheduledNetworkSync();
+    if (_captureLocalOperations && !_isClosing) {
+      // Local SQLite durability is the contract of flushNow. Remote ack is
+      // intentionally outside the critical path; the session/outbox retries.
+      unawaited(_onLocalOps());
     }
   }
 
@@ -248,6 +279,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     _setStatus(NoteSessionStatus.closing);
     final restartPollingOnFailure = _pollTimer != null;
     _pollTimer?.cancel();
+    _cancelScheduledNetworkSync();
     adapter.setCaptureLocalOperations(false);
     adapter.onLocalOperations = null;
     try {
@@ -258,7 +290,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
       // slow or unavailable. Closing must not discard an in-memory edit.
       await adapter.flushNow();
       // The outbox is durable now. Do not wait for the network queue during
-      // teardown; the next session or catalog sync will retry it.
+      // teardown; the app-scoped outbox worker will retry it.
     } catch (error, stackTrace) {
       // The adapter still owns any operation that failed to reach the
       // durable outbox. Keep the session usable so the caller can retry the
@@ -300,6 +332,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
       }
       _protocolFailed = true;
       _pollTimer?.cancel();
+      _cancelScheduledNetworkSync();
       _setStatus(NoteSessionStatus.error);
       onProtocolError?.call(error);
     } else {
