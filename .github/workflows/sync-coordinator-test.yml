@@ -1,0 +1,40 @@
+name: Sync Coordinator Regression
+
+on:
+  push:
+    branches: [feat/sync-coordinator-outbox-inbox]
+    paths:
+      - lib/**
+      - test/**
+      - pubspec.yaml
+      - pubspec.lock
+      - .github/workflows/sync-coordinator-test.yml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Sync regression tests
+        run: >-
+          flutter test
+          test/core/sync
+          test/features/notes/editor/sync
+          test/features/notes/editor/offline_persistence_e2e_test.dart
+          test/core/database/daos/note_operations_dao_test.dart
+
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos
