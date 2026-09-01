@@ -105,6 +105,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      ref.read(noteOutboxWorkerProvider)?.wake();
       final coordinator = ref.read(shareIntakeCoordinatorProvider);
       final notes = ref.read(activeNotesProvider).asData?.value;
       if (notes != null && notes.isNotEmpty) {
@@ -143,6 +144,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(noteOutboxRuntimeProvider);
     ref.listen(taskNotificationSchedulerProvider, (_, _) {});
     ref.listen(authControllerProvider, (_, next) {
       // Ignore loading/error transitions: only settled sessions drive the
