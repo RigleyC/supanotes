@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
+import 'package:supanotes/features/notes/editor/document/empty_task_deletion_policy.dart';
 import 'package:supanotes/features/notes/editor/document/hidden_task_editing_guard.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
 import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart'
@@ -244,7 +245,10 @@ class NoteEditorController extends ChangeNotifier {
       document: document,
       composer: composer,
     );
-    editor.requestHandlers.insert(0, _hiddenTaskEditingGuard.handle);
+    editor.requestHandlers.insertAll(0, [
+      _hiddenTaskEditingGuard.handle,
+      handleEmptyTaskDeletion,
+    ]);
     editor.reactionPipeline.removeWhere(
       (r) => r is HorizontalRuleConversionReaction,
     );
