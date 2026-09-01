@@ -9,6 +9,7 @@ library;
 
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart' show Dio;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -19,9 +20,11 @@ import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
 import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
+import 'package:supanotes/core/database/daos/note_operations_pending_query.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
+import 'package:supanotes/core/sync/note_outbox_worker.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
@@ -155,6 +158,72 @@ final noteOperationsSyncServiceProvider = Provider<NoteOperationsSyncService>((
     clientId: clientId,
     actorId: userId,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Global note outbox worker
+// ---------------------------------------------------------------------------
+
+/// App-scoped worker for durable note operations whose editor is no longer
+/// open. The provider deliberately returns null outside an authenticated
+/// session so none of its actor-scoped dependencies are constructed.
+final noteOutboxWorkerProvider = Provider<NoteOutboxWorker?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null || userId.isEmpty) return null;
+
+  final dao = ref.watch(noteOperationsDaoProvider);
+  final syncService = ref.watch(noteOperationsSyncServiceProvider);
+  final activityTracker = ref.watch(noteSessionActivityTrackerProvider);
+  final worker = NoteOutboxWorker(
+    loadPendingNoteIds: () => dao.getPendingNoteIds(ownerUserId: userId),
+    syncNote: syncService.syncPending,
+    isNoteActive: activityTracker.isActive,
+  );
+
+  ref.onDispose(() {
+    unawaited(worker.dispose());
+  });
+  return worker;
+});
+
+/// Injectable connectivity stream so lifecycle behavior can be tested without
+/// platform channels.
+final noteOutboxConnectivityChangesProvider =
+    Provider<Stream<List<ConnectivityResult>>>((ref) {
+      return Connectivity().onConnectivityChanged;
+    });
+
+/// Periodic safety wake in case a platform connectivity event is missed.
+final noteOutboxSafetyWakeIntervalProvider = Provider<Duration>((ref) {
+  return const Duration(minutes: 5);
+});
+
+/// Keeps connectivity and safety-wake resources alive for the authenticated
+/// app session. Meaningful connectivity/foreground wakes reset retry backoff;
+/// the periodic safety wake respects the existing retry schedule.
+final noteOutboxRuntimeProvider = Provider<bool>((ref) {
+  final worker = ref.watch(noteOutboxWorkerProvider);
+  if (worker == null) return false;
+
+  final connectivitySubscription = ref
+      .watch(noteOutboxConnectivityChangesProvider)
+      .listen((results) {
+        if (results.any((result) => result != ConnectivityResult.none)) {
+          worker.wake();
+        }
+      });
+  final safetyTimer = Timer.periodic(
+    ref.watch(noteOutboxSafetyWakeIntervalProvider),
+    (_) => worker.wake(resetBackoff: false),
+  );
+
+  worker.wake();
+
+  ref.onDispose(() {
+    safetyTimer.cancel();
+    unawaited(connectivitySubscription.cancel());
+  });
+  return true;
 });
 
 // ---------------------------------------------------------------------------
