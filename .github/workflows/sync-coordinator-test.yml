@@ -35,6 +35,7 @@ jobs:
           test/features/notes/editor/sync
           test/features/notes/editor/offline_persistence_e2e_test.dart
           test/core/database/daos/note_operations_dao_test.dart
+          test/core/database/daos/note_operations_pending_ids_test.dart
 
       - name: Flutter analyze
         run: flutter analyze --no-fatal-infos
