@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/core/database/daos/note_operations_pending_query.dart';
 import 'package:supanotes/core/database/database.dart';
 
 void main() {
