@@ -122,10 +122,14 @@ void main() {
   test('flushNow guarantees local durability without waiting for remote ack', () async {
     final database = AppDatabase.test();
     final client = _MockNoteSyncClient();
+    final remoteStarted = Completer<void>();
     final remoteRelease = Completer<SyncResponse>();
     when(
       () => client.syncOperations(any(), any()),
-    ).thenAnswer((_) => remoteRelease.future);
+    ).thenAnswer((_) {
+      if (!remoteStarted.isCompleted) remoteStarted.complete();
+      return remoteRelease.future;
+    });
 
     final syncService = NoteOperationsSyncService(
       syncClient: client,
@@ -171,9 +175,12 @@ void main() {
     );
     expect(pending, hasLength(1));
 
+    await remoteStarted.future.timeout(const Duration(milliseconds: 250));
+    expect(remoteRelease.isCompleted, isFalse);
     final capturedRequest = verify(
       () => client.syncOperations('flush-note', captureAny()),
     ).captured.single as SyncRequest;
+
     remoteRelease.complete(_acceptedResponse(capturedRequest, 'durable'));
     await pumpEventQueue();
 
