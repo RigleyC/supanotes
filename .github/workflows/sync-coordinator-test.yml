@@ -32,6 +32,7 @@ jobs:
         run: >-
           flutter test
           test/core/sync
+          test/core/di/note_outbox_worker_provider_test.dart
           test/features/notes/editor/sync
           test/features/notes/editor/offline_persistence_e2e_test.dart
           test/core/database/daos/note_operations_dao_test.dart
