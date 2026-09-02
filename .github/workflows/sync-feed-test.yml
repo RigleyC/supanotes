@@ -1,0 +1,27 @@
+name: Sync Feed Regression
+
+on:
+  push:
+    branches: [feat/sync-coordinator-outbox-inbox]
+    paths:
+      - backend/**
+      - lib/**
+      - test/**
+      - pubspec.yaml
+      - pubspec.lock
+      - .github/workflows/sync-feed-test.yml
+
+jobs:
+  backend-red-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+          cache-dependency-path: backend/go.sum
+      - run: go test -count=1 ./internal/syncfeed
