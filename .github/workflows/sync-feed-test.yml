@@ -1,4 +1,4 @@
-name: Sync Feed Regression
+name: Sync Full Verification
 
 on:
   push:
@@ -12,9 +12,9 @@ on:
       - .github/workflows/sync-feed-test.yml
 
 jobs:
-  backend:
+  backend-integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -41,7 +41,23 @@ jobs:
           cache-dependency-path: backend/go.sum
       - run: go test -count=1 ./internal/syncfeed ./internal/noteoperations
 
-  flutter-inbox:
+  backend-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+          cache-dependency-path: backend/go.sum
+      - run: go vet ./...
+      - run: go build ./...
+      - run: go test -count=1 -short ./...
+
+  flutter-focused:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -61,3 +77,17 @@ jobs:
           test/core/sync/multi_device_sync_e2e_test.dart
           test/features/notes/catalog/data/remote_note_change_applier_test.dart
           test/features/notes/catalog/data/note_catalog_sync_provider_test.dart
+
+  flutter-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
