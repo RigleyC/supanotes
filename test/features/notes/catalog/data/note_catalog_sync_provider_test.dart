@@ -1,14 +1,16 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/sync/note_remote_sync_runtime.dart';
+import 'package:supanotes/core/sync/sync_feed_client.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 class _StubAuthController extends AuthController {
@@ -22,14 +24,33 @@ class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('authenticated catalog provider hydrates a remote note', () async {
+  test('incremental runtime bootstraps a remote note once', () async {
     final database = AppDatabase.test();
     final client = _MockNoteSyncClient();
+    final feedCalls = <int>[];
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
         noteSyncClientProvider.overrideWithValue(client),
         authControllerProvider.overrideWith(_StubAuthController.new),
+        noteOutboxConnectivityChangesProvider.overrideWithValue(
+          const Stream<List<ConnectivityResult>>.empty(),
+        ),
+        syncChangesFetcherProvider.overrideWithValue(({
+          required int after,
+          required int limit,
+        }) async {
+          feedCalls.add(after);
+          return SyncChangePage(
+            cursor: after,
+            watermark: 0,
+            hasMore: false,
+            changes: const [],
+          );
+        }),
+        remoteNoteMetadataLoaderProvider.overrideWithValue((_) async {
+          throw StateError('incremental metadata loader should not run');
+        }),
       ],
     );
     final completed = Completer<void>();
@@ -59,8 +80,8 @@ void main() {
       ),
     );
 
-    final subscription = container.listen(noteCatalogSyncProvider, (_, next) {
-      if (next.hasError) {
+    final subscription = container.listen(noteRemoteSyncRuntimeProvider, (_, next) {
+      if (next.hasError && !completed.isCompleted) {
         completed.completeError(
           next.error!,
           next.stackTrace ?? StackTrace.current,
@@ -77,6 +98,7 @@ void main() {
     expect(note, isNotNull);
     expect(note!.userId, 'user-1');
     expect(note.hasRemoteCopy, isTrue);
+    expect(feedCalls, [0, 0]);
     verify(client.listNotes).called(1);
     verify(() => client.getDocument('remote-note')).called(1);
   });
