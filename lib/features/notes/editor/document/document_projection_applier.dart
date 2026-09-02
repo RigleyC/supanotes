@@ -2,13 +2,13 @@ import 'dart:convert';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
+import 'package:supanotes/features/notes/editor/document/effective_document_projector.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 import 'package:super_editor/super_editor.dart';
 
 class DocumentProjectionApplier {
-
   DocumentProjectionApplier({
     required MutableDocument document,
     required Editor editor,
@@ -19,6 +19,8 @@ class DocumentProjectionApplier {
   final MutableDocument _document;
   final Editor _editor;
   final NoteDocumentCodec _codec;
+  late final EffectiveDocumentProjector _effectiveProjector =
+      EffectiveDocumentProjector(codec: _codec);
 
   Future<void> rebuildFromSnapshot({
     required Map<String, dynamic> snapshot,
@@ -42,10 +44,11 @@ class DocumentProjectionApplier {
       },
     );
 
-    if (!repairPersistedSnapshot && _matchesCurrentEffectiveDoc(
-      snapshot: snapshot,
-      pendingOps: pendingOps,
-    )) {
+    if (!repairPersistedSnapshot &&
+        _matchesCurrentEffectiveDoc(
+          snapshot: snapshot,
+          pendingOps: pendingOps,
+        )) {
       NoteSyncDebug.log(
         'projection.rebuild.skip_effective_doc',
         fields: {
@@ -315,208 +318,12 @@ class DocumentProjectionApplier {
     required Map<String, dynamic> snapshot,
     required List<PendingNoteOperationData>? pendingOps,
   }) {
-    final projected = _projectEffectiveBlocks(snapshot, pendingOps);
+    final projected = _effectiveProjector.projectBlocks(
+      snapshot: snapshot,
+      pendingOps: pendingOps,
+    );
     final current = _codec.encodeDocument(_document);
     return _sameBlockList(projected, current);
-  }
-
-  List<Map<String, dynamic>> _projectEffectiveBlocks(
-    Map<String, dynamic> snapshot,
-    List<PendingNoteOperationData>? pendingOps,
-  ) {
-    final nodes = <DocumentNode>[];
-    final blocks = snapshot['blocks'] as List<dynamic>? ?? [];
-    if (blocks.isEmpty) {
-      nodes.add(
-        ParagraphNode(id: initialNoteBlockId, text: AttributedText()),
-      );
-    } else {
-      final insertedNodeIds = <String>{};
-      for (final block in blocks) {
-        final b = block as Map<String, dynamic>;
-        final node = _codec.decodeNode(b);
-        if (!insertedNodeIds.add(node.id)) continue;
-        nodes.add(node);
-      }
-    }
-
-    if (pendingOps != null) {
-      for (final op in pendingOps) {
-        final payload = jsonDecode(op.payloadJson) as Map<String, dynamic>;
-        _applyProjectedPayload(
-          nodes,
-          kind: op.kind,
-          blockId: op.blockId,
-          payload: payload,
-        );
-      }
-    }
-
-    return nodes.map(_codec.encodeNode).toList(growable: false);
-  }
-
-  void _applyProjectedPayload(
-    List<DocumentNode> nodes, {
-    required String kind,
-    required String? blockId,
-    required Map<String, dynamic> payload,
-  }) {
-    switch (kind) {
-      case NoteOperationWireNames.textDelta:
-        _projectTextDelta(nodes, blockId, payload);
-      case NoteOperationWireNames.createBlock:
-        _projectCreateBlock(nodes, payload);
-      case NoteOperationWireNames.deleteBlock:
-        _projectDeleteBlock(nodes, blockId);
-      case NoteOperationWireNames.moveBlock:
-        _projectMoveBlock(nodes, blockId, payload);
-      case NoteOperationWireNames.setBlockType:
-        _projectSetBlockType(nodes, blockId, payload);
-      case NoteOperationWireNames.setBlockMetadata:
-        _projectSetBlockMetadata(nodes, blockId, payload);
-      case NoteOperationWireNames.completeTaskOccurrence:
-        _projectCompleteTaskOccurrence(nodes, blockId, payload);
-    }
-  }
-
-  void _projectTextDelta(
-    List<DocumentNode> nodes,
-    String? blockId,
-    Map<String, dynamic> payload,
-  ) {
-    if (blockId == null) return;
-    final index = nodes.indexWhere((node) => node.id == blockId);
-    if (index < 0) return;
-    final node = nodes[index];
-    if (node is! TextNode) return;
-
-    final rawOps = payload['ops'] as List<dynamic>?;
-    if (rawOps == null) return;
-    final ops = rawOps.cast<Map<String, dynamic>>();
-    final newText = _codec.applyDeltaToText(node.text, ops);
-    if (newText == null) return;
-
-    nodes[index] = _createNodeWithUpdatedText(node, newText);
-  }
-
-  void _projectCreateBlock(
-    List<DocumentNode> nodes,
-    Map<String, dynamic> payload,
-  ) {
-    final node = _codec.decodeNode(payload);
-    if (nodes.any((existing) => existing.id == node.id)) return;
-
-    final afterBlockId = payload['afterBlockId'] as String?;
-    var insertIndex = nodes.length;
-    if (afterBlockId != null) {
-      final targetIndex = nodes.indexWhere((existing) => existing.id == afterBlockId);
-      if (targetIndex >= 0) {
-        insertIndex = targetIndex + 1;
-      }
-    } else {
-      insertIndex = 0;
-    }
-    nodes.insert(insertIndex.clamp(0, nodes.length), node);
-  }
-
-  void _projectDeleteBlock(List<DocumentNode> nodes, String? blockId) {
-    if (blockId == null) return;
-    final index = nodes.indexWhere((node) => node.id == blockId);
-    if (index >= 0 && nodes.length > 1) {
-      nodes.removeAt(index);
-    }
-  }
-
-  void _projectMoveBlock(
-    List<DocumentNode> nodes,
-    String? blockId,
-    Map<String, dynamic> payload,
-  ) {
-    final moveBlockId = payload['blockId'] as String? ?? blockId;
-    if (moveBlockId == null) return;
-    final sourceIndex = nodes.indexWhere((node) => node.id == moveBlockId);
-    if (sourceIndex < 0 || nodes.length <= 1) return;
-
-    final afterBlockId = payload['afterBlockId'] as String?;
-    if (afterBlockId == moveBlockId) return;
-    var targetIndex = nodes.length - 1;
-    if (afterBlockId == null) {
-      targetIndex = 0;
-    } else {
-      final targetIndexInList = nodes.indexWhere((node) => node.id == afterBlockId);
-      if (targetIndexInList >= 0) {
-        targetIndex = targetIndexInList + 1;
-        if (sourceIndex < targetIndexInList) {
-          targetIndex -= 1;
-        }
-      }
-    }
-    final node = nodes.removeAt(sourceIndex);
-    nodes.insert(targetIndex.clamp(0, nodes.length), node);
-  }
-
-  void _projectSetBlockType(
-    List<DocumentNode> nodes,
-    String? blockId,
-    Map<String, dynamic> payload,
-  ) {
-    if (blockId == null) return;
-    final index = nodes.indexWhere((node) => node.id == blockId);
-    if (index < 0) return;
-    final node = nodes[index];
-
-    final newType = payload['type'] as String? ?? 'paragraph';
-    final text = (node is TextNode) ? node.text : AttributedText();
-    final isComplete = (node is TaskNode) && node.isComplete;
-    nodes[index] = _codec.createNodeFromBlockType(
-      nodeId: blockId,
-      type: newType,
-      text: text,
-      isTaskComplete: isComplete,
-      metadata: Map<String, dynamic>.from(node.metadata),
-    );
-  }
-
-  void _projectSetBlockMetadata(
-    List<DocumentNode> nodes,
-    String? blockId,
-    Map<String, dynamic> payload,
-  ) {
-    if (blockId == null) return;
-    final index = nodes.indexWhere((node) => node.id == blockId);
-    if (index < 0) return;
-    final node = nodes[index];
-    final meta = payload['metadata'] as Map<String, dynamic>?;
-    if (meta == null) return;
-
-    nodes[index] = _createNodeWithUpdatedMetadata(node, meta);
-  }
-
-  void _projectCompleteTaskOccurrence(
-    List<DocumentNode> nodes,
-    String? blockId,
-    Map<String, dynamic> payload,
-  ) {
-    final targetId = blockId ?? payload['taskId'] as String?;
-    if (targetId == null) return;
-    final index = nodes.indexWhere((node) => node.id == targetId);
-    if (index < 0) return;
-    final node = nodes[index];
-    final scheduledAt = payload['scheduledAt'] as String?;
-    final completedAt = payload['completedAt'] as String?;
-    if (node is! TaskNode || scheduledAt == null) return;
-
-    final currentCompletions = Map<String, dynamic>.from(
-      node.metadata['completions'] as Map? ?? {},
-    );
-    if (completedAt != null && completedAt.isNotEmpty) {
-      currentCompletions[scheduledAt] = completedAt;
-    } else {
-      currentCompletions.remove(scheduledAt);
-    }
-    nodes[index] = _createNodeWithUpdatedMetadata(node, {
-      'completions': currentCompletions,
-    });
   }
 
   static bool _sameBlockList(

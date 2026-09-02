@@ -42,7 +42,7 @@
 - [x] Pin all Super Editor monorepo dependencies to one immutable commit.
 - [x] Wake the global outbox when an editor closes and avoid redundant polling.
 - [x] Move remote inbox/cursor state into Drift schema v31 with migration tests.
-- [x] Run the complete Flutter suite (729 tests passed) and document the Go
+- [x] Run the complete Flutter suite (733 tests passed) and document the Go
   toolchain limitation in `HANDOFF.md`.
 - [ ] Run Go verification and commit after thermo-nuclear review on a machine
   with the Go toolchain available.

@@ -30,6 +30,9 @@ thermo-nuclear.
   descarte do provider; `pollNow` não faz GET redundante após POST útil.
 - `sync_inbox` e `sync_feed_cursors` são tabelas Drift na schema v31, com
   migração v30→v31 testada e cursor/inbox transacionais.
+- O provider legado de polling do catálogo foi removido; o runtime incremental
+  é o único owner da orquestração remota. A projeção efetiva agora é reutilizada
+  pelo applier do editor, e o decoder do feed valida payloads antes dos casts.
 - O workflow temporário `sync-feed-test.yml`, que apontava para uma branch
   antiga, foi removido.
 
@@ -49,7 +52,7 @@ thermo-nuclear.
 
 ## Verification
 
-- `flutter test --no-pub`: **730 passed**.
+- `flutter test --no-pub`: **733 passed**.
 - Grupos individuais também passaram: core 169, auth 33, notes 380,
   settings 7, tasks 82, shared 50 e widget raiz 1.
 - `git diff --check`: passou.

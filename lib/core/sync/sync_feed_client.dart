@@ -15,14 +15,24 @@ final class SyncChange {
     final sequence = json['sequence'];
     final type = json['type'];
     final createdAt = json['createdAt'];
+    final String? noteId = switch (json['noteId']) {
+      null => null,
+      String value => value,
+      _ => throw const FormatException('Invalid sync change payload'),
+    };
+    final int? revision = switch (json['revision']) {
+      null => null,
+      int value => value,
+      _ => throw const FormatException('Invalid sync change payload'),
+    };
     if (sequence is! int || type is! String || createdAt is! String) {
       throw const FormatException('Invalid sync change payload');
     }
     return SyncChange(
       sequence: sequence,
       type: type,
-      noteId: json['noteId'] as String?,
-      revision: json['revision'] as int?,
+      noteId: noteId,
+      revision: revision,
       createdAt: DateTime.parse(createdAt).toUtc(),
     );
   }
@@ -44,6 +54,11 @@ final class SyncChangePage {
 
   factory SyncChangePage.fromJson(Map<String, dynamic> json) {
     final cursor = json['cursor'];
+    final int? watermark = switch (json['watermark']) {
+      null => null,
+      int value => value,
+      _ => throw const FormatException('Invalid sync change page'),
+    };
     final hasMore = json['hasMore'];
     final rawChanges = json['changes'];
     if (cursor is! int || hasMore is! bool || rawChanges is! List) {
@@ -51,10 +66,10 @@ final class SyncChangePage {
     }
     return SyncChangePage(
       cursor: cursor,
-      watermark: json['watermark'] as int?,
+      watermark: watermark,
       hasMore: hasMore,
       changes: rawChanges
-          .map((entry) => SyncChange.fromJson(Map<String, dynamic>.from(entry as Map)))
+          .map((entry) => SyncChange.fromJson(_asJsonObject(entry)))
           .toList(growable: false),
     );
   }
@@ -65,10 +80,26 @@ final class SyncChangePage {
   final List<SyncChange> changes;
 }
 
-typedef SyncChangesFetcher = Future<SyncChangePage> Function({
-  required int after,
-  required int limit,
-});
+Map<String, dynamic> _asJsonObject(Object? value) {
+  if (value is! Map) {
+    throw const FormatException('Invalid sync change entry');
+  }
+  final object = <String, dynamic>{};
+  for (final entry in value.entries) {
+    final key = entry.key;
+    if (key is! String) {
+      throw const FormatException('Invalid sync change entry');
+    }
+    object[key] = entry.value;
+  }
+  return object;
+}
+
+typedef SyncChangesFetcher =
+    Future<SyncChangePage> Function({
+      required int after,
+      required int limit,
+    });
 
 final class SyncFeedClient {
   const SyncFeedClient(this._api);
@@ -94,7 +125,8 @@ final class SyncFeedClient {
       if (data is Map<String, dynamic>) {
         throw NoteOperationsException(
           errorCode: data['error'] as String? ?? 'UNKNOWN',
-          message: data['message'] as String? ?? error.message ?? 'Sync feed failed',
+          message:
+              data['message'] as String? ?? error.message ?? 'Sync feed failed',
           statusCode: error.response?.statusCode,
         );
       }

@@ -89,6 +89,10 @@ formats, task insertion, and bitmap paste; paste failures are reported through
 Evidence: toolbar, task-component, and list-marker tests pass. Task callbacks now
 live in the view model for the current node instead of builder-lifetime maps/sets.
 
+Thermo follow-up: removed the unused legacy catalog polling provider and made
+the effective-document projector the single pure projection implementation;
+the editor applier delegates its equality projection to that module.
+
 ### Task 4: Pin and verify Super Editor dependencies
 
 **Files:**

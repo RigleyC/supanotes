@@ -45,7 +45,6 @@ final class _RemoteNoteWriteResult {
 enum _NoteIconPushOutcome { completed, retry }
 
 class NoteCatalogSync {
-
   NoteCatalogSync({
     required NoteSyncClient syncClient,
     required AppDatabase database,
@@ -561,56 +560,30 @@ class NoteCatalogSync {
 /// The root app listens to this provider so every catalog page is hydrated in
 /// the background while the UI continues reading Drift. It must stay alive
 /// across widget rebuilds; opening a note never waits for this provider.
-final Provider<NoteCatalogSync> noteCatalogSyncServiceProvider = Provider.autoDispose<NoteCatalogSync>((
-  ref,
-) {
-  if (ref.watch(currentUserIdProvider) == null) {
-    throw StateError('NoteCatalogSync requires an authenticated user');
-  }
-  return NoteCatalogSync(
-    syncClient: ref.watch(noteSyncClientProvider),
-    database: ref.watch(appDatabaseProvider),
-    activityTracker: ref.watch(noteSessionActivityTrackerProvider),
-    updateNoteIcon: (noteId, icon, expectedUpdatedAt) async {
-      await ref
-          .read(apiClientProvider)
-          .patch<Map<String, dynamic>>(
-            '/notes/$noteId',
-            data: {
-              'note_icon': icon?.toJson(),
-              if (expectedUpdatedAt != null)
-                'expected_updated_at': expectedUpdatedAt
-                    .toUtc()
-                    .toIso8601String(),
-            },
-          );
-    },
-  );
-});
-
-final StreamProvider<void> noteCatalogSyncProvider = StreamProvider.autoDispose<void>((ref) async* {
-  final user = ref.watch(authControllerProvider).asData?.value;
-  if (user == null) return;
-
-  final sync = ref.watch(noteCatalogSyncServiceProvider);
-  while (true) {
-    try {
-      await sync.pushDeletedNotes();
-      await sync.pushDirtyPreferences();
-      await sync.pullRemoteNotes(user.id);
-      await sync.pushDirtyNoteIcons();
-      yield null;
-    } catch (error, stackTrace) {
-      if (error is NoteOperationsException && error.statusCode == 401) {
-        dev.log('[NoteCatalogSync] Stopped (unauthenticated 401)');
-        break;
+final Provider<NoteCatalogSync> noteCatalogSyncServiceProvider =
+    Provider.autoDispose<NoteCatalogSync>((
+      ref,
+    ) {
+      if (ref.watch(currentUserIdProvider) == null) {
+        throw StateError('NoteCatalogSync requires an authenticated user');
       }
-      dev.log(
-        '[NoteCatalogSync] Pull failed',
-        error: error,
-        stackTrace: stackTrace,
+      return NoteCatalogSync(
+        syncClient: ref.watch(noteSyncClientProvider),
+        database: ref.watch(appDatabaseProvider),
+        activityTracker: ref.watch(noteSessionActivityTrackerProvider),
+        updateNoteIcon: (noteId, icon, expectedUpdatedAt) async {
+          await ref
+              .read(apiClientProvider)
+              .patch<Map<String, dynamic>>(
+                '/notes/$noteId',
+                data: {
+                  'note_icon': icon?.toJson(),
+                  if (expectedUpdatedAt != null)
+                    'expected_updated_at': expectedUpdatedAt
+                        .toUtc()
+                        .toIso8601String(),
+                },
+              );
+        },
       );
-    }
-    await Future<void>.delayed(const Duration(seconds: 15));
-  }
-});
+    });

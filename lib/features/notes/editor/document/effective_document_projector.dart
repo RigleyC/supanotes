@@ -19,6 +19,29 @@ final class EffectiveDocumentProjector {
     required Map<String, dynamic> snapshot,
     required List<PendingNoteOperationData>? pendingOps,
   }) {
+    final nodes = _projectNodes(snapshot, pendingOps);
+    return {
+      'schemaVersion': snapshot['schemaVersion'] ?? 1,
+      'blocks': nodes.map(_codec.encodeNode).toList(growable: false),
+    };
+  }
+
+  /// Projects only the encoded block list for callers that already own a
+  /// document envelope, such as the editor's equality check.
+  List<Map<String, dynamic>> projectBlocks({
+    required Map<String, dynamic> snapshot,
+    required List<PendingNoteOperationData>? pendingOps,
+  }) {
+    return _projectNodes(
+      snapshot,
+      pendingOps,
+    ).map(_codec.encodeNode).toList(growable: false);
+  }
+
+  List<DocumentNode> _projectNodes(
+    Map<String, dynamic> snapshot,
+    List<PendingNoteOperationData>? pendingOps,
+  ) {
     final nodes = _decodeSnapshot(snapshot);
     for (final op in pendingOps ?? const <PendingNoteOperationData>[]) {
       _apply(
@@ -28,10 +51,7 @@ final class EffectiveDocumentProjector {
         payload: Map<String, dynamic>.from(jsonDecode(op.payloadJson) as Map),
       );
     }
-    return {
-      'schemaVersion': snapshot['schemaVersion'] ?? 1,
-      'blocks': nodes.map(_codec.encodeNode).toList(growable: false),
-    };
+    return nodes;
   }
 
   List<DocumentNode> _decodeSnapshot(Map<String, dynamic> snapshot) {
@@ -104,7 +124,9 @@ final class EffectiveDocumentProjector {
     if (afterBlockId == null) {
       index = 0;
     } else {
-      final target = nodes.indexWhere((existing) => existing.id == afterBlockId);
+      final target = nodes.indexWhere(
+        (existing) => existing.id == afterBlockId,
+      );
       if (target >= 0) index = target + 1;
     }
     nodes.insert(index.clamp(0, nodes.length), node);
@@ -271,7 +293,9 @@ final class EffectiveDocumentProjector {
   }
 
   int _updatedIndent(int current, Map<String, dynamic> updates) {
-    return updates.containsKey('indent') ? updates['indent'] as int? ?? 0 : current;
+    return updates.containsKey('indent')
+        ? updates['indent'] as int? ?? 0
+        : current;
   }
 
   void _normalizeBlockType(Map<String, dynamic> metadata) {

@@ -187,7 +187,7 @@ wake into the global outbox. Polling consumes useful POST responses instead of
 issuing an immediate redundant GET. The temporary branch-specific verification
 workflow was removed.
 
-Verification: `flutter test --no-pub` passed 730 tests and `git diff --check`
+Verification: `flutter test --no-pub` passed 733 tests and `git diff --check`
 passed. Analyzer output remains limited to the repository's existing
 warnings/infos. Go verification is pending because the Go toolchain is not
 installed on the current Windows host; see `HANDOFF.md`.

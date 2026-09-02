@@ -59,7 +59,7 @@ void main() {
       pollAndReconcile: (_) async {},
       hydrateRemote: (_) async {},
       deleteLocal: (_) async {},
-      onAppliedForTest: (change) => applied.add(change.sequence),
+      onApplied: (change) => applied.add(change.sequence),
     );
 
     await coordinator.syncOnce();

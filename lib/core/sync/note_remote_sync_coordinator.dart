@@ -21,7 +21,7 @@ final class NoteRemoteSyncCoordinator {
     required Future<void> Function(String noteId) pollAndReconcile,
     required Future<void> Function(String noteId) hydrateRemote,
     required Future<void> Function(String noteId) deleteLocal,
-    void Function(SyncInboxEntry change)? onAppliedForTest,
+    void Function(SyncInboxEntry change)? onApplied,
   }) : _store = store,
        _fetchChanges = fetchChanges,
        _bootstrapCatalog = bootstrapCatalog,
@@ -30,7 +30,7 @@ final class NoteRemoteSyncCoordinator {
        _pollAndReconcile = pollAndReconcile,
        _hydrateRemote = hydrateRemote,
        _deleteLocal = deleteLocal,
-       _onAppliedForTest = onAppliedForTest {
+       _onApplied = onApplied {
     _worker = SyncInboxWorker(
       userId: userId,
       store: store,
@@ -49,7 +49,7 @@ final class NoteRemoteSyncCoordinator {
   final Future<void> Function(String noteId) _pollAndReconcile;
   final Future<void> Function(String noteId) _hydrateRemote;
   final Future<void> Function(String noteId) _deleteLocal;
-  final void Function(SyncInboxEntry change)? _onAppliedForTest;
+  final void Function(SyncInboxEntry change)? _onApplied;
 
   late final SyncInboxWorker _worker;
   Future<void> _tail = Future<void>.value();
@@ -101,7 +101,7 @@ final class NoteRemoteSyncCoordinator {
       default:
         throw StateError('Unsupported sync change type: ${change.type}');
     }
-    _onAppliedForTest?.call(change);
+    _onApplied?.call(change);
   }
 
   Future<void> _applyNoteChanged(
