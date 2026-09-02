@@ -89,33 +89,51 @@ class NoteOutboxWorker {
 
     for (final noteId in noteIds) {
       if (_disposed) return;
-      if (_isNoteActive(noteId)) continue;
-      if (_protocolSuppressedNotes.contains(noteId)) continue;
-
-      final retry = _retryByNote[noteId];
-      if (retry != null && _now().isBefore(retry.nextAttemptAt)) {
-        continue;
-      }
-
-      try {
-        final result = await _syncNote(noteId);
-        if (result.isBlocked) {
-          _recordTransientFailure(noteId);
-          continue;
-        }
-        _retryByNote.remove(noteId);
-        _protocolSuppressedNotes.remove(noteId);
-      } catch (error) {
-        if (_isProtocolError(error)) {
-          _retryByNote.remove(noteId);
-          _protocolSuppressedNotes.add(noteId);
-        } else {
-          _recordTransientFailure(noteId);
-        }
-      }
+      await _drainNoteIfEligible(noteId);
     }
 
     _scheduleRetryTimer();
+  }
+
+  Future<void> _drainNoteIfEligible(String noteId) async {
+    if (!_isEligibleForAttempt(noteId)) return;
+
+    try {
+      final result = await _syncNote(noteId);
+      _handleSyncResult(noteId, result);
+    } catch (error) {
+      _handleSyncError(noteId, error);
+    }
+  }
+
+  bool _isEligibleForAttempt(String noteId) {
+    if (_isNoteActive(noteId)) return false;
+    if (_protocolSuppressedNotes.contains(noteId)) return false;
+
+    final retry = _retryByNote[noteId];
+    return retry == null || !_now().isBefore(retry.nextAttemptAt);
+  }
+
+  void _handleSyncResult(String noteId, SyncResult result) {
+    if (result.isBlocked) {
+      _recordTransientFailure(noteId);
+      return;
+    }
+    _clearFailureState(noteId);
+  }
+
+  void _handleSyncError(String noteId, Object error) {
+    if (_isProtocolError(error)) {
+      _retryByNote.remove(noteId);
+      _protocolSuppressedNotes.add(noteId);
+      return;
+    }
+    _recordTransientFailure(noteId);
+  }
+
+  void _clearFailureState(String noteId) {
+    _retryByNote.remove(noteId);
+    _protocolSuppressedNotes.remove(noteId);
   }
 
   void _recordTransientFailure(String noteId) {
