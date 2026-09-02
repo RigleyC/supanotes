@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/features/notes/editor/document/document_node_transforms.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
@@ -9,11 +10,13 @@ import 'package:super_editor/super_editor.dart';
 /// Pure projection of the effective local document: canonical snapshot plus
 /// durable local operations that have not been acknowledged by the server.
 final class EffectiveDocumentProjector {
-  const EffectiveDocumentProjector({
+  EffectiveDocumentProjector({
     NoteDocumentCodec codec = const NoteDocumentCodec(),
-  }) : _codec = codec;
+  }) : _codec = codec,
+       _transforms = DocumentNodeTransforms(codec);
 
   final NoteDocumentCodec _codec;
+  final DocumentNodeTransforms _transforms;
 
   Map<String, dynamic> project({
     required Map<String, dynamic> snapshot,
@@ -110,7 +113,7 @@ final class EffectiveDocumentProjector {
       rawOps.cast<Map<String, dynamic>>(),
     );
     if (newText == null) return;
-    nodes[index] = _withText(node, newText);
+    nodes[index] = _transforms.withText(node, newText);
   }
 
   void _createBlock(
@@ -190,7 +193,7 @@ final class EffectiveDocumentProjector {
     final index = nodes.indexWhere((node) => node.id == blockId);
     final updates = payload['metadata'] as Map<String, dynamic>?;
     if (index < 0 || updates == null) return;
-    nodes[index] = _withMetadata(nodes[index], updates);
+    nodes[index] = _transforms.withMetadata(nodes[index], updates);
   }
 
   void _completeTaskOccurrence(
@@ -214,102 +217,6 @@ final class EffectiveDocumentProjector {
     } else {
       completions.remove(scheduledAt);
     }
-    nodes[index] = _withMetadata(node, {'completions': completions});
-  }
-
-  DocumentNode _withText(TextNode node, AttributedText text) {
-    if (node is TaskNode) {
-      return TaskNode(
-        id: node.id,
-        text: text,
-        isComplete: node.isComplete,
-        indent: node.indent,
-        metadata: Map.from(node.metadata),
-      );
-    }
-    if (node is ListItemNode) {
-      return ListItemNode(
-        id: node.id,
-        itemType: node.type,
-        text: text,
-        indent: node.indent,
-        metadata: Map.from(node.metadata),
-      );
-    }
-    if (node is ParagraphNode) {
-      return ParagraphNode(
-        id: node.id,
-        text: text,
-        indent: node.indent,
-        metadata: Map.from(node.metadata),
-      );
-    }
-    return ParagraphNode(id: node.id, text: text);
-  }
-
-  DocumentNode _withMetadata(
-    DocumentNode node,
-    Map<String, dynamic> updates,
-  ) {
-    final metadata = Map<String, dynamic>.from(node.metadata);
-    for (final entry in updates.entries) {
-      if (entry.value == null) {
-        metadata.remove(entry.key);
-      } else {
-        metadata[entry.key] = entry.value;
-      }
-    }
-    _normalizeBlockType(metadata);
-
-    if (node is TaskNode) {
-      return TaskNode(
-        id: node.id,
-        text: node.text,
-        isComplete: updates.containsKey('isCompleted')
-            ? updates['isCompleted'] as bool
-            : node.isComplete,
-        indent: _updatedIndent(node.indent, updates),
-        metadata: metadata,
-      );
-    }
-    if (node is ParagraphNode) {
-      return ParagraphNode(
-        id: node.id,
-        text: node.text,
-        indent: _updatedIndent(node.indent, updates),
-        metadata: metadata,
-      );
-    }
-    if (node is ListItemNode) {
-      return ListItemNode(
-        id: node.id,
-        itemType: node.type,
-        text: node.text,
-        indent: _updatedIndent(node.indent, updates),
-        metadata: metadata,
-      );
-    }
-    return node;
-  }
-
-  int _updatedIndent(int current, Map<String, dynamic> updates) {
-    return updates.containsKey('indent')
-        ? updates['indent'] as int? ?? 0
-        : current;
-  }
-
-  void _normalizeBlockType(Map<String, dynamic> metadata) {
-    if (!metadata.containsKey('blockType')) return;
-    final value = metadata['blockType'];
-    if (value is String) {
-      final attribution = _codec.attributionFromName(value);
-      if (attribution == null) {
-        metadata.remove('blockType');
-      } else {
-        metadata['blockType'] = attribution;
-      }
-    } else if (value == null) {
-      metadata.remove('blockType');
-    }
+    nodes[index] = _transforms.withMetadata(node, {'completions': completions});
   }
 }

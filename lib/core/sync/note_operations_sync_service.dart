@@ -102,7 +102,7 @@ class NoteOperationsSyncService {
   final Uuid _uuid = const Uuid();
   final _syncQueue = KeyedAsyncQueue();
   final _outboxQueue = KeyedAsyncQueue();
-  final EffectiveDocumentProjector _projector = const EffectiveDocumentProjector();
+  final EffectiveDocumentProjector _projector = EffectiveDocumentProjector();
   late final NoteOperationRebaser _rebaser;
 
   String get clientId => _clientId;

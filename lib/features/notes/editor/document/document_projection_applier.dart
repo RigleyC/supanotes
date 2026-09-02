@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
+import 'package:supanotes/features/notes/editor/document/document_node_transforms.dart';
 import 'package:supanotes/features/notes/editor/document/effective_document_projector.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
@@ -19,6 +20,9 @@ class DocumentProjectionApplier {
   final MutableDocument _document;
   final Editor _editor;
   final NoteDocumentCodec _codec;
+  late final DocumentNodeTransforms _transforms = DocumentNodeTransforms(
+    _codec,
+  );
   late final EffectiveDocumentProjector _effectiveProjector =
       EffectiveDocumentProjector(codec: _codec);
 
@@ -197,7 +201,7 @@ class DocumentProjectionApplier {
     final newText = _codec.applyDeltaToText(node.text, ops);
     if (newText == null) return;
 
-    _replaceNode(blockId, _createNodeWithUpdatedText(node, newText));
+    _replaceNode(blockId, _transforms.withText(node, newText));
   }
 
   void _applyCreateBlock(Map<String, dynamic> payload) {
@@ -286,7 +290,7 @@ class DocumentProjectionApplier {
     final meta = payload['metadata'] as Map<String, dynamic>?;
     if (node == null || meta == null) return;
 
-    _replaceNode(blockId, _createNodeWithUpdatedMetadata(node, meta));
+    _replaceNode(blockId, _transforms.withMetadata(node, meta));
   }
 
   void _applyCompleteTaskOccurrence(
@@ -308,7 +312,7 @@ class DocumentProjectionApplier {
     } else {
       currentCompletions.remove(scheduledAt);
     }
-    final newNode = _createNodeWithUpdatedMetadata(node, {
+    final newNode = _transforms.withMetadata(node, {
       'completions': currentCompletions,
     });
     _replaceNode(targetId, newNode);
@@ -381,37 +385,6 @@ class DocumentProjectionApplier {
     return DocumentSelection(base: base, extent: extent);
   }
 
-  DocumentNode _createNodeWithUpdatedText(
-    TextNode node,
-    AttributedText newText,
-  ) {
-    if (node is TaskNode) {
-      return TaskNode(
-        id: node.id,
-        text: newText,
-        isComplete: node.isComplete,
-        indent: node.indent,
-        metadata: Map.from(node.metadata),
-      );
-    } else if (node is ListItemNode) {
-      return ListItemNode(
-        id: node.id,
-        itemType: node.type,
-        text: newText,
-        indent: node.indent,
-        metadata: Map.from(node.metadata),
-      );
-    } else if (node is ParagraphNode) {
-      return ParagraphNode(
-        id: node.id,
-        text: newText,
-        indent: node.indent,
-        metadata: Map.from(node.metadata),
-      );
-    }
-    return ParagraphNode(id: node.id, text: newText);
-  }
-
   void _replaceNode(String nodeId, DocumentNode newNode) {
     _editor.execute([
       ReplaceNodeRequest(existingNodeId: nodeId, newNode: newNode),
@@ -421,82 +394,5 @@ class DocumentProjectionApplier {
       // task indentation. Restore the existing level after that reaction.
       _editor.execute([SetTaskIndentRequest(newNode.id, newNode.indent)]);
     }
-  }
-
-  DocumentNode _createNodeWithUpdatedMetadata(
-    DocumentNode node,
-    Map<String, dynamic> meta,
-  ) {
-    final updatedMeta = _mergeMetadata(node.metadata, meta);
-    _normalizeBlockType(updatedMeta);
-
-    if (node is TaskNode) {
-      return TaskNode(
-        id: node.id,
-        text: node.text,
-        isComplete: _updatedCompletion(node, meta),
-        indent: _updatedIndent(node.indent, meta),
-        metadata: updatedMeta,
-      );
-    } else if (node is ParagraphNode) {
-      return ParagraphNode(
-        id: node.id,
-        text: node.text,
-        indent: _updatedIndent(node.indent, meta),
-        metadata: updatedMeta,
-      );
-    } else if (node is ListItemNode) {
-      return ListItemNode(
-        id: node.id,
-        itemType: node.type,
-        text: node.text,
-        indent: _updatedIndent(node.indent, meta),
-        metadata: updatedMeta,
-      );
-    }
-    return node;
-  }
-
-  Map<String, dynamic> _mergeMetadata(
-    Map<String, dynamic> current,
-    Map<String, dynamic> updates,
-  ) {
-    final merged = Map<String, dynamic>.from(current);
-    for (final entry in updates.entries) {
-      if (entry.value == null) {
-        merged.remove(entry.key);
-      } else {
-        merged[entry.key] = entry.value;
-      }
-    }
-    return merged;
-  }
-
-  void _normalizeBlockType(Map<String, dynamic> metadata) {
-    if (!metadata.containsKey('blockType')) return;
-
-    final rawBlockType = metadata['blockType'];
-    if (rawBlockType is String) {
-      final attribution = _codec.attributionFromName(rawBlockType);
-      if (attribution != null) {
-        metadata['blockType'] = attribution;
-      } else {
-        metadata.remove('blockType');
-      }
-    } else if (rawBlockType == null) {
-      metadata.remove('blockType');
-    }
-  }
-
-  bool _updatedCompletion(TaskNode node, Map<String, dynamic> metadata) {
-    return metadata.containsKey('isCompleted')
-        ? metadata['isCompleted'] as bool
-        : node.isComplete;
-  }
-
-  int _updatedIndent(int currentIndent, Map<String, dynamic> metadata) {
-    return metadata.containsKey('indent')
-        ? metadata['indent'] as int? ?? 0
-        : currentIndent;
   }
 }
