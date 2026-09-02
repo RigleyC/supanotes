@@ -42,3 +42,4 @@ jobs:
           test/core/sync/sync_inbox_store_test.dart
           test/core/sync/sync_inbox_worker_test.dart
           test/core/sync/note_operations_materialized_projection_test.dart
+          test/core/sync/note_remote_sync_coordinator_test.dart
