@@ -12,7 +12,7 @@ on:
       - .github/workflows/sync-feed-test.yml
 
 jobs:
-  backend-red-green:
+  backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -24,4 +24,17 @@ jobs:
         with:
           go-version: '1.25.0'
           cache-dependency-path: backend/go.sum
-      - run: go test -count=1 ./internal/syncfeed
+      - run: go test -count=1 ./internal/syncfeed ./internal/noteoperations
+
+  flutter-inbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test test/core/sync/sync_inbox_store_test.dart test/core/sync/sync_inbox_worker_test.dart
