@@ -30,8 +30,9 @@ func (f *fakeChangeReader) ListChanges(_ context.Context, userID pgtype.UUID, af
 
 func TestListChangesUsesAuthenticatedActorAndCursor(t *testing.T) {
 	reader := &fakeChangeReader{page: Page{
-		Cursor: 43,
-		HasMore: true,
+		Cursor:    43,
+		Watermark: 51,
+		HasMore:   true,
 		Changes: []Change{{
 			Sequence: 43,
 			Type: "note_changed",
@@ -60,14 +61,15 @@ func TestListChangesUsesAuthenticatedActorAndCursor(t *testing.T) {
 	}
 
 	var payload struct {
-		Cursor  int64    `json:"cursor"`
-		HasMore bool     `json:"hasMore"`
-		Changes []Change `json:"changes"`
+		Cursor    int64    `json:"cursor"`
+		Watermark int64    `json:"watermark"`
+		HasMore   bool     `json:"hasMore"`
+		Changes   []Change `json:"changes"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if payload.Cursor != 43 || !payload.HasMore || len(payload.Changes) != 1 {
+	if payload.Cursor != 43 || payload.Watermark != 51 || !payload.HasMore || len(payload.Changes) != 1 {
 		t.Fatalf("response = %+v", payload)
 	}
 }
