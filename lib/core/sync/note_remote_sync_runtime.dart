@@ -5,6 +5,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/note_remote_sync_coordinator.dart';
 import 'package:supanotes/core/sync/sync_feed_client.dart';
