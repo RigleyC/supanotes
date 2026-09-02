@@ -18,6 +18,21 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: supanotes
+          POSTGRES_PASSWORD: supanotes
+          POSTGRES_DB: supanotes_sync_feed
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U supanotes"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SUPANOTES_SYNC_TEST_DATABASE_URL: postgres://supanotes:supanotes@localhost:5432/supanotes_sync_feed?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -43,3 +58,6 @@ jobs:
           test/core/sync/sync_inbox_worker_test.dart
           test/core/sync/note_operations_materialized_projection_test.dart
           test/core/sync/note_remote_sync_coordinator_test.dart
+          test/core/sync/multi_device_sync_e2e_test.dart
+          test/features/notes/catalog/data/remote_note_change_applier_test.dart
+          test/features/notes/catalog/data/note_catalog_sync_provider_test.dart
