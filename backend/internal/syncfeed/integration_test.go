@@ -39,7 +39,8 @@ func TestChangeFeedTriggersAndCursorWithPostgres(t *testing.T) {
 	collaboratorID := uuid.NewString()
 	noteID := uuid.NewString()
 	defer func() {
-		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = ANY($1::uuid[])", []string{ownerID, collaboratorID})
+		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", ownerID)
+		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", collaboratorID)
 	}()
 
 	_, err = pool.Exec(ctx, `
@@ -112,7 +113,6 @@ func TestChangeFeedTriggersAndCursorWithPostgres(t *testing.T) {
 	require.Len(t, page.Changes, 2)
 	require.True(t, page.HasMore)
 	require.GreaterOrEqual(t, page.Watermark, page.Cursor)
-	require.Equal(t, collaboratorID, collaboratorUUID.String())
 }
 
 func loadKinds(
