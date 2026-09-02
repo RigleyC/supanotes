@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -8,6 +7,7 @@ import 'package:supanotes/core/auth/auth_session_resource_registry.dart';
 import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/sync/sync_inbox_store.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/data/session_cache.dart';
@@ -96,9 +96,13 @@ class AuthController extends AsyncNotifier<User?> {
         cleanupStack ??= stack;
       }
 
-      // Explicit logout is the user-confirmed data-clearing operation.
+      // Explicit logout is the user-confirmed data-clearing operation. Raw
+      // inbox tables are intentionally outside Drift codegen, so clear them
+      // before clearing the generated schema tables.
       try {
-        await ref.read(appDatabaseProvider).clearAllData();
+        final database = ref.read(appDatabaseProvider);
+        await SyncInboxStore(database).clearAll();
+        await database.clearAllData();
       } catch (error, stack) {
         debugPrint('Error clearing local database: $error');
         cleanupError ??= error;
