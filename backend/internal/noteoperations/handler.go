@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/syncfeed"
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
@@ -23,6 +24,10 @@ func (h *Handler) RegisterRoutes(router *echo.Group) {
 	router.GET("/notes/:noteId/document", h.GetDocument)
 	router.GET("/notes/:noteId/operations", h.ListOperations)
 	router.POST("/notes/:noteId/operations:sync", h.SyncOperations)
+	if h.svc.pool != nil {
+		feed := syncfeed.NewHandler(syncfeed.NewRepository(h.svc.pool))
+		router.GET("/sync/changes", feed.ListChanges)
+	}
 }
 
 func (h *Handler) GetDocument(c echo.Context) error {
