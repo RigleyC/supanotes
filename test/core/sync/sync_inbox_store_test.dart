@@ -23,8 +23,29 @@ void main() {
     await store.ingestPage(userId: 'u1', page: page);
 
     expect(await store.getCursor('u1'), 2);
+    expect(await store.isBootstrapComplete('u1'), isFalse);
     final pending = await store.listPending('u1');
     expect(pending.map((e) => e.sequence).toList(), [1, 2]);
+  });
+
+  test('bootstrap is completed only by explicit catalog checkpoint', () async {
+    final db = AppDatabase.test();
+    addTearDown(db.close);
+    final store = SyncInboxStore(db);
+
+    await store.ingestPage(
+      userId: 'u1',
+      page: SyncChangePage(
+        cursor: 4,
+        hasMore: false,
+        changes: const [],
+      ),
+    );
+    expect(await store.isBootstrapComplete('u1'), isFalse);
+
+    await store.completeBootstrap(userId: 'u1', cursor: 9);
+    expect(await store.isBootstrapComplete('u1'), isTrue);
+    expect(await store.getCursor('u1'), 9);
   });
 
   test('pending inbox survives store recreation and applied events do not return', () async {
