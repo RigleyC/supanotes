@@ -11,9 +11,9 @@ import 'package:supanotes/core/constants/app_constants.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_link_provider.dart';
 import 'package:supanotes/core/router/app_router.dart';
+import 'package:supanotes/core/sync/note_remote_sync_runtime.dart';
 import 'package:supanotes/core/utils/platform_utils.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
-import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
 import 'package:supanotes/features/notes/share/domain/share_strings.dart';
@@ -106,6 +106,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(noteOutboxWorkerProvider)?.wake();
+      ref.read(noteRemoteSyncCoordinatorProvider)?.wake();
       final coordinator = ref.read(shareIntakeCoordinatorProvider);
       final notes = ref.read(activeNotesProvider).asData?.value;
       if (notes != null && notes.isNotEmpty) {
@@ -155,10 +156,10 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
         if (user != null) unawaited(_processPendingShare());
       });
     });
-    ref.listen(noteCatalogSyncProvider, (_, next) {
+    ref.listen(noteRemoteSyncRuntimeProvider, (_, next) {
       next.whenOrNull(
         error: (error, _) {
-          debugPrint('Note catalog sync failed: $error');
+          debugPrint('Incremental note sync failed: $error');
         },
       );
     });
