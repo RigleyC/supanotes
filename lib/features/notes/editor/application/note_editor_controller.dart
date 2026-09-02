@@ -255,6 +255,20 @@ class NoteEditorController extends ChangeNotifier {
     editor.reactionPipeline.add(
       const RandomDividerConversionReaction(),
     );
+    document.addListener(_clearSelectionIfHidden);
+  }
+
+  void _clearSelectionIfHidden(DocumentChangeLog _) {
+    final selection = composer.selection;
+    if (selection == null ||
+        !_hiddenTaskEditingGuard.selectionTouchesHiddenTask(
+          document,
+          selection,
+        )) {
+      return;
+    }
+    composer.clearSelection();
+    focusNode.unfocus();
   }
 
   Future<void> pickAndAttachFile({bool imageOnly = false}) async {
@@ -315,6 +329,7 @@ class NoteEditorController extends ChangeNotifier {
   @override
   Future<void> dispose() async {
     onHasContentChanged = null;
+    document.removeListener(_clearSelectionIfHidden);
     editor.dispose();
     document.dispose();
     composer.dispose();

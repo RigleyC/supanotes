@@ -4661,6 +4661,753 @@ class SyncSessionsCompanion extends UpdateCompanion<SyncSessionData> {
   }
 }
 
+class $SyncFeedCursorsTable extends SyncFeedCursors
+    with TableInfo<$SyncFeedCursorsTable, SyncFeedCursorData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncFeedCursorsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _receiveCursorMeta = const VerificationMeta(
+    'receiveCursor',
+  );
+  @override
+  late final GeneratedColumn<int> receiveCursor = GeneratedColumn<int>(
+    'receive_cursor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _bootstrapCompleteMeta = const VerificationMeta(
+    'bootstrapComplete',
+  );
+  @override
+  late final GeneratedColumn<bool> bootstrapComplete = GeneratedColumn<bool>(
+    'bootstrap_complete',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("bootstrap_complete" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userId,
+    receiveCursor,
+    bootstrapComplete,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_feed_cursors';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncFeedCursorData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('receive_cursor')) {
+      context.handle(
+        _receiveCursorMeta,
+        receiveCursor.isAcceptableOrUnknown(
+          data['receive_cursor']!,
+          _receiveCursorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bootstrap_complete')) {
+      context.handle(
+        _bootstrapCompleteMeta,
+        bootstrapComplete.isAcceptableOrUnknown(
+          data['bootstrap_complete']!,
+          _bootstrapCompleteMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userId};
+  @override
+  SyncFeedCursorData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncFeedCursorData(
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      )!,
+      receiveCursor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}receive_cursor'],
+      )!,
+      bootstrapComplete: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}bootstrap_complete'],
+      )!,
+    );
+  }
+
+  @override
+  $SyncFeedCursorsTable createAlias(String alias) {
+    return $SyncFeedCursorsTable(attachedDatabase, alias);
+  }
+}
+
+class SyncFeedCursorData extends DataClass
+    implements Insertable<SyncFeedCursorData> {
+  final String userId;
+  final int receiveCursor;
+  final bool bootstrapComplete;
+  const SyncFeedCursorData({
+    required this.userId,
+    required this.receiveCursor,
+    required this.bootstrapComplete,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_id'] = Variable<String>(userId);
+    map['receive_cursor'] = Variable<int>(receiveCursor);
+    map['bootstrap_complete'] = Variable<bool>(bootstrapComplete);
+    return map;
+  }
+
+  SyncFeedCursorsCompanion toCompanion(bool nullToAbsent) {
+    return SyncFeedCursorsCompanion(
+      userId: Value(userId),
+      receiveCursor: Value(receiveCursor),
+      bootstrapComplete: Value(bootstrapComplete),
+    );
+  }
+
+  factory SyncFeedCursorData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncFeedCursorData(
+      userId: serializer.fromJson<String>(json['userId']),
+      receiveCursor: serializer.fromJson<int>(json['receiveCursor']),
+      bootstrapComplete: serializer.fromJson<bool>(json['bootstrapComplete']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userId': serializer.toJson<String>(userId),
+      'receiveCursor': serializer.toJson<int>(receiveCursor),
+      'bootstrapComplete': serializer.toJson<bool>(bootstrapComplete),
+    };
+  }
+
+  SyncFeedCursorData copyWith({
+    String? userId,
+    int? receiveCursor,
+    bool? bootstrapComplete,
+  }) => SyncFeedCursorData(
+    userId: userId ?? this.userId,
+    receiveCursor: receiveCursor ?? this.receiveCursor,
+    bootstrapComplete: bootstrapComplete ?? this.bootstrapComplete,
+  );
+  SyncFeedCursorData copyWithCompanion(SyncFeedCursorsCompanion data) {
+    return SyncFeedCursorData(
+      userId: data.userId.present ? data.userId.value : this.userId,
+      receiveCursor: data.receiveCursor.present
+          ? data.receiveCursor.value
+          : this.receiveCursor,
+      bootstrapComplete: data.bootstrapComplete.present
+          ? data.bootstrapComplete.value
+          : this.bootstrapComplete,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncFeedCursorData(')
+          ..write('userId: $userId, ')
+          ..write('receiveCursor: $receiveCursor, ')
+          ..write('bootstrapComplete: $bootstrapComplete')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(userId, receiveCursor, bootstrapComplete);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncFeedCursorData &&
+          other.userId == this.userId &&
+          other.receiveCursor == this.receiveCursor &&
+          other.bootstrapComplete == this.bootstrapComplete);
+}
+
+class SyncFeedCursorsCompanion extends UpdateCompanion<SyncFeedCursorData> {
+  final Value<String> userId;
+  final Value<int> receiveCursor;
+  final Value<bool> bootstrapComplete;
+  final Value<int> rowid;
+  const SyncFeedCursorsCompanion({
+    this.userId = const Value.absent(),
+    this.receiveCursor = const Value.absent(),
+    this.bootstrapComplete = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncFeedCursorsCompanion.insert({
+    required String userId,
+    this.receiveCursor = const Value.absent(),
+    this.bootstrapComplete = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userId = Value(userId);
+  static Insertable<SyncFeedCursorData> custom({
+    Expression<String>? userId,
+    Expression<int>? receiveCursor,
+    Expression<bool>? bootstrapComplete,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userId != null) 'user_id': userId,
+      if (receiveCursor != null) 'receive_cursor': receiveCursor,
+      if (bootstrapComplete != null) 'bootstrap_complete': bootstrapComplete,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncFeedCursorsCompanion copyWith({
+    Value<String>? userId,
+    Value<int>? receiveCursor,
+    Value<bool>? bootstrapComplete,
+    Value<int>? rowid,
+  }) {
+    return SyncFeedCursorsCompanion(
+      userId: userId ?? this.userId,
+      receiveCursor: receiveCursor ?? this.receiveCursor,
+      bootstrapComplete: bootstrapComplete ?? this.bootstrapComplete,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (receiveCursor.present) {
+      map['receive_cursor'] = Variable<int>(receiveCursor.value);
+    }
+    if (bootstrapComplete.present) {
+      map['bootstrap_complete'] = Variable<bool>(bootstrapComplete.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncFeedCursorsCompanion(')
+          ..write('userId: $userId, ')
+          ..write('receiveCursor: $receiveCursor, ')
+          ..write('bootstrapComplete: $bootstrapComplete, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SyncInboxTable extends SyncInbox
+    with TableInfo<$SyncInboxTable, SyncInboxData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncInboxTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sequenceMeta = const VerificationMeta(
+    'sequence',
+  );
+  @override
+  late final GeneratedColumn<int> sequence = GeneratedColumn<int>(
+    'sequence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appliedAtMeta = const VerificationMeta(
+    'appliedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> appliedAt = GeneratedColumn<DateTime>(
+    'applied_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userId,
+    sequence,
+    type,
+    noteId,
+    revision,
+    createdAt,
+    appliedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_inbox';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncInboxData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('sequence')) {
+      context.handle(
+        _sequenceMeta,
+        sequence.isAcceptableOrUnknown(data['sequence']!, _sequenceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sequenceMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('applied_at')) {
+      context.handle(
+        _appliedAtMeta,
+        appliedAt.isAcceptableOrUnknown(data['applied_at']!, _appliedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userId, sequence};
+  @override
+  SyncInboxData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncInboxData(
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      )!,
+      sequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sequence'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      appliedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}applied_at'],
+      ),
+    );
+  }
+
+  @override
+  $SyncInboxTable createAlias(String alias) {
+    return $SyncInboxTable(attachedDatabase, alias);
+  }
+}
+
+class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
+  final String userId;
+  final int sequence;
+  final String type;
+  final String? noteId;
+  final int? revision;
+  final DateTime createdAt;
+  final DateTime? appliedAt;
+  const SyncInboxData({
+    required this.userId,
+    required this.sequence,
+    required this.type,
+    this.noteId,
+    this.revision,
+    required this.createdAt,
+    this.appliedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_id'] = Variable<String>(userId);
+    map['sequence'] = Variable<int>(sequence);
+    map['type'] = Variable<String>(type);
+    if (!nullToAbsent || noteId != null) {
+      map['note_id'] = Variable<String>(noteId);
+    }
+    if (!nullToAbsent || revision != null) {
+      map['revision'] = Variable<int>(revision);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || appliedAt != null) {
+      map['applied_at'] = Variable<DateTime>(appliedAt);
+    }
+    return map;
+  }
+
+  SyncInboxCompanion toCompanion(bool nullToAbsent) {
+    return SyncInboxCompanion(
+      userId: Value(userId),
+      sequence: Value(sequence),
+      type: Value(type),
+      noteId: noteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(noteId),
+      revision: revision == null && nullToAbsent
+          ? const Value.absent()
+          : Value(revision),
+      createdAt: Value(createdAt),
+      appliedAt: appliedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appliedAt),
+    );
+  }
+
+  factory SyncInboxData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncInboxData(
+      userId: serializer.fromJson<String>(json['userId']),
+      sequence: serializer.fromJson<int>(json['sequence']),
+      type: serializer.fromJson<String>(json['type']),
+      noteId: serializer.fromJson<String?>(json['noteId']),
+      revision: serializer.fromJson<int?>(json['revision']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      appliedAt: serializer.fromJson<DateTime?>(json['appliedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userId': serializer.toJson<String>(userId),
+      'sequence': serializer.toJson<int>(sequence),
+      'type': serializer.toJson<String>(type),
+      'noteId': serializer.toJson<String?>(noteId),
+      'revision': serializer.toJson<int?>(revision),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'appliedAt': serializer.toJson<DateTime?>(appliedAt),
+    };
+  }
+
+  SyncInboxData copyWith({
+    String? userId,
+    int? sequence,
+    String? type,
+    Value<String?> noteId = const Value.absent(),
+    Value<int?> revision = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> appliedAt = const Value.absent(),
+  }) => SyncInboxData(
+    userId: userId ?? this.userId,
+    sequence: sequence ?? this.sequence,
+    type: type ?? this.type,
+    noteId: noteId.present ? noteId.value : this.noteId,
+    revision: revision.present ? revision.value : this.revision,
+    createdAt: createdAt ?? this.createdAt,
+    appliedAt: appliedAt.present ? appliedAt.value : this.appliedAt,
+  );
+  SyncInboxData copyWithCompanion(SyncInboxCompanion data) {
+    return SyncInboxData(
+      userId: data.userId.present ? data.userId.value : this.userId,
+      sequence: data.sequence.present ? data.sequence.value : this.sequence,
+      type: data.type.present ? data.type.value : this.type,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      revision: data.revision.present ? data.revision.value : this.revision,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      appliedAt: data.appliedAt.present ? data.appliedAt.value : this.appliedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncInboxData(')
+          ..write('userId: $userId, ')
+          ..write('sequence: $sequence, ')
+          ..write('type: $type, ')
+          ..write('noteId: $noteId, ')
+          ..write('revision: $revision, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('appliedAt: $appliedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    userId,
+    sequence,
+    type,
+    noteId,
+    revision,
+    createdAt,
+    appliedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncInboxData &&
+          other.userId == this.userId &&
+          other.sequence == this.sequence &&
+          other.type == this.type &&
+          other.noteId == this.noteId &&
+          other.revision == this.revision &&
+          other.createdAt == this.createdAt &&
+          other.appliedAt == this.appliedAt);
+}
+
+class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
+  final Value<String> userId;
+  final Value<int> sequence;
+  final Value<String> type;
+  final Value<String?> noteId;
+  final Value<int?> revision;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> appliedAt;
+  final Value<int> rowid;
+  const SyncInboxCompanion({
+    this.userId = const Value.absent(),
+    this.sequence = const Value.absent(),
+    this.type = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.appliedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncInboxCompanion.insert({
+    required String userId,
+    required int sequence,
+    required String type,
+    this.noteId = const Value.absent(),
+    this.revision = const Value.absent(),
+    required DateTime createdAt,
+    this.appliedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userId = Value(userId),
+       sequence = Value(sequence),
+       type = Value(type),
+       createdAt = Value(createdAt);
+  static Insertable<SyncInboxData> custom({
+    Expression<String>? userId,
+    Expression<int>? sequence,
+    Expression<String>? type,
+    Expression<String>? noteId,
+    Expression<int>? revision,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? appliedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userId != null) 'user_id': userId,
+      if (sequence != null) 'sequence': sequence,
+      if (type != null) 'type': type,
+      if (noteId != null) 'note_id': noteId,
+      if (revision != null) 'revision': revision,
+      if (createdAt != null) 'created_at': createdAt,
+      if (appliedAt != null) 'applied_at': appliedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncInboxCompanion copyWith({
+    Value<String>? userId,
+    Value<int>? sequence,
+    Value<String>? type,
+    Value<String?>? noteId,
+    Value<int?>? revision,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? appliedAt,
+    Value<int>? rowid,
+  }) {
+    return SyncInboxCompanion(
+      userId: userId ?? this.userId,
+      sequence: sequence ?? this.sequence,
+      type: type ?? this.type,
+      noteId: noteId ?? this.noteId,
+      revision: revision ?? this.revision,
+      createdAt: createdAt ?? this.createdAt,
+      appliedAt: appliedAt ?? this.appliedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (sequence.present) {
+      map['sequence'] = Variable<int>(sequence.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (appliedAt.present) {
+      map['applied_at'] = Variable<DateTime>(appliedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncInboxCompanion(')
+          ..write('userId: $userId, ')
+          ..write('sequence: $sequence, ')
+          ..write('type: $type, ')
+          ..write('noteId: $noteId, ')
+          ..write('revision: $revision, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('appliedAt: $appliedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4675,6 +5422,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $PendingNoteOperationsTable(this);
   late final $NoteSyncErrorsTable noteSyncErrors = $NoteSyncErrorsTable(this);
   late final $SyncSessionsTable syncSessions = $SyncSessionsTable(this);
+  late final $SyncFeedCursorsTable syncFeedCursors = $SyncFeedCursorsTable(
+    this,
+  );
+  late final $SyncInboxTable syncInbox = $SyncInboxTable(this);
+  late final Index idxSyncInboxPending = Index(
+    'idx_sync_inbox_pending',
+    'CREATE INDEX idx_sync_inbox_pending ON sync_inbox (user_id, applied_at, sequence)',
+  );
   late final NotesDao notesDao = NotesDao(this as AppDatabase);
   late final NoteLinksDao noteLinksDao = NoteLinksDao(this as AppDatabase);
   late final AttachmentsDao attachmentsDao = AttachmentsDao(
@@ -4698,6 +5453,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     pendingNoteOperations,
     noteSyncErrors,
     syncSessions,
+    syncFeedCursors,
+    syncInbox,
+    idxSyncInboxPending,
   ];
 }
 
@@ -7207,6 +7965,420 @@ typedef $$SyncSessionsTableProcessedTableManager =
       SyncSessionData,
       PrefetchHooks Function()
     >;
+typedef $$SyncFeedCursorsTableCreateCompanionBuilder =
+    SyncFeedCursorsCompanion Function({
+      required String userId,
+      Value<int> receiveCursor,
+      Value<bool> bootstrapComplete,
+      Value<int> rowid,
+    });
+typedef $$SyncFeedCursorsTableUpdateCompanionBuilder =
+    SyncFeedCursorsCompanion Function({
+      Value<String> userId,
+      Value<int> receiveCursor,
+      Value<bool> bootstrapComplete,
+      Value<int> rowid,
+    });
+
+class $$SyncFeedCursorsTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncFeedCursorsTable> {
+  $$SyncFeedCursorsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get receiveCursor => $composableBuilder(
+    column: $table.receiveCursor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get bootstrapComplete => $composableBuilder(
+    column: $table.bootstrapComplete,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncFeedCursorsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncFeedCursorsTable> {
+  $$SyncFeedCursorsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get receiveCursor => $composableBuilder(
+    column: $table.receiveCursor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get bootstrapComplete => $composableBuilder(
+    column: $table.bootstrapComplete,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncFeedCursorsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncFeedCursorsTable> {
+  $$SyncFeedCursorsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<int> get receiveCursor => $composableBuilder(
+    column: $table.receiveCursor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get bootstrapComplete => $composableBuilder(
+    column: $table.bootstrapComplete,
+    builder: (column) => column,
+  );
+}
+
+class $$SyncFeedCursorsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncFeedCursorsTable,
+          SyncFeedCursorData,
+          $$SyncFeedCursorsTableFilterComposer,
+          $$SyncFeedCursorsTableOrderingComposer,
+          $$SyncFeedCursorsTableAnnotationComposer,
+          $$SyncFeedCursorsTableCreateCompanionBuilder,
+          $$SyncFeedCursorsTableUpdateCompanionBuilder,
+          (
+            SyncFeedCursorData,
+            BaseReferences<
+              _$AppDatabase,
+              $SyncFeedCursorsTable,
+              SyncFeedCursorData
+            >,
+          ),
+          SyncFeedCursorData,
+          PrefetchHooks Function()
+        > {
+  $$SyncFeedCursorsTableTableManager(
+    _$AppDatabase db,
+    $SyncFeedCursorsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncFeedCursorsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncFeedCursorsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncFeedCursorsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> userId = const Value.absent(),
+                Value<int> receiveCursor = const Value.absent(),
+                Value<bool> bootstrapComplete = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncFeedCursorsCompanion(
+                userId: userId,
+                receiveCursor: receiveCursor,
+                bootstrapComplete: bootstrapComplete,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userId,
+                Value<int> receiveCursor = const Value.absent(),
+                Value<bool> bootstrapComplete = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncFeedCursorsCompanion.insert(
+                userId: userId,
+                receiveCursor: receiveCursor,
+                bootstrapComplete: bootstrapComplete,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncFeedCursorsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncFeedCursorsTable,
+      SyncFeedCursorData,
+      $$SyncFeedCursorsTableFilterComposer,
+      $$SyncFeedCursorsTableOrderingComposer,
+      $$SyncFeedCursorsTableAnnotationComposer,
+      $$SyncFeedCursorsTableCreateCompanionBuilder,
+      $$SyncFeedCursorsTableUpdateCompanionBuilder,
+      (
+        SyncFeedCursorData,
+        BaseReferences<
+          _$AppDatabase,
+          $SyncFeedCursorsTable,
+          SyncFeedCursorData
+        >,
+      ),
+      SyncFeedCursorData,
+      PrefetchHooks Function()
+    >;
+typedef $$SyncInboxTableCreateCompanionBuilder =
+    SyncInboxCompanion Function({
+      required String userId,
+      required int sequence,
+      required String type,
+      Value<String?> noteId,
+      Value<int?> revision,
+      required DateTime createdAt,
+      Value<DateTime?> appliedAt,
+      Value<int> rowid,
+    });
+typedef $$SyncInboxTableUpdateCompanionBuilder =
+    SyncInboxCompanion Function({
+      Value<String> userId,
+      Value<int> sequence,
+      Value<String> type,
+      Value<String?> noteId,
+      Value<int?> revision,
+      Value<DateTime> createdAt,
+      Value<DateTime?> appliedAt,
+      Value<int> rowid,
+    });
+
+class $$SyncInboxTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncInboxTable> {
+  $$SyncInboxTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sequence => $composableBuilder(
+    column: $table.sequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get appliedAt => $composableBuilder(
+    column: $table.appliedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncInboxTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncInboxTable> {
+  $$SyncInboxTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sequence => $composableBuilder(
+    column: $table.sequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get appliedAt => $composableBuilder(
+    column: $table.appliedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncInboxTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncInboxTable> {
+  $$SyncInboxTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<int> get sequence =>
+      $composableBuilder(column: $table.sequence, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get appliedAt =>
+      $composableBuilder(column: $table.appliedAt, builder: (column) => column);
+}
+
+class $$SyncInboxTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncInboxTable,
+          SyncInboxData,
+          $$SyncInboxTableFilterComposer,
+          $$SyncInboxTableOrderingComposer,
+          $$SyncInboxTableAnnotationComposer,
+          $$SyncInboxTableCreateCompanionBuilder,
+          $$SyncInboxTableUpdateCompanionBuilder,
+          (
+            SyncInboxData,
+            BaseReferences<_$AppDatabase, $SyncInboxTable, SyncInboxData>,
+          ),
+          SyncInboxData,
+          PrefetchHooks Function()
+        > {
+  $$SyncInboxTableTableManager(_$AppDatabase db, $SyncInboxTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncInboxTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncInboxTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncInboxTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> userId = const Value.absent(),
+                Value<int> sequence = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String?> noteId = const Value.absent(),
+                Value<int?> revision = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> appliedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncInboxCompanion(
+                userId: userId,
+                sequence: sequence,
+                type: type,
+                noteId: noteId,
+                revision: revision,
+                createdAt: createdAt,
+                appliedAt: appliedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userId,
+                required int sequence,
+                required String type,
+                Value<String?> noteId = const Value.absent(),
+                Value<int?> revision = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> appliedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncInboxCompanion.insert(
+                userId: userId,
+                sequence: sequence,
+                type: type,
+                noteId: noteId,
+                revision: revision,
+                createdAt: createdAt,
+                appliedAt: appliedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncInboxTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncInboxTable,
+      SyncInboxData,
+      $$SyncInboxTableFilterComposer,
+      $$SyncInboxTableOrderingComposer,
+      $$SyncInboxTableAnnotationComposer,
+      $$SyncInboxTableCreateCompanionBuilder,
+      $$SyncInboxTableUpdateCompanionBuilder,
+      (
+        SyncInboxData,
+        BaseReferences<_$AppDatabase, $SyncInboxTable, SyncInboxData>,
+      ),
+      SyncInboxData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7227,4 +8399,8 @@ class $AppDatabaseManager {
       $$NoteSyncErrorsTableTableManager(_db, _db.noteSyncErrors);
   $$SyncSessionsTableTableManager get syncSessions =>
       $$SyncSessionsTableTableManager(_db, _db.syncSessions);
+  $$SyncFeedCursorsTableTableManager get syncFeedCursors =>
+      $$SyncFeedCursorsTableTableManager(_db, _db.syncFeedCursors);
+  $$SyncInboxTableTableManager get syncInbox =>
+      $$SyncInboxTableTableManager(_db, _db.syncInbox);
 }

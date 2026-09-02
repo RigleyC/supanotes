@@ -15,7 +15,8 @@ import 'package:supanotes/features/notes/sharing/model/share_link_document.dart'
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:super_editor/super_editor.dart';
 
-final FutureProviderFamily<ShareLinkDocument, String> shareLinkDocumentProvider = FutureProvider.autoDispose
+final FutureProviderFamily<ShareLinkDocument, String>
+shareLinkDocumentProvider = FutureProvider.autoDispose
     .family<ShareLinkDocument, String>((ref, token) async {
       final response = await ref
           .read(apiClientProvider)
@@ -105,8 +106,6 @@ class _ShareLinkDocumentReaderState extends State<_ShareLinkDocumentReader> {
       componentBuilders: [
         const CustomDividerComponentBuilder(),
         CustomTaskComponentBuilder(
-          editor: _editor,
-          composer: _editor.composer,
           readOnly: true,
         ),
         AttachmentComponentBuilder(

@@ -117,6 +117,18 @@ void main() {
       expect(coordinator.statusOf('note-1'), NoteSessionStatus.closed);
     });
 
+    test('wakes durable outbox after a note closes', () async {
+      final closedNoteIds = <String>[];
+      final coordinator = NoteSessionCoordinator<_FakeSessionHandle>(
+        onSessionClosed: closedNoteIds.add,
+      );
+
+      await coordinator.open('note-1', _FakeSessionHandle.new);
+      await coordinator.close('note-1');
+
+      expect(closedNoteIds, ['note-1']);
+    });
+
     test('keeps a failed close recoverable for a later retry', () async {
       final coordinator = NoteSessionCoordinator<_FakeSessionHandle>();
       final handle = _FakeSessionHandle(disposeFailures: 1);

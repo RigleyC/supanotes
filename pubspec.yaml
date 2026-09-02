@@ -21,12 +21,12 @@ dependencies:
   super_editor:
     git:
       url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
-      ref: main
+      ref: 3bb857bc423240b61dc0fb799f3c269e71feb24a
       path: super_editor
   super_editor_clipboard:
     git:
       url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
-      ref: main
+      ref: 3bb857bc423240b61dc0fb799f3c269e71feb24a
       path: super_editor_clipboard
 
   # State management
@@ -123,22 +123,22 @@ dependency_overrides:
   super_editor:
     git:
       url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
-      ref: main
+      ref: 3bb857bc423240b61dc0fb799f3c269e71feb24a
       path: super_editor
   super_keyboard:
     git:
       url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
-      ref: main
+      ref: 3bb857bc423240b61dc0fb799f3c269e71feb24a
       path: super_keyboard
   super_text_layout:
     git:
       url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
-      ref: main
+      ref: 3bb857bc423240b61dc0fb799f3c269e71feb24a
       path: super_text_layout
   super_editor_clipboard:
     git:
       url: https://github.com/Flutter-Bounty-Hunters/super_editor.git
-      ref: main
+      ref: 3bb857bc423240b61dc0fb799f3c269e71feb24a
       path: super_editor_clipboard
   device_info_plus: ^12.0.0
 

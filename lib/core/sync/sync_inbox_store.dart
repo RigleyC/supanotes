@@ -20,153 +20,128 @@ final class SyncInboxEntry {
   final DateTime createdAt;
 }
 
+/// Durable receive-side state for the account-scoped sync change feed.
+///
+/// The tables are part of [AppDatabase]'s schema and migrations. Keeping the
+/// store as a small repository preserves the feed workers' API without hiding
+/// schema creation in runtime SQL.
 final class SyncInboxStore {
   SyncInboxStore(this._database);
 
   final AppDatabase _database;
-  Future<void>? _initialization;
-
-  Future<void> initialize() => _initialization ??= _initialize();
-
-  Future<void> _initialize() async {
-    await _database.customStatement('''
-      CREATE TABLE IF NOT EXISTS sync_feed_cursors (
-        user_id TEXT PRIMARY KEY,
-        receive_cursor INTEGER NOT NULL DEFAULT 0,
-        bootstrap_complete INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-    await _database.customStatement('''
-      CREATE TABLE IF NOT EXISTS sync_inbox (
-        user_id TEXT NOT NULL,
-        sequence INTEGER NOT NULL,
-        type TEXT NOT NULL,
-        note_id TEXT,
-        revision INTEGER,
-        created_at TEXT NOT NULL,
-        applied_at TEXT,
-        PRIMARY KEY (user_id, sequence)
-      )
-    ''');
-    await _database.customStatement('''
-      CREATE INDEX IF NOT EXISTS idx_sync_inbox_pending
-      ON sync_inbox(user_id, applied_at, sequence)
-    ''');
-  }
 
   Future<int> getCursor(String userId) async {
-    await initialize();
-    final row = await _database.customSelect(
-      'SELECT receive_cursor FROM sync_feed_cursors WHERE user_id = ?',
-      variables: [Variable.withString(userId)],
-    ).getSingleOrNull();
-    return row?.read<int>('receive_cursor') ?? 0;
+    final row = await (_database.select(
+      _database.syncFeedCursors,
+    )..where((t) => t.userId.equals(userId))).getSingleOrNull();
+    return row?.receiveCursor ?? 0;
   }
 
   Future<bool> isBootstrapComplete(String userId) async {
-    await initialize();
-    final row = await _database.customSelect(
-      'SELECT bootstrap_complete FROM sync_feed_cursors WHERE user_id = ?',
-      variables: [Variable.withString(userId)],
-    ).getSingleOrNull();
-    return (row?.read<int>('bootstrap_complete') ?? 0) != 0;
+    final row = await (_database.select(
+      _database.syncFeedCursors,
+    )..where((t) => t.userId.equals(userId))).getSingleOrNull();
+    return row?.bootstrapComplete ?? false;
   }
 
   Future<void> completeBootstrap({
     required String userId,
     required int cursor,
   }) async {
-    await initialize();
-    await _database.customStatement(
-      '''
-      INSERT INTO sync_feed_cursors(user_id, receive_cursor, bootstrap_complete)
-      VALUES (?, ?, 1)
-      ON CONFLICT(user_id) DO UPDATE SET
-        receive_cursor = MAX(sync_feed_cursors.receive_cursor, excluded.receive_cursor),
-        bootstrap_complete = 1
-      ''',
-      [userId, cursor],
-    );
+    await _database.transaction(() async {
+      final current = await (_database.select(
+        _database.syncFeedCursors,
+      )..where((t) => t.userId.equals(userId))).getSingleOrNull();
+      await _database
+          .into(_database.syncFeedCursors)
+          .insertOnConflictUpdate(
+            SyncFeedCursorsCompanion.insert(
+              userId: userId,
+              receiveCursor: Value(_maxCursor(current?.receiveCursor, cursor)),
+              bootstrapComplete: const Value(true),
+            ),
+          );
+    });
   }
 
   Future<void> ingestPage({
     required String userId,
     required SyncChangePage page,
   }) async {
-    await initialize();
     await _database.transaction(() async {
       for (final change in page.changes) {
-        await _database.customStatement(
-          '''
-          INSERT OR IGNORE INTO sync_inbox(
-            user_id, sequence, type, note_id, revision, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?)
-          ''',
-          [
-            userId,
-            change.sequence,
-            change.type,
-            change.noteId,
-            change.revision,
-            change.createdAt.toUtc().toIso8601String(),
-          ],
-        );
+        await _database
+            .into(_database.syncInbox)
+            .insert(
+              SyncInboxCompanion.insert(
+                userId: userId,
+                sequence: change.sequence,
+                type: change.type,
+                noteId: Value(change.noteId),
+                revision: Value(change.revision),
+                createdAt: change.createdAt.toUtc(),
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
       }
-      await _database.customStatement(
-        '''
-        INSERT INTO sync_feed_cursors(user_id, receive_cursor, bootstrap_complete)
-        VALUES (?, ?, 0)
-        ON CONFLICT(user_id) DO UPDATE SET
-          receive_cursor = MAX(sync_feed_cursors.receive_cursor, excluded.receive_cursor)
-        ''',
-        [userId, page.cursor],
-      );
+
+      final current = await (_database.select(
+        _database.syncFeedCursors,
+      )..where((t) => t.userId.equals(userId))).getSingleOrNull();
+      await _database
+          .into(_database.syncFeedCursors)
+          .insertOnConflictUpdate(
+            SyncFeedCursorsCompanion.insert(
+              userId: userId,
+              receiveCursor: Value(
+                _maxCursor(current?.receiveCursor, page.cursor),
+              ),
+              bootstrapComplete: Value(current?.bootstrapComplete ?? false),
+            ),
+          );
     });
   }
 
   Future<List<SyncInboxEntry>> listPending(String userId) async {
-    await initialize();
-    final rows = await _database.customSelect(
-      '''
-      SELECT user_id, sequence, type, note_id, revision, created_at
-      FROM sync_inbox
-      WHERE user_id = ? AND applied_at IS NULL
-      ORDER BY sequence ASC
-      ''',
-      variables: [Variable.withString(userId)],
-    ).get();
-    return rows.map((row) {
-      return SyncInboxEntry(
-        userId: row.read<String>('user_id'),
-        sequence: row.read<int>('sequence'),
-        type: row.read<String>('type'),
-        noteId: row.readNullable<String>('note_id'),
-        revision: row.readNullable<int>('revision'),
-        createdAt: DateTime.parse(row.read<String>('created_at')).toUtc(),
-      );
-    }).toList(growable: false);
+    final rows =
+        await (_database.select(_database.syncInbox)
+              ..where((t) => t.userId.equals(userId) & t.appliedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.asc(t.sequence)]))
+            .get();
+    return rows
+        .map(
+          (row) => SyncInboxEntry(
+            userId: row.userId,
+            sequence: row.sequence,
+            type: row.type,
+            noteId: row.noteId,
+            revision: row.revision,
+            createdAt: row.createdAt.toUtc(),
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<void> markApplied({
     required String userId,
     required int sequence,
   }) async {
-    await initialize();
-    await _database.customStatement(
-      '''
-      UPDATE sync_inbox
-      SET applied_at = ?
-      WHERE user_id = ? AND sequence = ? AND applied_at IS NULL
-      ''',
-      [DateTime.now().toUtc().toIso8601String(), userId, sequence],
-    );
+    await (_database.update(_database.syncInbox)..where(
+          (t) =>
+              t.userId.equals(userId) &
+              t.sequence.equals(sequence) &
+              t.appliedAt.isNull(),
+        ))
+        .write(SyncInboxCompanion(appliedAt: Value(DateTime.now().toUtc())));
   }
 
   Future<void> clearAll() async {
-    await initialize();
     await _database.transaction(() async {
-      await _database.customStatement('DELETE FROM sync_inbox');
-      await _database.customStatement('DELETE FROM sync_feed_cursors');
+      await _database.delete(_database.syncInbox).go();
+      await _database.delete(_database.syncFeedCursors).go();
     });
   }
+
+  int _maxCursor(int? current, int candidate) =>
+      current == null || candidate > current ? candidate : current;
 }

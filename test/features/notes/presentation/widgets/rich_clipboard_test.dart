@@ -12,6 +12,7 @@ import 'package:super_clipboard/super_clipboard.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_clipboard/super_editor_clipboard.dart';
 import 'package:super_native_extensions/src/native/context.dart';
+import 'dart:async';
 
 class MockEditor extends Mock implements Editor {}
 
@@ -337,6 +338,67 @@ void main() {
 
       expect((document.first as ParagraphNode).text.toPlainText(), 'World');
     });
+
+    test(
+      'paste keeps the selection captured before asynchronous clipboard read',
+      () async {
+        final document = MutableDocument(
+          nodes: [
+            ParagraphNode(id: 'first', text: AttributedText('First')),
+            ParagraphNode(id: 'second', text: AttributedText('Second')),
+          ],
+        );
+        final composer = MutableDocumentComposer(
+          initialSelection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'first',
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        );
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+        );
+        final plainItem = MockClipboardDataReader();
+        final reader = MockClipboardReader();
+        final clipboard = MockClipboard();
+        final readValue = Completer<String?>();
+
+        when(clipboard.read).thenAnswer((_) async => reader);
+        when(() => reader.items).thenReturn([plainItem]);
+        _stubNoBitmapFormats(reader);
+        when(() => reader.canProvide(Formats.plainText)).thenReturn(true);
+        when(
+          () => reader.readValue<String>(Formats.plainText),
+        ).thenAnswer((_) => readValue.future);
+        when(() => plainItem.canProvide(Formats.md)).thenReturn(false);
+        when(() => plainItem.canProvide(Formats.htmlText)).thenReturn(false);
+        when(() => plainItem.canProvide(Formats.uri)).thenReturn(false);
+
+        final paste = pasteWithPreprocessing(editor, testClipboard: clipboard);
+        await Future<void>.delayed(Duration.zero);
+        composer.setSelectionWithReason(
+          const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: 'second',
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        );
+        readValue.complete('X');
+        await paste;
+
+        expect(
+          (document.getNodeById('first')! as ParagraphNode).text.toPlainText(),
+          'FirstX',
+        );
+        expect(
+          (document.getNodeById('second')! as ParagraphNode).text.toPlainText(),
+          'Second',
+        );
+      },
+    );
   });
 
   group('Rich Keyboard Actions', () {

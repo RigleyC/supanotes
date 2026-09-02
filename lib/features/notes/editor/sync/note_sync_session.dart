@@ -157,8 +157,8 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     });
   }
 
-  Future<void> _syncPending() async {
-    await syncService.syncPending(
+  Future<SyncResult> _syncPending() {
+    return syncService.syncPending(
       noteId,
       onReconcile: (result) async {
         await _handleSyncResult(result);
@@ -180,8 +180,13 @@ class NoteSyncSession implements NoteEditorSyncHandle {
       // debounce so it cannot fire again immediately after this pass.
       _cancelScheduledNetworkSync();
       await _runSyncOperation('pollNow', () async {
+        SyncResult? pendingResult;
         if (_captureLocalOperations) {
-          await _syncPending();
+          pendingResult = await _syncPending();
+        }
+        final result = pendingResult;
+        if (result?.hasReconciliationPayload ?? false) {
+          return;
         }
         await syncService.pollAndReconcile(
           noteId,

@@ -1,5 +1,9 @@
 # Sync Coordinator + Global Outbox Implementation Plan
 
+> **Status:** Implemented on `codex/fix-all-editor-sync`. The original plan was
+> expanded by `2026-09-02-editor-sync-hardening.md` to include the remote
+> change-feed/inbox and editor regressions found during review.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make note-operation sync independent from an open editor session while preserving fast local durability and reducing unnecessary network traffic.
@@ -216,4 +220,8 @@ Expected: PASS, or document only pre-existing/environmental failures with exact 
 
 - [ ] **Step 4: Open PR against `master`**
 
-PR should explain the closed-note outbox bug, local-vs-network durability semantics, network coalescing and backoff, and explicitly state that remote inbox/change-feed is the next independent subproject.
+The implementation also includes the remote change-feed/inbox subproject that
+was originally deferred: cursor and inbox state are Drift-managed at schema
+version 31, bootstrap is watermark-anchored, and the inbox worker applies
+changes idempotently. The final handoff records the verification evidence and
+the remaining protocol-level retention decision.

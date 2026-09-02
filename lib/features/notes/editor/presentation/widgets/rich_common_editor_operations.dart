@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/clipboard_preprocessor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/rich_clipboard_serializers.dart';
@@ -35,6 +33,6 @@ class RichCommonEditorOperations extends CommonEditorOperations {
 
   @override
   void paste() {
-    unawaited(pasteWithPreprocessing(editor));
+    pasteWithPreprocessingAndReport(editor);
   }
 }

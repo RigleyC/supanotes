@@ -96,9 +96,9 @@ class AuthController extends AsyncNotifier<User?> {
         cleanupStack ??= stack;
       }
 
-      // Explicit logout is the user-confirmed data-clearing operation. Raw
-      // inbox tables are intentionally outside Drift codegen, so clear them
-      // before clearing the generated schema tables.
+      // Explicit logout is the user-confirmed data-clearing operation. Clear
+      // the actor-scoped inbox/cursor state before clearing the rest of the
+      // local schema.
       try {
         final database = ref.read(appDatabaseProvider);
         await SyncInboxStore(database).clearAll();

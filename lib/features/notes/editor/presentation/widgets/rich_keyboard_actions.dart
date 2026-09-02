@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/clipboard_preprocessor.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/rich_clipboard_serializers.dart';
@@ -130,7 +128,7 @@ ExecutionInstruction pastePreprocessedRichText({
     return ExecutionInstruction.continueExecution;
   }
 
-  unawaited(pasteWithPreprocessing(editContext.editor));
+  pasteWithPreprocessingAndReport(editContext.editor);
 
   return ExecutionInstruction.haltExecution;
 }

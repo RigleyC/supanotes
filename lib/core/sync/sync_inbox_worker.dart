@@ -34,7 +34,6 @@ final class SyncInboxWorker {
   }
 
   Future<void> _syncOnce() async {
-    await _store.initialize();
     await drainInbox();
 
     while (!_disposed) {
@@ -57,7 +56,6 @@ final class SyncInboxWorker {
 
   Future<void> drainInbox() async {
     if (_disposed) return;
-    await _store.initialize();
     final pending = await _store.listPending(userId);
     for (final change in pending) {
       if (_disposed) return;

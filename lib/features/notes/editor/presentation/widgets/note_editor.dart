@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,9 +20,11 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolba
 import 'package:super_editor/super_editor.dart';
 
 class NoteEditor extends StatefulWidget {
-
   const NoteEditor({
-    required this.noteId, required this.session, required this.delegate, super.key,
+    required this.noteId,
+    required this.session,
+    required this.delegate,
+    super.key,
     this.hideCompleted = false,
     this.collapseImages = false,
     this.attachmentDelivery,
@@ -138,8 +139,6 @@ class _NoteEditorState extends State<NoteEditor> {
     ];
 
     _taskComponentBuilder = CustomTaskComponentBuilder(
-      editor: controller.editor,
-      composer: controller.composer,
       hideCompleted: widget.hideCompleted,
       readOnly: _isReadOnly,
       onTaskLongPress: _isReadOnly ? null : widget.delegate.onTaskLongPress,
@@ -191,8 +190,7 @@ class _NoteEditorState extends State<NoteEditor> {
   }
 
   void _handleHiddenTaskUpdate(NoteEditor oldWidget) {
-    if (widget.hideCompleted != oldWidget.hideCompleted ||
-        widget.hideCompleted != oldWidget.hideCompleted) {
+    if (widget.hideCompleted != oldWidget.hideCompleted) {
       _configureHiddenTaskEditing();
     }
   }

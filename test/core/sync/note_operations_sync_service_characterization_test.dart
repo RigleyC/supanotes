@@ -124,7 +124,13 @@ void main() {
             canonicalDocument: const {
               'schemaVersion': 1,
               'blocks': [
-                {'id': 'b1', 'type': 'paragraph', 'text': 'server'},
+                {
+                  'id': 'b1',
+                  'type': 'paragraph',
+                  'delta': [
+                    {'insert': 'server'},
+                  ],
+                },
               ],
             },
             serverTime: DateTime.utc(2026, 7, 26),

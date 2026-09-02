@@ -171,3 +171,23 @@ Verification:
 - Windows debug build: passed.
 - Controlled `flutter run -d windows --debug`: reached VM service attachment
   with no `FormatException` or note-session startup error.
+
+## Editor and sync hardening (2026-09-02)
+
+The editor now skips hidden completed tasks when deleting across visible block
+boundaries, sanitizes selections when a selected task becomes hidden, captures
+paste destinations before asynchronous clipboard reads, and reports paste
+errors. Multi-heading toolbar state, task callback lifetime/failure recovery,
+and text-scaled list markers were corrected. Super Editor packages are pinned
+to one immutable commit.
+
+Remote synchronization now has a durable Drift-managed inbox and feed cursor
+(schema v31), a tested v30 migration, watermark bootstrap, and a close-session
+wake into the global outbox. Polling consumes useful POST responses instead of
+issuing an immediate redundant GET. The temporary branch-specific verification
+workflow was removed.
+
+Verification: `flutter test --no-pub` passed 730 tests and `git diff --check`
+passed. Analyzer output remains limited to the repository's existing
+warnings/infos. Go verification is pending because the Go toolchain is not
+installed on the current Windows host; see `HANDOFF.md`.

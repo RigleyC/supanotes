@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
+import 'package:supanotes/core/sync/sync_retry_policy.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 typedef PendingNoteIdsLoader = Future<List<String>> Function();
@@ -147,10 +148,8 @@ class NoteOutboxWorker {
   }
 
   Duration _defaultBackoff(int attempt) {
-    const seconds = [1, 2, 5, 10, 30, 60];
-    final index = (attempt - 1).clamp(0, seconds.length - 1);
     final jitterMs = _random.nextInt(251);
-    return Duration(seconds: seconds[index], milliseconds: jitterMs);
+    return syncRetryDelayForAttempt(attempt) + Duration(milliseconds: jitterMs);
   }
 
   void _scheduleRetryTimer() {
@@ -160,7 +159,8 @@ class NoteOutboxWorker {
 
     DateTime? nextAttemptAt;
     for (final retry in _retryByNote.values) {
-      if (nextAttemptAt == null || retry.nextAttemptAt.isBefore(nextAttemptAt)) {
+      if (nextAttemptAt == null ||
+          retry.nextAttemptAt.isBefore(nextAttemptAt)) {
         nextAttemptAt = retry.nextAttemptAt;
       }
     }

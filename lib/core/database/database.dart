@@ -20,6 +20,8 @@ import 'package:supanotes/core/database/tables/note_links.dart';
 import 'package:supanotes/core/database/tables/note_sync_errors.dart';
 import 'package:supanotes/core/database/tables/notes.dart';
 import 'package:supanotes/core/database/tables/pending_note_operations.dart';
+import 'package:supanotes/core/database/tables/sync_feed_cursors.dart';
+import 'package:supanotes/core/database/tables/sync_inbox.dart';
 import 'package:supanotes/core/database/tables/sync_sessions.dart';
 import 'package:supanotes/core/database/tables/user_note_preferences.dart';
 
@@ -43,7 +45,8 @@ final class UpdateRemoteNote extends RemoteNoteWriteMode {
 /// shared `notes.collapse_images` column before it is dropped. Rows that
 /// carry a collapsed state are marked dirty so the preserved local value is
 /// pushed to the backend, and their notes are materialized.
-const perUserCollapseBackfillSql = '''
+const perUserCollapseBackfillSql =
+    '''
 INSERT INTO user_note_preferences
   (user_id, note_id, collapse_images, updated_at, is_dirty)
 SELECT n.user_id, n.id, n.collapse_images, n.updated_at, 1
@@ -103,6 +106,8 @@ Future<void> migratePerUserCollapse(
     PendingNoteOperations,
     NoteSyncErrors,
     SyncSessions,
+    SyncFeedCursors,
+    SyncInbox,
   ],
   daos: [
     NotesDao,
@@ -201,7 +206,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 30;
+  int get schemaVersion => 31;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -220,6 +225,82 @@ class AppDatabase extends _$AppDatabase {
     await _migrateNoteMetadata(m, from);
     await _migrateEffectiveDocuments(m, from);
     await migratePerUserCollapse(this, m, from);
+    await _migrateSyncInbox(m, from);
+  }
+
+  Future<void> _migrateSyncInbox(Migrator m, int from) async {
+    if (from >= 31) return;
+    await _rebuildSyncFeedCursors(m);
+    await _rebuildSyncInbox(m);
+  }
+
+  Future<void> _rebuildSyncFeedCursors(Migrator m) async {
+    if (!await _tableExists('sync_feed_cursors')) {
+      await m.createTable(syncFeedCursors);
+      return;
+    }
+    await customStatement('''
+      CREATE TABLE sync_feed_cursors_v31 (
+        user_id TEXT NOT NULL PRIMARY KEY,
+        receive_cursor INTEGER NOT NULL DEFAULT 0,
+        bootstrap_complete INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await customStatement('''
+      INSERT INTO sync_feed_cursors_v31(user_id, receive_cursor, bootstrap_complete)
+      SELECT user_id, receive_cursor, bootstrap_complete
+      FROM sync_feed_cursors
+    ''');
+    await customStatement('DROP TABLE sync_feed_cursors');
+    await customStatement(
+      'ALTER TABLE sync_feed_cursors_v31 RENAME TO sync_feed_cursors',
+    );
+  }
+
+  Future<void> _rebuildSyncInbox(Migrator m) async {
+    if (!await _tableExists('sync_inbox')) {
+      await m.createTable(syncInbox);
+      return;
+    }
+    await customStatement('''
+      CREATE TABLE sync_inbox_v31 (
+        user_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        note_id TEXT,
+        revision INTEGER,
+        created_at INTEGER NOT NULL,
+        applied_at INTEGER,
+        PRIMARY KEY (user_id, sequence)
+      )
+    ''');
+    await customStatement('''
+      INSERT INTO sync_inbox_v31(
+        user_id, sequence, type, note_id, revision, created_at, applied_at
+      )
+      SELECT
+        user_id, sequence, type, note_id, revision,
+        CAST(strftime('%s', created_at) AS INTEGER),
+        CASE WHEN applied_at IS NULL THEN NULL
+          ELSE CAST(strftime('%s', applied_at) AS INTEGER) END
+      FROM sync_inbox
+    ''');
+    await customStatement('DROP TABLE sync_inbox');
+    await customStatement(
+      'ALTER TABLE sync_inbox_v31 RENAME TO sync_inbox',
+    );
+    await customStatement('''
+      CREATE INDEX IF NOT EXISTS idx_sync_inbox_pending
+      ON sync_inbox(user_id, applied_at, sequence)
+    ''');
+  }
+
+  Future<bool> _tableExists(String tableName) async {
+    final rows = await customSelect(
+      'SELECT 1 FROM sqlite_master WHERE type = ? AND name = ?',
+      variables: [Variable.withString('table'), Variable.withString(tableName)],
+    ).get();
+    return rows.isNotEmpty;
   }
 
   Future<void> _migrateEffectiveDocuments(Migrator m, int from) async {

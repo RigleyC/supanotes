@@ -32,6 +32,14 @@ class SyncResult {
 
   bool get isBlocked => blockedReason != null;
 
+  /// Whether a pending-operation response already carried enough information
+  /// for the caller to reconcile without a follow-up poll.
+  bool get hasReconciliationPayload =>
+      isBlocked ||
+      acceptedCount > 0 ||
+      canonicalDocument != null ||
+      remoteOperations.isNotEmpty;
+
   static SyncResult empty() => SyncResult(
     acceptedCount: 0,
     acceptedOperationIds: [],

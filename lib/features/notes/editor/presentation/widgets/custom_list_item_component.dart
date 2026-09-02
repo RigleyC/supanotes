@@ -66,7 +66,12 @@ class CustomListItemComponentBuilder extends ListItemComponentBuilder {
         indentCalculator: (textStyle, indent) => noteEditorListIndentCalculator(
           textStyle,
           indent,
-          _orderedListMarkerWidth(textStyle, listIndex, numeralStyle),
+          _orderedListMarkerWidth(
+            textStyle,
+            listIndex,
+            numeralStyle,
+            MediaQuery.textScalerOf(componentContext.context),
+          ),
         ),
         textSelection: componentViewModel.selection,
         selectionColor: componentViewModel.selectionColor,
@@ -112,7 +117,6 @@ Widget _leftAlignedDotBuilder(
             ),
           ],
         ),
-        textScaler: const TextScaler.linear(1),
       ),
     ),
   );
@@ -150,12 +154,13 @@ double _orderedListMarkerWidth(
   TextStyle textStyle,
   int listIndex,
   OrderedListNumeralStyle numeralStyle,
+  TextScaler textScaler,
 ) {
   final marker = '${_numeralForIndex(listIndex, numeralStyle)}.';
   final painter = TextPainter(
     text: TextSpan(text: marker, style: textStyle.copyWith(inherit: false)),
     textDirection: TextDirection.ltr,
-    textScaler: const TextScaler.linear(1),
+    textScaler: textScaler,
   )..layout();
   return painter.width;
 }

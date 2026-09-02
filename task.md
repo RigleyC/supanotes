@@ -32,6 +32,21 @@
 - [x] Apply the shared fade to the notes list and note editor.
 - [x] Validate fade geometry and existing editor layout behavior.
 
+## Editor and sync hardening (2026-09-02)
+
+- [x] Skip hidden completed tasks at visible deletion boundaries while
+  preserving canonical hidden nodes.
+- [x] Stabilize asynchronous paste destinations and report paste failures.
+- [x] Correct multi-heading toolbar state, task callback lifecycle, completion
+  recovery, and list-marker text scaling.
+- [x] Pin all Super Editor monorepo dependencies to one immutable commit.
+- [x] Wake the global outbox when an editor closes and avoid redundant polling.
+- [x] Move remote inbox/cursor state into Drift schema v31 with migration tests.
+- [x] Run the complete Flutter suite (729 tests passed) and document the Go
+  toolchain limitation in `HANDOFF.md`.
+- [ ] Run Go verification and commit after thermo-nuclear review on a machine
+  with the Go toolchain available.
+
 ## Per-note preference sync (plan 2026-08-14) — Task 2: collapse ownership → preference row
 
 - [x] Failing DAO tests: collapse changes dirty the shared preference row; remote

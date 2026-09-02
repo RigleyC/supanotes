@@ -120,9 +120,10 @@ final noteOperationsDaoProvider = Provider<NoteOperationsDao>((ref) {
   return ref.watch(appDatabaseProvider).noteOperationsDao;
 });
 
-final Provider<NoteLifecycleStore> noteLifecycleStoreProvider = Provider.autoDispose<NoteLifecycleStore>(
-  (ref) => DatabaseNoteLifecycleStore(ref.watch(appDatabaseProvider)),
-);
+final Provider<NoteLifecycleStore> noteLifecycleStoreProvider =
+    Provider.autoDispose<NoteLifecycleStore>(
+      (ref) => DatabaseNoteLifecycleStore(ref.watch(appDatabaseProvider)),
+    );
 
 // ---------------------------------------------------------------------------
 // Note sync client
@@ -239,8 +240,14 @@ final noteSessionCoordinatorProvider =
         );
       }
 
+      // Capture the worker instance while this provider is alive. The
+      // registry closes sessions from an `onDispose` callback, after Riverpod
+      // invalidates this Ref; consulting `ref` from the close callback would
+      // therefore race provider disposal.
+      final outboxWorker = ref.read(noteOutboxWorkerProvider);
       final coordinator = NoteSessionCoordinator<NoteEditorSession>(
         activityTracker: ref.watch(noteSessionActivityTrackerProvider),
+        onSessionClosed: (_) => outboxWorker?.wake(),
       );
       final unregister = ref
           .read(authSessionResourceRegistryProvider)

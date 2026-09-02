@@ -2,7 +2,9 @@
 
 ## Status
 
-Aprovado para implementação.
+Implementado na branch `codex/fix-all-editor-sync`. O change-feed/inbox que era
+uma etapa posterior foi incorporado durante a correção completa; as tabelas
+locais agora fazem parte do schema Drift (v31).
 
 ## Problema
 
@@ -19,12 +21,14 @@ Além disso, cada flush local de 50 ms pode disparar `syncPending()` imediatamen
 5. Aplicar retry com backoff e jitter no worker global.
 6. Acordar o worker ao voltar conectividade, ao retornar ao foreground e por timer de segurança.
 7. Não alterar o protocolo REST/OT nem a lógica de rebase nesta etapa.
-8. Preparar a arquitetura para uma etapa posterior de inbox/change-feed global, sem implementar o backend de change feed agora.
+8. Consumir mudanças remotas por um change-feed global durável, sem aplicar
+   eventos diretamente no widget do editor.
 
 ## Não objetivos
 
 - Não substituir REST/OT por Yjs, WebSocket ou SSE.
-- Não criar a tabela de inbox remota nesta etapa.
+- Não adicionar SSE/WebSocket nesta etapa; o cursor HTTP continua sendo o
+  mecanismo confiável de recuperação.
 - Não mudar o formato wire das operações.
 - Não fazer background execution nativa quando o processo do app estiver encerrado.
 - Não aplicar sync do worker global em notas atualmente ativas no editor.
@@ -129,13 +133,10 @@ worker tenta
 7. `flushNow()` continua garantindo persistência local sem exigir sucesso de rede.
 8. Fechar sessão offline deixa a operação na outbox e o worker consegue enviá-la posteriormente.
 
-## Próxima etapa: remote inbox/change feed
+## Próxima etapa: retenção e wake-up remoto
 
-Depois desta etapa estabilizar, criar uma spec independente para:
-
-- cursor global monotônico no backend;
-- endpoint incremental `/sync/changes?after=<cursor>`;
-- tabela local `sync_inbox`;
-- `InboxWorker` idempotente;
-- substituição gradual da varredura completa de catálogo de 15 s;
-- SSE opcional apenas como mecanismo de wake-up, mantendo o cursor HTTP como recuperação.
+O feed e a inbox já estão implementados. Uma política de retenção/compactação
+do feed exige protocolo adicional de acknowledgement/expiração de cursor; não
+foi adicionado um TTL especulativo que poderia fazer clientes offline pularem
+eventos. SSE continua opcional apenas como mecanismo de wake-up, mantendo o
+cursor HTTP como recuperação.

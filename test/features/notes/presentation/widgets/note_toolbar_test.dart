@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_state.dart';
 import 'package:super_editor/super_editor.dart';
 
 /// Pumps a bare [NoteToolbar] with the given nodes and initial selection.
 /// Returns the document, composer, and editor for assertions and commands.
 ({Editor editor, MutableDocument document, MutableDocumentComposer composer})
-    buildToolbarHarness({
+buildToolbarHarness({
   required List<DocumentNode> nodes,
   DocumentSelection? selection,
 }) {
@@ -58,6 +59,23 @@ Finder iconButtonWithIcon(IconData icon) {
 }
 
 void main() {
+  test('resolves a shared block type across multiple paragraphs', () {
+    final nodes = [
+      ParagraphNode(
+        id: 'heading-1',
+        text: AttributedText('One'),
+        metadata: const {'blockType': header2Attribution},
+      ),
+      ParagraphNode(
+        id: 'heading-2',
+        text: AttributedText('Two'),
+        metadata: const {'blockType': header2Attribution},
+      ),
+    ];
+
+    expect(resolveSelectedBlockType(nodes), header2Attribution);
+  });
+
   group('normal block-format controls', () {
     testWidgets('shows block controls for a paragraph and hides inline', (
       tester,
@@ -86,7 +104,12 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+          home: Scaffold(
+            body: NoteToolbar(
+              editor: harness.editor,
+              composer: harness.composer,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -106,7 +129,12 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+          home: Scaffold(
+            body: NoteToolbar(
+              editor: harness.editor,
+              composer: harness.composer,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -125,7 +153,12 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+          home: Scaffold(
+            body: NoteToolbar(
+              editor: harness.editor,
+              composer: harness.composer,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -146,7 +179,12 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+          home: Scaffold(
+            body: NoteToolbar(
+              editor: harness.editor,
+              composer: harness.composer,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -154,14 +192,16 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Título 3'));
       await tester.pumpAndSettle();
       expect(
-        (harness.document.getNodeById('node-1')! as ParagraphNode).getMetadataValue('blockType'),
+        (harness.document.getNodeById('node-1')! as ParagraphNode)
+            .getMetadataValue('blockType'),
         header3Attribution,
       );
 
       await tester.tap(find.bySemanticsLabel('Citação'));
       await tester.pumpAndSettle();
       expect(
-        (harness.document.getNodeById('node-1')! as ParagraphNode).getMetadataValue('blockType'),
+        (harness.document.getNodeById('node-1')! as ParagraphNode)
+            .getMetadataValue('blockType'),
         blockquoteAttribution,
       );
     });
@@ -279,8 +319,14 @@ void main() {
   });
 
   group('command results', () {
-    Future<({Editor editor, MutableDocument document, MutableDocumentComposer composer})>
-        pumpCommand(
+    Future<
+      ({
+        Editor editor,
+        MutableDocument document,
+        MutableDocumentComposer composer,
+      })
+    >
+    pumpCommand(
       WidgetTester tester, {
       required List<DocumentNode> nodes,
       required DocumentSelection selection,
@@ -288,7 +334,12 @@ void main() {
       final harness = buildToolbarHarness(nodes: nodes, selection: selection);
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+          home: Scaffold(
+            body: NoteToolbar(
+              editor: harness.editor,
+              composer: harness.composer,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -489,7 +540,12 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: NoteToolbar(editor: harness.editor, composer: harness.composer)),
+          home: Scaffold(
+            body: NoteToolbar(
+              editor: harness.editor,
+              composer: harness.composer,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -534,7 +590,10 @@ void main() {
           home: Scaffold(
             body: MediaQuery(
               data: const MediaQueryData(disableAnimations: true),
-              child: NoteToolbar(editor: harness.editor, composer: harness.composer),
+              child: NoteToolbar(
+                editor: harness.editor,
+                composer: harness.composer,
+              ),
             ),
           ),
         ),

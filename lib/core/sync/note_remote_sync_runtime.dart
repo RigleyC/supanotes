@@ -10,14 +10,16 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/note_remote_sync_coordinator.dart';
 import 'package:supanotes/core/sync/sync_feed_client.dart';
 import 'package:supanotes/core/sync/sync_inbox_store.dart';
+import 'package:supanotes/core/sync/sync_retry_policy.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/data/remote_note_change_applier.dart';
 import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
-typedef RemoteNoteMetadataLoader = Future<RemoteNoteMetadata> Function(
-  String noteId,
-);
+typedef RemoteNoteMetadataLoader =
+    Future<RemoteNoteMetadata> Function(
+      String noteId,
+    );
 
 final syncInboxStoreProvider = Provider.autoDispose<SyncInboxStore>((ref) {
   return SyncInboxStore(ref.watch(appDatabaseProvider));
@@ -138,12 +140,14 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
     unawaited(connectivitySubscription.cancel());
   });
 
+  var failureAttempt = 0;
   while (true) {
     try {
       await catalog.pushDeletedNotes();
       await catalog.pushDirtyPreferences();
       await coordinator.syncOnce();
       await catalog.pushDirtyNoteIcons();
+      failureAttempt = 0;
       yield null;
     } catch (error, stackTrace) {
       if (_isUnauthenticated(error)) {
@@ -155,10 +159,16 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
         error: error,
         stackTrace: stackTrace,
       );
+      failureAttempt++;
     }
-    await Future<void>.delayed(const Duration(seconds: 2));
+    await Future<void>.delayed(_remoteSyncDelay(failureAttempt));
   }
 });
+
+Duration _remoteSyncDelay(int failureAttempt) {
+  if (failureAttempt == 0) return const Duration(seconds: 2);
+  return syncRetryDelayForAttempt(failureAttempt);
+}
 
 bool _isUnauthenticated(Object error) {
   if (error is NoteOperationsException) return error.statusCode == 401;

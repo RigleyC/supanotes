@@ -18,8 +18,6 @@ const double _taskCheckboxTextGap = noteEditorMarkerTextGap;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
-    this.editor,
-    this.composer,
     this.hideCompleted = false,
     this.readOnly = false,
     this.onTaskLongPress,
@@ -27,17 +25,11 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     this.onTaskReopen,
   });
 
-  Editor? editor;
-
-  final MutableDocumentComposer? composer;
   bool hideCompleted;
   final bool readOnly;
   ValueChanged<String>? onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
   final Future<void> Function(String taskId)? onTaskReopen;
-
-  final Map<String, Future<void> Function(bool)> _completionHandlers = {};
-  final Set<String> _recurringTaskIds = {};
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -48,28 +40,16 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     final metadata = TaskMetadataDraft.fromTaskNode(node);
     final isRecurring = isRecurringTaskNode(node);
-    if (isRecurring) {
-      _recurringTaskIds.add(node.id);
-    } else {
-      _recurringTaskIds.remove(node.id);
-    }
 
     Future<void> updateCompletion(bool isComplete) async {
       if (readOnly) return;
       AppHaptics.taskCompletion();
       if (isComplete) {
-        if (hideCompleted && !isRecurring) {
-          FocusManager.instance.primaryFocus?.unfocus();
-          composer?.clearSelection();
-        }
-
         await onTaskComplete?.call(node.id);
       } else {
         await onTaskReopen?.call(node.id);
       }
     }
-
-    _completionHandlers[node.id] = updateCompletion;
 
     return CustomTaskComponentViewModel(
       nodeId: node.id,
@@ -86,6 +66,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       dueDate: metadata.scheduleAnchor,
       recurrence: metadata.recurrence,
       taskMetadata: metadata,
+      isRecurring: isRecurring,
+      onCompletionChange: updateCompletion,
     );
   }
 
@@ -96,7 +78,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   ) {
     if (componentViewModel is! TaskComponentViewModel) return null;
 
-    final nodeId = componentViewModel.nodeId;
     final customViewModel = componentViewModel is CustomTaskComponentViewModel
         ? componentViewModel
         : null;
@@ -105,14 +86,14 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       key: componentContext.componentKey,
       viewModel: componentViewModel,
       taskMetadata: customViewModel?.taskMetadata,
-      isRecurring: _recurringTaskIds.contains(nodeId),
+      isRecurring: customViewModel?.isRecurring ?? false,
       isReadOnly: readOnly,
-      onCompletionChange: _completionHandlers[nodeId],
+      onCompletionChange: customViewModel?.onCompletionChange,
       hideCompleted: hideCompleted,
       onLongPress: readOnly || onTaskLongPress == null
           ? null
           : () {
-              onTaskLongPress!(nodeId);
+              onTaskLongPress!(componentViewModel.nodeId);
             },
     );
   }
@@ -131,14 +112,27 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     required super.nodeId,
     required super.createdAt,
     required super.padding,
-    required super.indent, required super.isComplete, required super.setComplete, required super.text, required super.textDirection, required super.textAlignment, required super.textStyleBuilder, required super.selectionColor, required this.taskMetadata, super.opacity = 1.0,
+    required super.indent,
+    required super.isComplete,
+    required super.setComplete,
+    required super.text,
+    required super.textDirection,
+    required super.textAlignment,
+    required super.textStyleBuilder,
+    required super.selectionColor,
+    required this.taskMetadata,
+    super.opacity = 1.0,
     this.dueDate,
     this.recurrence,
+    required this.isRecurring,
+    required this.onCompletionChange,
   });
 
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
   final TaskMetadataDraft taskMetadata;
+  final bool isRecurring;
+  final Future<void> Function(bool isComplete)? onCompletionChange;
 
   @override
   CustomTaskComponentViewModel copy() {
@@ -159,6 +153,8 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
             dueDate: dueDate,
             recurrence: recurrence,
             taskMetadata: taskMetadata,
+            isRecurring: isRecurring,
+            onCompletionChange: onCompletionChange,
           ),
         )
         as CustomTaskComponentViewModel;
@@ -171,17 +167,24 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     if (super != other) return false;
     return dueDate == other.dueDate &&
         recurrence == other.recurrence &&
-        taskMetadata == other.taskMetadata;
+        taskMetadata == other.taskMetadata &&
+        isRecurring == other.isRecurring;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(super.hashCode, dueDate, recurrence, taskMetadata);
+  int get hashCode => Object.hash(
+    super.hashCode,
+    dueDate,
+    recurrence,
+    taskMetadata,
+    isRecurring,
+  );
 }
 
 class CustomTaskComponent extends StatefulWidget {
   const CustomTaskComponent({
-    required this.viewModel, super.key,
+    required this.viewModel,
+    super.key,
     this.isReadOnly = false,
     this.isRecurring = false,
     this.taskMetadata,

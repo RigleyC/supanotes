@@ -47,14 +47,174 @@ void main() {
     );
   });
 
-  test('multiple local flushes inside the window produce one network sync', () async {
+  test(
+    'multiple local flushes inside the window produce one network sync',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      var networkCalls = 0;
+      when(() => client.syncOperations(any(), any())).thenAnswer((
+        invocation,
+      ) async {
+        networkCalls++;
+        final request = invocation.positionalArguments[1] as SyncRequest;
+        return _acceptedResponse(request, 'ab');
+      });
+
+      final syncService = NoteOperationsSyncService(
+        syncClient: client,
+        dao: database.noteOperationsDao,
+        clientId: 'client-1',
+        actorId: 'user-1',
+      );
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: MutableDocumentComposer(),
+      );
+      final session = NoteSyncSession(
+        noteId: 'debounce-note',
+        syncService: syncService,
+        document: document,
+        editor: editor,
+        userId: 'user-1',
+        captureLocalOperations: false,
+        networkCoalescingWindow: const Duration(milliseconds: 300),
+      );
+      addTearDown(() async {
+        await session.dispose();
+        editor.dispose();
+        document.dispose();
+        await database.close();
+      });
+
+      await session.start();
+      session.setCaptureLocalOperations(true);
+
+      editor.execute([
+        InsertTextRequest(
+          documentPosition: const DocumentPosition(
+            nodeId: 'init',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          textToInsert: 'a',
+          attributions: const {},
+        ),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      editor.execute([
+        InsertTextRequest(
+          documentPosition: const DocumentPosition(
+            nodeId: 'init',
+            nodePosition: TextNodePosition(offset: 1),
+          ),
+          textToInsert: 'b',
+          attributions: const {},
+        ),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+
+      expect(networkCalls, 0);
+
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      expect(networkCalls, 1);
+    },
+  );
+
+  test(
+    'flushNow guarantees local durability without waiting for remote ack',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final remoteStarted = Completer<void>();
+      final remoteRelease = Completer<SyncResponse>();
+      when(
+        () => client.syncOperations(any(), any()),
+      ).thenAnswer((_) {
+        if (!remoteStarted.isCompleted) remoteStarted.complete();
+        return remoteRelease.future;
+      });
+
+      final syncService = NoteOperationsSyncService(
+        syncClient: client,
+        dao: database.noteOperationsDao,
+        clientId: 'client-1',
+        actorId: 'user-1',
+      );
+      final document = MutableDocument(
+        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
+      );
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: MutableDocumentComposer(),
+      );
+      final session = NoteSyncSession(
+        noteId: 'flush-note',
+        syncService: syncService,
+        document: document,
+        editor: editor,
+        userId: 'user-1',
+        captureLocalOperations: false,
+        networkCoalescingWindow: const Duration(seconds: 5),
+      );
+
+      await session.start();
+      session.setCaptureLocalOperations(true);
+      editor.execute([
+        InsertTextRequest(
+          documentPosition: const DocumentPosition(
+            nodeId: 'init',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+          textToInsert: 'durable',
+          attributions: const {},
+        ),
+      ]);
+
+      await session.flushNow().timeout(const Duration(milliseconds: 250));
+
+      final pending = await database.noteOperationsDao.getPendingOperations(
+        'flush-note',
+        ownerUserId: 'user-1',
+      );
+      expect(pending, hasLength(1));
+
+      await remoteStarted.future.timeout(const Duration(milliseconds: 250));
+      expect(remoteRelease.isCompleted, isFalse);
+      final capturedRequest =
+          verify(
+                () => client.syncOperations('flush-note', captureAny()),
+              ).captured.single
+              as SyncRequest;
+
+      remoteRelease.complete(_acceptedResponse(capturedRequest, 'durable'));
+      await pumpEventQueue();
+
+      await session.dispose();
+      editor.dispose();
+      document.dispose();
+      await database.close();
+    },
+  );
+
+  test('does not poll again after pollNow syncs pending operations', () async {
     final database = AppDatabase.test();
     final client = _MockNoteSyncClient();
-    var networkCalls = 0;
-    when(() => client.syncOperations(any(), any())).thenAnswer((invocation) async {
-      networkCalls++;
+    var syncCalls = 0;
+    var pollCalls = 0;
+    when(() => client.syncOperations(any(), any())).thenAnswer((
+      invocation,
+    ) async {
+      syncCalls++;
       final request = invocation.positionalArguments[1] as SyncRequest;
-      return _acceptedResponse(request, 'ab');
+      return _acceptedResponse(request, 'synced');
+    });
+    when(() => client.getOperationsSince(any(), any())).thenAnswer((_) async {
+      pollCalls++;
+      return OperationsListResponse(operations: const []);
     });
 
     final syncService = NoteOperationsSyncService(
@@ -71,13 +231,13 @@ void main() {
       composer: MutableDocumentComposer(),
     );
     final session = NoteSyncSession(
-      noteId: 'debounce-note',
+      noteId: 'poll-note',
       syncService: syncService,
       document: document,
       editor: editor,
       userId: 'user-1',
       captureLocalOperations: false,
-      networkCoalescingWindow: const Duration(milliseconds: 300),
+      networkCoalescingWindow: const Duration(seconds: 5),
     );
     addTearDown(() async {
       await session.dispose();
@@ -87,106 +247,20 @@ void main() {
     });
 
     await session.start();
+    await syncService.enqueueOperations('poll-note', [
+      OperationRequest(
+        operationId: 'op-1',
+        baseRevision: 0,
+        kind: 'insert_text',
+        blockId: 'init',
+        payload: const {'text': 'local'},
+      ),
+    ]);
     session.setCaptureLocalOperations(true);
 
-    editor.execute([
-      InsertTextRequest(
-        documentPosition: const DocumentPosition(
-          nodeId: 'init',
-          nodePosition: TextNodePosition(offset: 0),
-        ),
-        textToInsert: 'a',
-        attributions: const {},
-      ),
-    ]);
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await session.pollNow();
 
-    editor.execute([
-      InsertTextRequest(
-        documentPosition: const DocumentPosition(
-          nodeId: 'init',
-          nodePosition: TextNodePosition(offset: 1),
-        ),
-        textToInsert: 'b',
-        attributions: const {},
-      ),
-    ]);
-    await Future<void>.delayed(const Duration(milliseconds: 180));
-
-    expect(networkCalls, 0);
-
-    await Future<void>.delayed(const Duration(milliseconds: 220));
-    expect(networkCalls, 1);
-  });
-
-  test('flushNow guarantees local durability without waiting for remote ack', () async {
-    final database = AppDatabase.test();
-    final client = _MockNoteSyncClient();
-    final remoteStarted = Completer<void>();
-    final remoteRelease = Completer<SyncResponse>();
-    when(
-      () => client.syncOperations(any(), any()),
-    ).thenAnswer((_) {
-      if (!remoteStarted.isCompleted) remoteStarted.complete();
-      return remoteRelease.future;
-    });
-
-    final syncService = NoteOperationsSyncService(
-      syncClient: client,
-      dao: database.noteOperationsDao,
-      clientId: 'client-1',
-      actorId: 'user-1',
-    );
-    final document = MutableDocument(
-      nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-    );
-    final editor = createDefaultDocumentEditor(
-      document: document,
-      composer: MutableDocumentComposer(),
-    );
-    final session = NoteSyncSession(
-      noteId: 'flush-note',
-      syncService: syncService,
-      document: document,
-      editor: editor,
-      userId: 'user-1',
-      captureLocalOperations: false,
-      networkCoalescingWindow: const Duration(seconds: 5),
-    );
-
-    await session.start();
-    session.setCaptureLocalOperations(true);
-    editor.execute([
-      InsertTextRequest(
-        documentPosition: const DocumentPosition(
-          nodeId: 'init',
-          nodePosition: TextNodePosition(offset: 0),
-        ),
-        textToInsert: 'durable',
-        attributions: const {},
-      ),
-    ]);
-
-    await session.flushNow().timeout(const Duration(milliseconds: 250));
-
-    final pending = await database.noteOperationsDao.getPendingOperations(
-      'flush-note',
-      ownerUserId: 'user-1',
-    );
-    expect(pending, hasLength(1));
-
-    await remoteStarted.future.timeout(const Duration(milliseconds: 250));
-    expect(remoteRelease.isCompleted, isFalse);
-    final capturedRequest = verify(
-      () => client.syncOperations('flush-note', captureAny()),
-    ).captured.single as SyncRequest;
-
-    remoteRelease.complete(_acceptedResponse(capturedRequest, 'durable'));
-    await pumpEventQueue();
-
-    await session.dispose();
-    editor.dispose();
-    document.dispose();
-    await database.close();
+    expect(syncCalls, 1);
+    expect(pollCalls, 0);
   });
 }

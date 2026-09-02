@@ -17,10 +17,13 @@ class NoteSessionSnapshot {
 }
 
 class NoteSessionCoordinator<T extends NoteSessionHandle> {
-  NoteSessionCoordinator({NoteSessionActivityTracker? activityTracker})
-    : _activityTracker = activityTracker;
+  NoteSessionCoordinator({
+    NoteSessionActivityTracker? activityTracker,
+    this.onSessionClosed,
+  }) : _activityTracker = activityTracker;
 
   final NoteSessionActivityTracker? _activityTracker;
+  final void Function(String noteId)? onSessionClosed;
   final Map<String, _SessionEntry<T>> _entries = {};
   bool _disposed = false;
 
@@ -186,6 +189,7 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
       if (_entries[noteId] == entry) {
         _entries.remove(noteId);
         _activityTracker?.markInactive(noteId);
+        onSessionClosed?.call(noteId);
       }
     }();
     entry.closeFuture = closeFuture;

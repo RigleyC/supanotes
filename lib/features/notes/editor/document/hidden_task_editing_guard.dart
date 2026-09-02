@@ -106,7 +106,13 @@ class HiddenTaskEditingGuard {
       return _clearSelectionCommand();
     }
     if (_deleteWouldCrossHiddenTask(document, selection, upstream: upstream)) {
-      return const _NoOpEditCommand();
+      final node = document.getNodeById(selection!.extent.nodeId);
+      if (node == null) return const _NoOpEditCommand();
+      final visibleNeighbor = upstream
+          ? _visibleNodeBefore(document, node.id)
+          : _visibleNodeAfter(document, node.id);
+      if (visibleNeighbor == null) return const _NoOpEditCommand();
+      return _moveCaretToBoundary(visibleNeighbor, upstream: upstream);
     }
     return null;
   }
@@ -115,9 +121,14 @@ class HiddenTaskEditingGuard {
     Document document,
     DeleteUpstreamAtBeginningOfNodeRequest request,
   ) {
-    if (_isHiddenTask(request.node) ||
-        _isHiddenTask(document.getNodeBeforeById(request.node.id))) {
+    if (_isHiddenTask(request.node)) {
       return const _NoOpEditCommand();
+    }
+    final previousNode = document.getNodeBeforeById(request.node.id);
+    if (_isHiddenTask(previousNode)) {
+      final visibleNode = _visibleNodeBefore(document, request.node.id);
+      if (visibleNode == null) return const _NoOpEditCommand();
+      return _moveCaretToBoundary(visibleNode, upstream: true);
     }
     return null;
   }
@@ -230,6 +241,38 @@ class HiddenTaskEditingGuard {
         ? document.getNodeBeforeById(node.id)
         : document.getNodeAfterById(node.id);
     return _isHiddenTask(adjacentNode);
+  }
+
+  DocumentNode? _visibleNodeBefore(Document document, String nodeId) {
+    var node = document.getNodeBeforeById(nodeId);
+    while (node != null && _isHiddenTask(node)) {
+      node = document.getNodeBeforeById(node.id);
+    }
+    return node;
+  }
+
+  DocumentNode? _visibleNodeAfter(Document document, String nodeId) {
+    var node = document.getNodeAfterById(nodeId);
+    while (node != null && _isHiddenTask(node)) {
+      node = document.getNodeAfterById(node.id);
+    }
+    return node;
+  }
+
+  EditCommand _moveCaretToBoundary(
+    DocumentNode node, {
+    required bool upstream,
+  }) {
+    return ChangeSelectionCommand(
+      DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: node.id,
+          nodePosition: upstream ? node.endPosition : node.beginningPosition,
+        ),
+      ),
+      SelectionChangeType.deleteContent,
+      SelectionReason.userInteraction,
+    );
   }
 
   bool _requestUsesCurrentSelection(EditRequest request) {

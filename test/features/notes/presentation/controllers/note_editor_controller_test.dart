@@ -150,7 +150,10 @@ void main() {
           id: 'task-1',
           text: AttributedText('One-time task'),
           isComplete: false,
-          metadata: const {'dueDate': '2026-08-12T09:00:00.000', 'hasTime': true},
+          metadata: const {
+            'dueDate': '2026-08-12T09:00:00.000',
+            'hasTime': true,
+          },
         ),
       ],
     );
@@ -347,6 +350,124 @@ void main() {
       (controller.document.getNodeById('task-hidden')! as TaskNode).text
           .toPlainText(),
       'completed',
+    );
+  });
+
+  test('clears selection when the selected task becomes hidden', () async {
+    final controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Complete me'),
+          isComplete: false,
+        ),
+      ],
+    );
+    addTearDown(controller.dispose);
+
+    controller.setHiddenTaskPredicate((node) => node.isComplete);
+    controller.composer.setSelectionWithReason(
+      const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'task-1',
+          nodePosition: TextNodePosition(offset: 4),
+        ),
+      ),
+    );
+
+    controller.editor.execute([
+      ReplaceNodeRequest(
+        existingNodeId: 'task-1',
+        newNode: TaskNode(
+          id: 'task-1',
+          text: AttributedText('Complete me'),
+          isComplete: true,
+        ),
+      ),
+    ]);
+
+    expect(controller.composer.selection, isNull);
+  });
+
+  test('backspace skips a hidden task between visible paragraphs', () async {
+    final controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        ParagraphNode(id: 'before', text: AttributedText('Before')),
+        TaskNode(
+          id: 'task-hidden',
+          text: AttributedText('completed'),
+          isComplete: true,
+        ),
+        ParagraphNode(id: 'after', text: AttributedText('After')),
+      ],
+    );
+    addTearDown(controller.dispose);
+
+    controller.setHiddenTaskPredicate((node) => node.id == 'task-hidden');
+    controller.composer.setSelectionWithReason(
+      const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'after',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+      ),
+    );
+
+    controller.editor.execute([const DeleteUpstreamRequest()]);
+
+    expect(controller.document.nodeCount, 3);
+    expect(
+      controller.composer.selection,
+      const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'before',
+          nodePosition: TextNodePosition(offset: 6),
+        ),
+      ),
+    );
+  });
+
+  test('delete skips a hidden task between visible paragraphs', () async {
+    final controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        ParagraphNode(id: 'before', text: AttributedText('Before')),
+        TaskNode(
+          id: 'task-hidden',
+          text: AttributedText('completed'),
+          isComplete: true,
+        ),
+        ParagraphNode(id: 'after', text: AttributedText('After')),
+      ],
+    );
+    addTearDown(controller.dispose);
+
+    controller.setHiddenTaskPredicate((node) => node.id == 'task-hidden');
+    controller.composer.setSelectionWithReason(
+      const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'before',
+          nodePosition: TextNodePosition(offset: 6),
+        ),
+      ),
+    );
+
+    controller.editor.execute([const DeleteDownstreamRequest()]);
+
+    expect(controller.document.nodeCount, 3);
+    expect(
+      controller.composer.selection,
+      const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'after',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+      ),
     );
   });
 }

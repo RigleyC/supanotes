@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:html2md/html2md.dart' as html2md;
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:super_editor/super_editor.dart';
@@ -70,23 +72,107 @@ Future<void> pasteWithPreprocessing(
   Editor editor, {
   SystemClipboard? testClipboard,
 }) async {
+  final destination = editor.composer.selection;
+  if (destination == null) return;
+
   await pasteIntoEditorFromNativeClipboard(
     editor,
     testClipboard: testClipboard,
-    customInserter: _pasteSingleLineTaskText,
-    customFileInserters: {Formats.md: _pastePreprocessedMarkdownFile},
-    customValueInserters: {
-      Formats.htmlText: _pastePreprocessedHtml,
-      Formats.plainText: _pastePreprocessedPlainText,
+    customInserter: (editor, reader) =>
+        _pasteSingleLineTaskText(editor, reader, destination),
+    customFileInserters: {
+      Formats.md: (editor, reader) =>
+          _pastePreprocessedMarkdownFile(editor, reader, destination),
+      for (final format in _bitmapFormats)
+        format: (editor, reader) =>
+            _pastePreprocessedImage(editor, reader, destination, format),
     },
+    customValueInserters: {
+      Formats.htmlText: (editor, reader) =>
+          _pastePreprocessedHtml(editor, reader, destination),
+      Formats.uri: (editor, reader) =>
+          _pastePreprocessedUri(editor, reader, destination),
+      Formats.plainText: (editor, reader) =>
+          _pastePreprocessedPlainText(editor, reader, destination),
+    },
+  );
+}
+
+const _bitmapFormats = <SimpleFileFormat>[
+  Formats.png,
+  Formats.jpeg,
+  Formats.heic,
+  Formats.gif,
+  Formats.bmp,
+  Formats.webp,
+];
+
+Future<bool> _pastePreprocessedImage(
+  Editor editor,
+  ClipboardReader reader,
+  DocumentSelection destination,
+  FileFormat format,
+) async {
+  if (!reader.canProvide(format)) return false;
+
+  final completer = Completer<bool>();
+  final progress = reader.getFile(
+    format,
+    (file) async {
+      try {
+        final imageData = await file.readAll();
+        final image = await decodeImageFromList(imageData);
+        if (!_restorePasteSelection(editor, destination)) {
+          completer.complete(false);
+          image.dispose();
+          return;
+        }
+        editor.execute([
+          InsertNodeAtCaretRequest(
+            node: BitmapImageNode(
+              id: Editor.createNodeId(),
+              imageData: imageData,
+              expectedBitmapSize: ExpectedSize(image.width, image.height),
+            ),
+          ),
+        ]);
+        image.dispose();
+        completer.complete(true);
+      } catch (error, stackTrace) {
+        if (!completer.isCompleted) completer.completeError(error, stackTrace);
+      }
+    },
+    onError: (error) {
+      if (!completer.isCompleted) completer.completeError(error);
+    },
+  );
+  if (progress == null) return false;
+  return completer.future;
+}
+
+/// Starts a paste from an unawaited keyboard/common-operations callback while
+/// making failures observable through Flutter's standard error boundary.
+void pasteWithPreprocessingAndReport(Editor editor) {
+  unawaited(
+    pasteWithPreprocessing(editor).catchError((Object error, StackTrace stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'supanotes clipboard',
+          context: ErrorDescription('while pasting clipboard content'),
+        ),
+      );
+    }),
   );
 }
 
 Future<bool> _pasteSingleLineTaskText(
   Editor editor,
   ClipboardReader reader,
+  DocumentSelection destination,
 ) async {
-  if (!_selectionIsInsideTask(editor) ||
+  if (!_selectionIsInsideTask(editor, destination) ||
       !reader.canProvide(Formats.plainText)) {
     return false;
   }
@@ -97,12 +183,14 @@ Future<bool> _pasteSingleLineTaskText(
   return pastePlainTextAtCurrentSelection(
     editor,
     preprocessClipboardText(text),
+    selection: destination,
   );
 }
 
 Future<bool> _pastePreprocessedHtml(
   Editor editor,
   ClipboardReader reader,
+  DocumentSelection destination,
 ) async {
   for (final item in reader.items) {
     if (!item.canProvide(Formats.htmlText)) continue;
@@ -110,6 +198,7 @@ Future<bool> _pastePreprocessedHtml(
     final html = await item.readValue(Formats.htmlText);
     if (html == null) continue;
 
+    if (!_restorePasteSelection(editor, destination)) return false;
     if (_containsClipboardCheckbox(html)) {
       editor.pasteMarkdown(editor, clipboardHtmlToMarkdown(html));
     } else {
@@ -124,6 +213,7 @@ Future<bool> _pastePreprocessedHtml(
 Future<bool> _pastePreprocessedMarkdownFile(
   Editor editor,
   ClipboardReader reader,
+  DocumentSelection destination,
 ) async {
   for (final item in reader.items) {
     if (!item.canProvide(Formats.md)) continue;
@@ -133,6 +223,10 @@ Future<bool> _pastePreprocessedMarkdownFile(
       final data = await file.readAll();
       final markdown = utf8.decode(data);
       if (markdown.isNotEmpty) {
+        if (!_restorePasteSelection(editor, destination)) {
+          completer.complete(false);
+          return;
+        }
         editor.pasteMarkdown(editor, preprocessClipboardText(markdown));
         completer.complete(true);
       } else {
@@ -148,6 +242,7 @@ Future<bool> _pastePreprocessedMarkdownFile(
 Future<bool> _pastePreprocessedPlainText(
   Editor editor,
   ClipboardReader reader,
+  DocumentSelection destination,
 ) async {
   if (!reader.canProvide(Formats.plainText)) return false;
 
@@ -156,11 +251,34 @@ Future<bool> _pastePreprocessedPlainText(
 
   final preprocessedText = preprocessClipboardText(text);
   if (_isMarkdown(preprocessedText)) {
+    if (!_restorePasteSelection(editor, destination)) return false;
     editor.pasteMarkdown(editor, preprocessedText);
     return true;
   }
 
-  return pastePlainTextAtCurrentSelection(editor, preprocessedText);
+  return pastePlainTextAtCurrentSelection(
+    editor,
+    preprocessedText,
+    selection: destination,
+  );
+}
+
+Future<bool> _pastePreprocessedUri(
+  Editor editor,
+  ClipboardReader reader,
+  DocumentSelection destination,
+) async {
+  for (final item in reader.items) {
+    if (!item.canProvide(Formats.uri)) continue;
+    final namedUri = await item.readValue<NamedUri>(Formats.uri);
+    if (namedUri == null) continue;
+    return pastePlainTextAtCurrentSelection(
+      editor,
+      namedUri.uri.toString(),
+      selection: destination,
+    );
+  }
+  return false;
 }
 
 bool _containsClipboardCheckbox(String html) {
@@ -170,15 +288,26 @@ bool _containsClipboardCheckbox(String html) {
   ).hasMatch(html);
 }
 
-bool _selectionIsInsideTask(Editor editor) {
-  final selection = editor.composer.selection;
-  if (selection == null) return false;
+bool _selectionIsInsideTask(Editor editor, DocumentSelection selection) {
   return editor.document.getNodeById(selection.extent.nodeId) is TaskNode;
 }
 
-bool pastePlainTextAtCurrentSelection(Editor editor, String text) {
-  final selection = editor.composer.selection;
-  if (selection == null) return false;
+bool pastePlainTextAtCurrentSelection(
+  Editor editor,
+  String text, {
+  DocumentSelection? selection,
+}) {
+  final destination = selection ?? editor.composer.selection;
+  if (destination == null) return false;
+  return pastePlainTextAtSelection(editor, destination, text);
+}
+
+bool pastePlainTextAtSelection(
+  Editor editor,
+  DocumentSelection selection,
+  String text,
+) {
+  if (!_restorePasteSelection(editor, selection)) return false;
 
   DocumentPosition? pastePosition = selection.extent;
   if (!selection.isCollapsed) {
@@ -202,5 +331,17 @@ bool pastePlainTextAtCurrentSelection(Editor editor, String text) {
   editor.execute([
     PasteEditorRequest(content: text, pastePosition: pastePosition),
   ]);
+  return true;
+}
+
+bool _restorePasteSelection(Editor editor, DocumentSelection selection) {
+  if (editor.document.getNodeById(selection.base.nodeId) == null ||
+      editor.document.getNodeById(selection.extent.nodeId) == null) {
+    return false;
+  }
+  editor.composer.setSelectionWithReason(
+    selection,
+    SelectionReason.userInteraction,
+  );
   return true;
 }
