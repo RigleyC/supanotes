@@ -9,8 +9,8 @@ thermo-nuclear.
 ## Current Progress
 
 - Branch de trabalho: `codex/fix-all-editor-sync`.
-- Correções do editor, outbox/inbox e documentação estão commitadas no `HEAD`
-  (`fix(editor): harden editing and sync lifecycle`).
+- Correções do editor, outbox/inbox, projeção e documentação estão commitadas
+  no `HEAD` (`34f1478f`, após `f116c6cf` e `944de593`).
 - O plano detalhado e seu checklist estão em
   `docs/superpowers/plans/2026-09-02-editor-sync-hardening.md`.
 - A spec antiga foi atualizada para refletir o change-feed/inbox já entregue.
@@ -44,7 +44,7 @@ thermo-nuclear.
 - A primeira versão do wake de fechamento capturava `ref.read` no callback
   tardio e gerava erro de provider descartado. A instância do worker agora é
   capturada durante a construção do provider.
-- `flutter analyze --no-pub --no-fatal-infos` ainda retorna exit 1 por 2.353
+- `flutter analyze --no-pub --no-fatal-infos` ainda retorna exit 1 por 2.348
   infos/avisos preexistentes do repositório (principalmente documentação,
   estilo e inferência em testes); não há erro novo nos arquivos alterados.
 - Go não está instalado nem no PATH nem nos locais padrão desta máquina, então
