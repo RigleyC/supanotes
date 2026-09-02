@@ -7,13 +7,13 @@ import 'package:supanotes/core/async/keyed_async_queue.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
+import 'package:supanotes/features/notes/editor/document/effective_document_projector.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:uuid/uuid.dart';
 
 class SyncResult {
-
   SyncResult({
     required this.acceptedCount,
     required this.acceptedOperationIds,
@@ -22,6 +22,7 @@ class SyncResult {
     this.canonicalDocument,
     this.blockedReason,
   });
+
   final int acceptedCount;
   final List<String> acceptedOperationIds;
   final int finalRevision;
@@ -48,12 +49,12 @@ class SyncResult {
 }
 
 class SyncError {
-
   SyncError({
     required this.errorCode,
     required this.message,
     this.failedOperation,
   });
+
   final String errorCode;
   final String message;
   final String? failedOperation;
@@ -74,7 +75,6 @@ class NoteSyncTelemetrySnapshot {
 }
 
 class NoteOperationsSyncService {
-
   NoteOperationsSyncService({
     required NoteSyncClient syncClient,
     required NoteOperationsDao dao,
@@ -86,6 +86,7 @@ class NoteOperationsSyncService {
        _actorId = actorId {
     _rebaser = NoteOperationRebaser(localActorId: actorId);
   }
+
   final NoteSyncClient _syncClient;
   final NoteOperationsDao _dao;
   final String _clientId;
@@ -93,6 +94,7 @@ class NoteOperationsSyncService {
   final Uuid _uuid = const Uuid();
   final _syncQueue = KeyedAsyncQueue();
   final _outboxQueue = KeyedAsyncQueue();
+  final EffectiveDocumentProjector _projector = const EffectiveDocumentProjector();
   late final NoteOperationRebaser _rebaser;
 
   String get clientId => _clientId;
@@ -100,8 +102,6 @@ class NoteOperationsSyncService {
   Future<T> runSerialized<T>(String noteId, Future<T> Function() fn) {
     return _syncQueue.run(noteId, fn);
   }
-
-  // ---- Public API ----
 
   Future<SyncResult> syncPending(
     String noteId, {
@@ -290,8 +290,6 @@ class NoteOperationsSyncService {
 
   String generateOperationId() => _uuid.v4();
 
-  // ---- Internal ----
-
   Future<void> _prepareAccountScope(String noteId) async {
     final noteOwnerId = await _dao.getNoteOwnerId(noteId);
     if (noteOwnerId == _actorId) {
@@ -375,12 +373,7 @@ class NoteOperationsSyncService {
       },
     );
 
-    SyncResponse response;
-    try {
-      response = await _syncClient.syncOperations(noteId, request);
-    } catch (e) {
-      rethrow;
-    }
+    final response = await _syncClient.syncOperations(noteId, request);
     NoteSyncDebug.log(
       'sync.response',
       noteId: noteId,
@@ -438,12 +431,8 @@ class NoteOperationsSyncService {
       clientId: _clientId,
     );
 
-    try {
-      final response = await _syncClient.syncOperations(noteId, request);
-      return _processSyncResponse(noteId, response, operationIds.toSet(), ops);
-    } catch (e) {
-      rethrow;
-    }
+    final response = await _syncClient.syncOperations(noteId, request);
+    return _processSyncResponse(noteId, response, operationIds.toSet(), ops);
   }
 
   Future<SyncResult> _processSyncResponse(
@@ -493,6 +482,10 @@ class NoteOperationsSyncService {
           finalRevision: response.finalRevision,
           acceptedOps: response.accepted,
         );
+        final materialized = _projector.project(
+          snapshot: canonical,
+          pendingOps: rebased,
+        );
         NoteSyncDebug.log(
           'sync.rebase',
           noteId: noteId,
@@ -509,7 +502,7 @@ class NoteOperationsSyncService {
             revision: response.finalRevision,
             documentJson: encodeDocument(canonical),
             updatedAt: response.serverTime,
-            materializedDocumentJson: Value(encodeDocument(canonical)),
+            materializedDocumentJson: Value(encodeDocument(materialized)),
             materializedUpdatedAt: Value(response.serverTime),
           ),
         );
@@ -614,6 +607,11 @@ class NoteOperationsSyncService {
         remote: response.operations,
         finalRevision: revision,
       );
+      final materialized = _projector.project(
+        snapshot: document,
+        pendingOps: rebased,
+      );
+      final now = DateTime.now().toUtc();
 
       await _dao.runInTransaction(() async {
         await _dao.upsertNoteDocument(
@@ -621,9 +619,9 @@ class NoteOperationsSyncService {
             noteId: noteId,
             revision: revision,
             documentJson: encodeDocument(document),
-            updatedAt: DateTime.now().toUtc(),
-            materializedDocumentJson: Value(encodeDocument(document)),
-            materializedUpdatedAt: Value(DateTime.now().toUtc()),
+            updatedAt: now,
+            materializedDocumentJson: Value(encodeDocument(materialized)),
+            materializedUpdatedAt: Value(now),
           ),
         );
         await _dao.replacePendingOps(noteId, rebased, ownerUserId: _actorId);
@@ -638,7 +636,7 @@ class NoteOperationsSyncService {
           noteId: noteId,
           revision: revision,
           document: document,
-          serverTime: DateTime.now().toUtc(),
+          serverTime: now,
         ),
       );
     });
