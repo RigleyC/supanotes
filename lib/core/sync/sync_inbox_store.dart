@@ -115,7 +115,7 @@ final class SyncInboxStore {
       await _database.customStatement(
         '''
         INSERT INTO sync_feed_cursors(user_id, receive_cursor, bootstrap_complete)
-        VALUES (?, ?, 1)
+        VALUES (?, ?, 0)
         ON CONFLICT(user_id) DO UPDATE SET
           receive_cursor = MAX(sync_feed_cursors.receive_cursor, excluded.receive_cursor)
         ''',
