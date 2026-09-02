@@ -37,4 +37,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter test test/core/sync/sync_inbox_store_test.dart test/core/sync/sync_inbox_worker_test.dart
+      - run: >-
+          flutter test
+          test/core/sync/sync_inbox_store_test.dart
+          test/core/sync/sync_inbox_worker_test.dart
+          test/core/sync/note_operations_materialized_projection_test.dart
