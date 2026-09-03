@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:super_editor/super_editor.dart';
 
 /// Prevents hidden completed tasks from participating in document editing.
@@ -84,8 +85,19 @@ class HiddenTaskEditingGuard {
     ChangeSelectionRequest request,
   ) {
     final requestedSelection = request.newSelection;
-    if (requestedSelection == null ||
-        !selectionTouchesHiddenTask(document, requestedSelection)) {
+    if (requestedSelection == null) {
+      return null;
+    }
+
+    final selectedNodes = document.getNodesInside(
+      requestedSelection.start,
+      requestedSelection.end,
+    );
+    if (selectedNodes.isEmpty ||
+        selectedNodes.any((node) => !_isHiddenTask(node))) {
+      // Hidden tasks are barriers for editing, but they must not make a
+      // whole-note selection disappear. The visible nodes in the range stay
+      // selectable while destructive operations below preserve hidden tasks.
       return null;
     }
 
@@ -108,6 +120,15 @@ class HiddenTaskEditingGuard {
     if (_deleteWouldCrossHiddenTask(document, selection, upstream: upstream)) {
       final node = document.getNodeById(selection!.extent.nodeId);
       if (node == null) return const _NoOpEditCommand();
+      if (upstream && node is ListItemNode) {
+        // A list item at offset zero can be converted without crossing the
+        // hidden task above it. This also covers IME paths that dispatch the
+        // generic upstream deletion request.
+        return ConvertListItemToParagraphCommand(
+          nodeId: node.id,
+          paragraphMetadata: node.metadata,
+        );
+      }
       final visibleNeighbor = upstream
           ? _visibleNodeBefore(document, node.id)
           : _visibleNodeAfter(document, node.id);
@@ -126,6 +147,11 @@ class HiddenTaskEditingGuard {
     }
     final previousNode = document.getNodeBeforeById(request.node.id);
     if (_isHiddenTask(previousNode)) {
+      // Backspace on a list item only changes that item into a paragraph.
+      // It does not cross the hidden task, so keep SuperEditor's normal list
+      // editing behavior available below the hidden node.
+      if (request.node is ListItemNode) return null;
+
       final visibleNode = _visibleNodeBefore(document, request.node.id);
       if (visibleNode == null) return const _NoOpEditCommand();
       return _moveCaretToBoundary(visibleNode, upstream: true);
@@ -137,9 +163,15 @@ class HiddenTaskEditingGuard {
     Document document,
     DocumentSelection? selection,
   ) {
-    return selectionTouchesHiddenTask(document, selection)
-        ? _clearSelectionCommand()
-        : null;
+    if (!selectionTouchesHiddenTask(document, selection)) return null;
+    if (selection == null || selection.isCollapsed) {
+      return _clearSelectionCommand();
+    }
+
+    return _DeleteVisibleContentCommand(
+      documentRange: selection,
+      isHiddenTask: _isHiddenTask,
+    );
   }
 
   EditCommand? _handleDeleteContent(
@@ -148,9 +180,23 @@ class HiddenTaskEditingGuard {
     DeleteContentRequest request,
   ) {
     if (!_rangeTouchesHiddenTask(document, request.documentRange)) return null;
-    return selectionTouchesHiddenTask(document, selection)
-        ? _clearSelectionCommand()
-        : const _NoOpEditCommand();
+
+    final hasVisibleContent = document
+        .getNodesInside(
+          request.documentRange.start,
+          request.documentRange.end,
+        )
+        .any((node) => !_isHiddenTask(node) && node.isDeletable);
+    if (!hasVisibleContent) {
+      return selectionTouchesHiddenTask(document, selection)
+          ? _clearSelectionCommand()
+          : const _NoOpEditCommand();
+    }
+
+    return _DeleteVisibleContentCommand(
+      documentRange: request.documentRange,
+      isHiddenTask: _isHiddenTask,
+    );
   }
 
   EditCommand? _handleAttributionChange(
@@ -301,10 +347,142 @@ class HiddenTaskEditingGuard {
       final UnIndentTaskRequest request => request.nodeId,
       final SetTaskIndentRequest request => request.nodeId,
       final ChangeListItemTypeRequest request => request.nodeId,
+      final DeleteNodeRequest request => request.nodeId,
       _ => null,
     };
 
     return nodeId != null && _isHiddenTask(document.getNodeById(nodeId));
+  }
+}
+
+/// Deletes selected visible content without allowing hidden tasks to be
+/// removed or used to merge content across their boundary.
+class _DeleteVisibleContentCommand extends EditCommand {
+  const _DeleteVisibleContentCommand({
+    required this.documentRange,
+    required this.isHiddenTask,
+  });
+
+  final DocumentRange documentRange;
+  final bool Function(DocumentNode node) isHiddenTask;
+
+  @override
+  HistoryBehavior get historyBehavior => HistoryBehavior.undoable;
+
+  @override
+  String describe() => 'Delete visible content within range: $documentRange';
+
+  @override
+  void execute(EditContext context, CommandExecutor executor) {
+    final document = context.document;
+    final normalizedRange = documentRange.normalize(document);
+    final selectedNodes = document.getNodesInside(
+      normalizedRange.start,
+      normalizedRange.end,
+    );
+    final deletableVisibleNodes = selectedNodes
+        .where((node) => !isHiddenTask(node) && node.isDeletable)
+        .toList(growable: false);
+    if (deletableVisibleNodes.isEmpty) return;
+
+    final deletedNodeIds = <String>[];
+    final partialCaretPositions = <String, DocumentPosition>{};
+
+    // Work from downstream to upstream so removing a node never invalidates
+    // the IDs and positions needed by the remaining selected nodes.
+    for (var index = selectedNodes.length - 1; index >= 0; index -= 1) {
+      final node = selectedNodes[index];
+      if (isHiddenTask(node) || !node.isDeletable) continue;
+
+      final startPosition = DocumentPosition(
+        nodeId: node.id,
+        nodePosition: index == 0
+            ? normalizedRange.start.nodePosition
+            : node.beginningPosition,
+      );
+      final endPosition = DocumentPosition(
+        nodeId: node.id,
+        nodePosition: index == selectedNodes.length - 1
+            ? normalizedRange.end.nodePosition
+            : node.endPosition,
+      );
+      final isFullySelected =
+          startPosition.nodePosition.isEquivalentTo(node.beginningPosition) &&
+          endPosition.nodePosition.isEquivalentTo(node.endPosition);
+
+      if (isFullySelected) {
+        executor.executeCommand(DeleteNodeCommand(nodeId: node.id));
+        deletedNodeIds.add(node.id);
+      } else {
+        executor.executeCommand(
+          DeleteContentCommand(
+            documentRange: DocumentRange(
+              start: startPosition,
+              end: endPosition,
+            ),
+          ),
+        );
+        partialCaretPositions[node.id] = index == 0
+            ? startPosition
+            : DocumentPosition(
+                nodeId: node.id,
+                nodePosition: node.beginningPosition,
+              );
+      }
+    }
+
+    final remainingPartialCaret = selectedNodes
+        .map((node) => partialCaretPositions[node.id])
+        .whereType<DocumentPosition>()
+        .map(
+          (position) =>
+              document.getNodeById(position.nodeId) == null ? null : position,
+        )
+        .whereType<DocumentPosition>()
+        .firstOrNull;
+    if (remainingPartialCaret != null) {
+      executor.executeCommand(
+        ChangeSelectionCommand(
+          DocumentSelection.collapsed(
+            position: remainingPartialCaret,
+          ),
+          SelectionChangeType.deleteContent,
+          SelectionReason.userInteraction,
+        ),
+      );
+    } else {
+      final hiddenNodes = selectedNodes.where(isHiddenTask).toList();
+      final hiddenAnchor = hiddenNodes.reversed
+          .map((node) => document.getNodeById(node.id))
+          .whereType<DocumentNode>()
+          .firstOrNull;
+      if (hiddenAnchor == null) return;
+
+      final replacementId = deletedNodeIds.first;
+      final emptyParagraph = ParagraphNode(
+        id: replacementId,
+        text: AttributedText(),
+      );
+      final insertIndex = document.getNodeIndexById(hiddenAnchor.id) + 1;
+      document.insertNodeAt(insertIndex, emptyParagraph);
+      executor.logChanges([
+        DocumentEdit(NodeChangeEvent(emptyParagraph.id)),
+      ]);
+      executor.executeCommand(
+        ChangeSelectionCommand(
+          DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: emptyParagraph.id,
+              nodePosition: emptyParagraph.beginningPosition,
+            ),
+          ),
+          SelectionChangeType.deleteContent,
+          SelectionReason.userInteraction,
+        ),
+      );
+    }
+
+    executor.executeCommand(ChangeComposingRegionCommand(null));
   }
 }
 

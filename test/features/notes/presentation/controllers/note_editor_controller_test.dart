@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
@@ -320,6 +321,115 @@ void main() {
     );
   });
 
+  test('select all includes visible content across hidden tasks', () async {
+    final controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        ParagraphNode(id: 'before', text: AttributedText('Before')),
+        TaskNode(
+          id: 'task-hidden',
+          text: AttributedText('completed'),
+          isComplete: true,
+        ),
+        ParagraphNode(id: 'after', text: AttributedText('After')),
+      ],
+    );
+    addTearDown(controller.dispose);
+
+    controller.setHiddenTaskPredicate((node) => node.id == 'task-hidden');
+
+    expect(selectAll(controller.editor), isTrue);
+    expect(
+      controller.composer.selection,
+      const DocumentSelection(
+        base: DocumentPosition(
+          nodeId: 'before',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+        extent: DocumentPosition(
+          nodeId: 'after',
+          nodePosition: TextNodePosition(offset: 5),
+        ),
+      ),
+    );
+  });
+
+  test(
+    'deleting a selection across hidden tasks keeps the hidden task',
+    () async {
+      final controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+        nodes: [
+          ParagraphNode(id: 'before', text: AttributedText('Before')),
+          TaskNode(
+            id: 'task-hidden',
+            text: AttributedText('completed'),
+            isComplete: true,
+          ),
+          ParagraphNode(id: 'after', text: AttributedText('After')),
+        ],
+      );
+      addTearDown(controller.dispose);
+
+      controller.setHiddenTaskPredicate((node) => node.id == 'task-hidden');
+      expect(selectAll(controller.editor), isTrue);
+
+      controller.editor.execute([
+        const DeleteSelectionRequest(TextAffinity.downstream),
+      ]);
+
+      expect(controller.document.nodeCount, 2);
+      expect(controller.document.getNodeById('task-hidden'), isA<TaskNode>());
+      expect(controller.document.last, isA<ParagraphNode>());
+      expect(
+        (controller.document.last as ParagraphNode).text.toPlainText(),
+        '',
+      );
+      expect(
+        controller.composer.selection,
+        const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'after',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+    },
+  );
+
+  test('hidden tasks do not block editing a list item below', () async {
+    final controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        TaskNode(
+          id: 'task-hidden',
+          text: AttributedText('completed'),
+          isComplete: true,
+        ),
+        ListItemNode.unordered(id: 'list-below', text: AttributedText('Item')),
+      ],
+    );
+    addTearDown(controller.dispose);
+
+    controller.setHiddenTaskPredicate((node) => node.id == 'task-hidden');
+    controller.composer.setSelectionWithReason(
+      const DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'list-below',
+          nodePosition: TextNodePosition(offset: 0),
+        ),
+      ),
+    );
+
+    controller.editor.execute([const DeleteUpstreamRequest()]);
+
+    expect(controller.document.getNodeById('task-hidden'), isA<TaskNode>());
+    expect(controller.document.getNodeById('list-below'), isA<ParagraphNode>());
+  });
+
   test('hidden tasks reject direct text insertion', () async {
     final controller = NoteEditorController(
       userId: 'user-1',
@@ -351,6 +461,30 @@ void main() {
           .toPlainText(),
       'completed',
     );
+  });
+
+  test('hidden tasks reject direct node deletion', () async {
+    final controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        TaskNode(
+          id: 'task-hidden',
+          text: AttributedText('completed'),
+          isComplete: true,
+        ),
+        ParagraphNode(id: 'paragraph-below', text: AttributedText('Below')),
+      ],
+    );
+    addTearDown(controller.dispose);
+
+    controller.setHiddenTaskPredicate((node) => node.id == 'task-hidden');
+    controller.editor.execute([
+      DeleteNodeRequest(nodeId: 'task-hidden'),
+    ]);
+
+    expect(controller.document.getNodeById('task-hidden'), isA<TaskNode>());
+    expect(controller.document.nodeCount, 2);
   });
 
   test('clears selection when the selected task becomes hidden', () async {
