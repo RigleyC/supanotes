@@ -8,8 +8,9 @@ workflows:
         - $FLUTTER_ROOT/.pub-cache
         - $HOME/.pub-cache
         - $HOME/Library/Caches/CocoaPods
+        - $HOME/Library/Caches/org.swift.swiftpm
         - ios/Pods
-        - ios/DerivedData
+        - DerivedData
     environment:
       groups:
         - api_config
@@ -57,9 +58,6 @@ workflows:
             --build-name="$APP_VERSION" \
             --build-number="$APP_BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL"
-      - name: Clean Swift Package Manager artifacts
-        script: |
-          rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
       - name: Build iOS project with xcodebuild
         script: |
           cd ios
