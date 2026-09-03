@@ -1,5 +1,23 @@
 # Implementation plan — local-first note persistence
 
+## Tasks independentes e navegação Tasks/Notas
+
+Status: design escrito; aguardando revisão antes do plano detalhado e da
+implementação.
+
+Design:
+`docs/superpowers/specs/2026-09-03-standalone-tasks-tabs-design.md`.
+
+Escopo aprovado em conversa: duas abas principais com Tasks primeiro; tasks
+independentes local-first sincronizadas entre dispositivos do proprietário;
+inclusão opcional e local das tasks dos documentos de notas na mesma lista;
+histórico de concluídas; colaboração entre pessoas fica para uma fase futura.
+
+O design também exige verificação atual, backup e encerramento explícito da
+retenção antes de remover as tabelas relacionais legadas. Com inventário vazio,
+o nome `tasks` será reutilizado para o novo contrato independente; dados antigos
+nunca serão convertidos automaticamente.
+
 ## Per-note preference synchronization
 
 Status: planned; implementation approved.
