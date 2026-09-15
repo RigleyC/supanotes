@@ -146,6 +146,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   @override
   Widget build(BuildContext context) {
     ref.watch(noteOutboxRuntimeProvider);
+    ref.watch(taskOutboxRuntimeProvider);
     ref.listen(taskNotificationSchedulerProvider, (_, _) {});
     ref.listen(authControllerProvider, (_, next) {
       // Ignore loading/error transitions: only settled sessions drive the

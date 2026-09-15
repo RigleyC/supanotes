@@ -27,6 +27,7 @@ import 'package:supanotes/core/database/tables/tasks.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/core/sync/note_outbox_worker.dart';
+import 'package:supanotes/core/sync/task_outbox_worker.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
@@ -40,6 +41,8 @@ import 'package:supanotes/features/notes/share/application/native_share_bridge.d
 import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
 import 'package:supanotes/features/notes/share/application/shared_link_delivery.dart';
 import 'package:supanotes/features/tasks/data/task_repository.dart';
+import 'package:supanotes/features/tasks/data/task_api.dart';
+import 'package:supanotes/features/tasks/data/task_sync_service.dart';
 import 'package:uuid/uuid.dart';
 
 // ---------------------------------------------------------------------------
@@ -141,7 +144,40 @@ final taskRepositoryProvider = Provider.autoDispose<TaskRepository>((ref) {
   if (userId == null || userId.isEmpty) {
     throw StateError('TaskRepository requires an authenticated user');
   }
-  return TaskRepository(ref.watch(tasksDaoProvider), userId);
+  return TaskRepository(
+    ref.watch(tasksDaoProvider),
+    userId,
+    onMutation: () => ref.read(taskOutboxWorkerProvider)?.wake(),
+  );
+});
+
+final taskApiProvider = Provider<TaskApi>((ref) {
+  return TaskApi(ref.watch(apiClientProvider));
+});
+
+final taskSyncServiceProvider = Provider<TaskSyncService?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null || userId.isEmpty) return null;
+  return TaskSyncService(
+    api: ref.watch(taskApiProvider),
+    dao: ref.watch(tasksDaoProvider),
+    userId: userId,
+  );
+});
+
+final taskOutboxWorkerProvider = Provider<TaskOutboxWorker?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  final syncService = ref.watch(taskSyncServiceProvider);
+  if (userId == null || userId.isEmpty || syncService == null) return null;
+  final worker = TaskOutboxWorker(
+    loadPendingTaskIds: () =>
+        ref.read(tasksDaoProvider).getPendingTaskIds(ownerUserId: userId),
+    syncTask: syncService.syncTask,
+  );
+  ref.onDispose(() {
+    unawaited(worker.dispose());
+  });
+  return worker;
 });
 
 /// Independent tasks can be disabled after a legacy SQLite table is
@@ -245,6 +281,33 @@ final noteOutboxRuntimeProvider = Provider<bool>((ref) {
     (_) => worker.wake(resetBackoff: false),
   );
 
+  worker.wake();
+
+  ref.onDispose(() {
+    safetyTimer.cancel();
+    unawaited(connectivitySubscription.cancel());
+  });
+  return true;
+});
+
+/// Keeps standalone-task outbox delivery alive for the authenticated app
+/// session. It is separate from the note worker so existing note lifecycle
+/// diagnostics remain scoped to note operations.
+final taskOutboxRuntimeProvider = Provider<bool>((ref) {
+  final worker = ref.watch(taskOutboxWorkerProvider);
+  if (worker == null) return false;
+
+  final connectivitySubscription = ref
+      .watch(noteOutboxConnectivityChangesProvider)
+      .listen((results) {
+        if (results.any((result) => result != ConnectivityResult.none)) {
+          worker.wake();
+        }
+      });
+  final safetyTimer = Timer.periodic(
+    ref.watch(noteOutboxSafetyWakeIntervalProvider),
+    (_) => worker.wake(resetBackoff: false),
+  );
   worker.wake();
 
   ref.onDispose(() {

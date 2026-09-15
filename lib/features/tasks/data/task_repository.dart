@@ -61,13 +61,17 @@ class TaskRebaseDiagnostic {
 /// in the same SQLite transaction. Remote sync can therefore never observe a
 /// task without the operation that explains the local change.
 class TaskRepository {
-  TaskRepository(this._dao, this._ownerUserId);
+  TaskRepository(this._dao, this._ownerUserId, {void Function()? onMutation})
+    : _onMutation = onMutation;
 
   final TasksDao _dao;
   final String _ownerUserId;
+  final void Function()? _onMutation;
   TaskRebaseDiagnostic? _lastRebaseDiagnostic;
 
   String get userId => _ownerUserId;
+
+  TasksDao get dao => _dao;
 
   /// Describes incompatible operations from the latest remote rebase, if any.
   TaskRebaseDiagnostic? get lastRebaseDiagnostic => _lastRebaseDiagnostic;
@@ -85,59 +89,18 @@ class TaskRepository {
   /// Applies a canonical remote snapshot while leaving every pending local
   /// operation untouched. Confirmation/removal of an outbox row belongs to
   /// the task sync service, which has the matching operation id.
-  Future<void> applyRemoteTask(Task task) async {
+  Future<void> applyRemoteTask(
+    Task task, {
+    int? confirmedOrdinal,
+  }) async {
     _assertOwner(task);
     final conflicts = <TaskRebaseConflict>[];
     await _dao.runInTransaction(
-      () async {
-        var rebased = task;
-        final pending = await _dao.getPendingOperations(
-          _ownerUserId,
-          task.id,
-        );
-        var blockedByScheduleConflict = false;
-        for (final operation in pending) {
-          if (blockedByScheduleConflict) {
-            conflicts.add(
-              TaskRebaseConflict(
-                operationId: operation.operationId,
-                operationKind: operation.kind,
-                operationScheduleGeneration: operation.scheduleGeneration,
-                currentScheduleGeneration: rebased.scheduleGeneration,
-              ),
-            );
-            await _dao.updatePendingStatus(operation.operationId, 'blocked');
-            continue;
-          }
-          final fields = _decodePendingPayload(operation);
-          final isScheduleOperation = _isScheduleOperation(
-            rebased,
-            operation,
-            fields,
-          );
-          if (!_isCompatibleWithScheduleGeneration(
-            rebased,
-            operation,
-            fields,
-          )) {
-            conflicts.add(
-              TaskRebaseConflict(
-                operationId: operation.operationId,
-                operationKind: operation.kind,
-                operationScheduleGeneration: operation.scheduleGeneration,
-                currentScheduleGeneration: rebased.scheduleGeneration,
-              ),
-            );
-            await _dao.updatePendingStatus(operation.operationId, 'blocked');
-            if (isScheduleOperation) {
-              blockedByScheduleConflict = true;
-            }
-            continue;
-          }
-          rebased = _reapplyPendingOperation(rebased, operation, fields);
-        }
-        await _dao.applyRemoteTask(_toCompanion(rebased));
-      },
+      () => _applyRemoteTaskInTransaction(
+        task,
+        conflicts,
+        afterOrdinal: confirmedOrdinal,
+      ),
     );
     _lastRebaseDiagnostic = conflicts.isEmpty
         ? null
@@ -146,6 +109,128 @@ class TaskRepository {
             remoteScheduleGeneration: task.scheduleGeneration,
             conflicts: List.unmodifiable(conflicts),
           );
+  }
+
+  /// Confirms one outbox operation and applies its canonical response as one
+  /// local transaction. Only operations after [confirmedOrdinal] are rebased.
+  Future<void> confirmRemoteTask({
+    required Task task,
+    required String operationId,
+    required int confirmedOrdinal,
+  }) async {
+    _assertOwner(task);
+    final conflicts = <TaskRebaseConflict>[];
+    await _dao.runInTransaction(() async {
+      await _dao.deletePendingOperation(operationId);
+      await _applyRemoteTaskInTransaction(
+        task,
+        conflicts,
+        afterOrdinal: confirmedOrdinal,
+      );
+    });
+    _lastRebaseDiagnostic = conflicts.isEmpty
+        ? null
+        : TaskRebaseDiagnostic(
+            taskId: task.id,
+            remoteScheduleGeneration: task.scheduleGeneration,
+            conflicts: List.unmodifiable(conflicts),
+          );
+  }
+
+  /// Applies a task bootstrap while the sync coordinator owns the surrounding
+  /// database transaction.
+  Future<void> applyRemoteTasks(Iterable<Task> tasks) async {
+    final diagnostics = <TaskRebaseDiagnostic>[];
+    await _dao.runInTransaction(
+      () => applyRemoteTasksInTransaction(tasks, diagnostics: diagnostics),
+    );
+    _lastRebaseDiagnostic = diagnostics.isEmpty ? null : diagnostics.last;
+  }
+
+  /// Same operation as [applyRemoteTasks], for an already-open transaction.
+  Future<void> applyRemoteTasksInTransaction(
+    Iterable<Task> tasks, {
+    List<TaskRebaseDiagnostic>? diagnostics,
+  }) async {
+    for (final task in tasks) {
+      _assertOwner(task);
+      final conflicts = <TaskRebaseConflict>[];
+      await _applyRemoteTaskInTransaction(task, conflicts);
+      if (conflicts.isNotEmpty) {
+        diagnostics?.add(
+          TaskRebaseDiagnostic(
+            taskId: task.id,
+            remoteScheduleGeneration: task.scheduleGeneration,
+            conflicts: List.unmodifiable(conflicts),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Applies a tombstone received from the change feed and keeps local
+  /// operations available for the server's explicit TASK_DELETED response.
+  Future<void> applyRemoteDeletion(String taskId) async {
+    final current = await get(taskId);
+    if (current == null || current.deletedAt != null) return;
+    final now = DateTime.now().toUtc();
+    await _dao.insertOrUpdateTask(
+      _toCompanion(current.copyWith(deletedAt: now, updatedAt: now)),
+    );
+  }
+
+  Future<void> _applyRemoteTaskInTransaction(
+    Task task,
+    List<TaskRebaseConflict> conflicts, {
+    int? afterOrdinal,
+  }) async {
+    var rebased = task;
+    final pending = (await _dao.getPendingOperations(_ownerUserId, task.id))
+        .where(
+          (operation) =>
+              afterOrdinal == null || operation.ordinal > afterOrdinal,
+        )
+        .toList(growable: false);
+    var blockedByScheduleConflict = false;
+    for (final operation in pending) {
+      if (blockedByScheduleConflict) {
+        conflicts.add(
+          TaskRebaseConflict(
+            operationId: operation.operationId,
+            operationKind: operation.kind,
+            operationScheduleGeneration: operation.scheduleGeneration,
+            currentScheduleGeneration: rebased.scheduleGeneration,
+          ),
+        );
+        await _dao.updatePendingStatus(operation.operationId, 'blocked');
+        continue;
+      }
+      final fields = _decodePendingPayload(operation);
+      final isScheduleOperation = _isScheduleOperation(
+        rebased,
+        operation,
+        fields,
+      );
+      if (!_isCompatibleWithScheduleGeneration(
+        rebased,
+        operation,
+        fields,
+      )) {
+        conflicts.add(
+          TaskRebaseConflict(
+            operationId: operation.operationId,
+            operationKind: operation.kind,
+            operationScheduleGeneration: operation.scheduleGeneration,
+            currentScheduleGeneration: rebased.scheduleGeneration,
+          ),
+        );
+        await _dao.updatePendingStatus(operation.operationId, 'blocked');
+        if (isScheduleOperation) blockedByScheduleConflict = true;
+        continue;
+      }
+      rebased = _reapplyPendingOperation(rebased, operation, fields);
+    }
+    await _dao.applyRemoteTask(_toCompanion(rebased));
   }
 
   /// Creates an optimistic task. The editor owns task construction so the
@@ -267,7 +352,7 @@ class TaskRepository {
 
   Future<Task> _persist(Task task, TaskOperation operation) async {
     final now = DateTime.now().toUtc();
-    return _dao.runInTransaction(() async {
+    final persisted = await _dao.runInTransaction(() async {
       final ordinal = await _dao.nextOrdinal(task.id);
       await _dao.insertOrUpdateTask(_toCompanion(task));
       await _dao.enqueueMutation(
@@ -286,6 +371,8 @@ class TaskRepository {
       );
       return task;
     });
+    _onMutation?.call();
+    return persisted;
   }
 
   Future<Task> _requireTask(String? taskId) async {

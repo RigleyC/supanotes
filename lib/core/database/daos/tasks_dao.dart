@@ -27,26 +27,23 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   }
 
   Stream<TaskData?> watchTask(String userId, String taskId) {
-    return (select(tasks)
-          ..where(
-            (task) =>
-                task.ownerUserId.equals(userId) & task.id.equals(taskId),
-          ))
+    return (select(tasks)..where(
+          (task) => task.ownerUserId.equals(userId) & task.id.equals(taskId),
+        ))
         .watchSingleOrNull();
   }
 
   Future<TaskData?> getTask(String userId, String taskId) {
-    return (select(tasks)
-          ..where(
-            (task) =>
-                task.ownerUserId.equals(userId) & task.id.equals(taskId),
-          ))
+    return (select(tasks)..where(
+          (task) => task.ownerUserId.equals(userId) & task.id.equals(taskId),
+        ))
         .getSingleOrNull();
   }
 
   Future<TaskData?> getTaskById(String taskId) {
-    return (select(tasks)..where((task) => task.id.equals(taskId)))
-        .getSingleOrNull();
+    return (select(
+      tasks,
+    )..where((task) => task.id.equals(taskId))).getSingleOrNull();
   }
 
   Future<void> insertOrUpdateTask(TasksCompanion task) async {
@@ -68,10 +65,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   }
 
   Future<int> nextOrdinal(String taskId) async {
-    final ordinals = await (select(pendingTaskOperations)
-          ..where((operation) => operation.taskId.equals(taskId)))
-        .map((operation) => operation.ordinal)
-        .get();
+    final ordinals =
+        await (select(pendingTaskOperations)
+              ..where((operation) => operation.taskId.equals(taskId)))
+            .map((operation) => operation.ordinal)
+            .get();
     if (ordinals.isEmpty) return 0;
     return ordinals.reduce((a, b) => a > b ? a : b) + 1;
   }
@@ -126,10 +124,30 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return query.get();
   }
 
+  /// Returns task ids that still have durable work. Blocked operations are
+  /// intentionally excluded; they require an explicit user-visible
+  /// resolution instead of being retried by the background worker.
+  Future<List<String>> getPendingTaskIds({required String ownerUserId}) async {
+    final rows =
+        await (select(pendingTaskOperations)
+              ..where(
+                (operation) =>
+                    operation.ownerUserId.equals(ownerUserId) &
+                    (operation.status.equals('pending') |
+                        operation.status.equals('in_flight')),
+              )
+              ..orderBy([
+                (operation) => OrderingTerm(expression: operation.taskId),
+                (operation) => OrderingTerm(expression: operation.ordinal),
+              ]))
+            .get();
+    return rows.map((row) => row.taskId).toSet().toList()..sort();
+  }
+
   Future<void> deletePendingOperation(String operationId) async {
-    await (delete(pendingTaskOperations)
-          ..where((operation) => operation.operationId.equals(operationId)))
-        .go();
+    await (delete(
+      pendingTaskOperations,
+    )..where((operation) => operation.operationId.equals(operationId))).go();
   }
 
   Future<void> updatePendingStatus(
@@ -138,19 +156,19 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     int? attemptCount,
     DateTime? lastAttemptAt,
   }) async {
-    await (update(pendingTaskOperations)
-          ..where((operation) => operation.operationId.equals(operationId)))
-        .write(
-          PendingTaskOperationsCompanion(
-            status: Value(status),
-            attemptCount: attemptCount == null
-                ? const Value.absent()
-                : Value(attemptCount),
-            lastAttemptAt: lastAttemptAt == null
-                ? const Value.absent()
-                : Value(lastAttemptAt),
-          ),
-        );
+    await (update(
+      pendingTaskOperations,
+    )..where((operation) => operation.operationId.equals(operationId))).write(
+      PendingTaskOperationsCompanion(
+        status: Value(status),
+        attemptCount: attemptCount == null
+            ? const Value.absent()
+            : Value(attemptCount),
+        lastAttemptAt: lastAttemptAt == null
+            ? const Value.absent()
+            : Value(lastAttemptAt),
+      ),
+    );
   }
 
   Future<T> runInTransaction<T>(Future<T> Function() action) {

@@ -51,6 +51,7 @@ final noteRemoteSyncCoordinatorProvider =
 
       final database = ref.watch(appDatabaseProvider);
       final catalog = ref.watch(noteCatalogSyncServiceProvider);
+      final taskSync = ref.watch(taskSyncServiceProvider);
       final activityTracker = ref.watch(noteSessionActivityTrackerProvider);
       final store = ref.watch(syncInboxStoreProvider);
       final metadataLoader = ref.watch(remoteNoteMetadataLoaderProvider);
@@ -100,12 +101,16 @@ final noteRemoteSyncCoordinatorProvider =
           // local transaction. The returned callback only applies that
           // snapshot through the transaction-owned catalog path.
           final snapshot = await catalog.fetchRemoteNotes();
+          final taskSnapshot = await taskSync?.bootstrap();
           return NoteRemoteSyncBootstrap(
             applyNotesInTransaction: () =>
                 catalog.applyRemoteNotesSnapshotInTransaction(
                   userId: userId,
                   snapshot: snapshot,
                 ),
+            applyTasksInTransaction: taskSnapshot == null
+                ? null
+                : () => taskSync!.applyBootstrapInTransaction(taskSnapshot),
           );
         },
         isNoteActive: activityTracker.isActive,
@@ -118,6 +123,9 @@ final noteRemoteSyncCoordinatorProvider =
         pollAndReconcile: pollAndReconcile,
         hydrateRemote: hydrateRemote,
         deleteLocal: database.deleteNoteData,
+        bootstrapTasksAvailable: taskSync != null,
+        applyTaskChanged: taskSync?.applyTaskChanged,
+        applyTaskDeleted: taskSync?.applyTaskDeleted,
       );
 
       ref.onDispose(() {
@@ -140,11 +148,13 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
   final catalog = ref.watch(noteCatalogSyncServiceProvider);
   final coordinator = ref.watch(noteRemoteSyncCoordinatorProvider);
   if (coordinator == null) return;
+  final taskWorker = ref.watch(taskOutboxWorkerProvider);
 
   final connectivitySubscription = ref
       .watch(noteOutboxConnectivityChangesProvider)
       .listen((results) {
         if (results.any((result) => result != ConnectivityResult.none)) {
+          taskWorker?.wake();
           coordinator.wake();
         }
       });
@@ -155,6 +165,9 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
   var failureAttempt = 0;
   while (true) {
     try {
+      // Push local standalone-task mutations before applying remote feed
+      // snapshots so a local write cannot be overwritten by an older event.
+      await taskWorker?.drain();
       await catalog.pushDeletedNotes();
       await catalog.pushDirtyPreferences();
       await coordinator.syncOnce();
