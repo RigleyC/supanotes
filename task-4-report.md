@@ -42,15 +42,53 @@ go test ./internal/syncfeed -v
 O teste PostgreSQL de integração foi descoberto e pulado porque
 `SUPANOTES_SYNC_TEST_DATABASE_URL` não está configurada.
 
-## Limite de schema
+## Limite de schema no commit inicial
 
-`schemaVersion` continua em `31`; não foram criadas as tabelas Drift de tasks
-nem aplicada a migração física v32. Como as declarações tipadas novas precisam
-ser utilizáveis no upgrade legado exercitado pelos testes atuais, o rebuild
-existente 30→31 passa a reconstruir as tabelas do inbox já com as colunas
-novas, preenchendo valores padrão. A Task 5 deve consolidar esse formato na
-migração física 31→32 junto das tabelas independentes e remover qualquer
-duplicação do rebuild legado.
+No commit inicial do Task 4, `schemaVersion` continuava em `31`; não eram
+criadas as tabelas Drift de tasks nem aplicada a migração física v32. Esse
+limite foi corrigido no fix round 1 abaixo. O rebuild legado 30→31 continua
+reconstruindo as tabelas do inbox já com as colunas novas, enquanto bancos
+físicos que já estavam em v31 recebem as colunas pela migração aditiva 31→32.
 
 As alterações preexistentes em sqlc, `pubspec.lock` e arquivos gerados do
 Windows foram preservadas fora deste escopo.
+
+## Fix round 1
+
+- `AppDatabase.schemaVersion` agora é `32`. A migração `31 -> 32` adiciona
+  fisicamente `sync_feed_cursors.bootstrap_version` e `sync_inbox.task_id`
+  quando ainda não existem; a migração legada `30 -> 31` continua reconstruindo
+  as tabelas com as colunas completas e não as duplica.
+- O ponto de extensão do `31 -> 32` permanece único e aditivo: a Task 5 deve
+  acrescentar as tabelas de tasks/quarentena nesse mesmo upgrade, sem criar uma
+  segunda versão ou uma migração concorrente.
+- `NoteRemoteSyncCoordinator` agora recebe um `fetchBootstrap` que busca e
+  materializa o snapshot antes da transação. O retorno contém apenas callbacks
+  de aplicação local (`applyNotesInTransaction` e, quando disponível,
+  `applyTasksInTransaction`); a runtime usa `fetchRemoteNotes` e
+  `applyRemoteNotesSnapshotInTransaction`, removendo a rede de dentro do
+  checkpoint transacional.
+- Adicionado teste de migração a partir de um banco físico v31 e teste de seam
+  que verifica a ordem fetch → apply. O suporte opcional a tasks mantém a
+  versão 2 bloqueada até que o snapshot traga seu aplicador transacional.
+
+### Verificação do fix
+
+Comando executado, serialmente:
+
+```text
+flutter test --concurrency=1 test/core/sync/sync_feed_client_test.dart \
+  test/core/sync/sync_inbox_store_test.dart \
+  test/core/sync/note_remote_sync_coordinator_test.dart \
+  test/core/sync/sync_inbox_worker_test.dart \
+  test/core/sync/multi_device_sync_e2e_test.dart \
+  test/features/notes/data/note_catalog_sync_test.dart
+```
+
+Resultado: **PASS**, 46 testes.
+
+Também foi executado `dart analyze` nos arquivos Dart alterados; não houve
+erros de analyzer (somente infos de documentação/style já existentes). O
+`git -c core.whitespace=cr-at-eol diff --check` não encontrou whitespace
+inválido. A validação PostgreSQL do feed continua dependente de
+`SUPANOTES_SYNC_TEST_DATABASE_URL`, conforme registrado acima.

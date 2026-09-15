@@ -57,7 +57,7 @@ final class SyncInboxStore {
     required String userId,
     required int cursor,
     int bootstrapVersion = 0,
-    Future<void> Function()? applySnapshot,
+    Future<void> Function()? applySnapshotInTransaction,
   }) async {
     if (bootstrapVersion < 0) {
       throw ArgumentError.value(
@@ -70,7 +70,7 @@ final class SyncInboxStore {
       // Snapshot writes are supplied by the coordinator and intentionally run
       // in this transaction. If they fail, neither the cursor nor the
       // bootstrap marker is committed, making the operation resumable.
-      await applySnapshot?.call();
+      await applySnapshotInTransaction?.call();
       final current = await (_database.select(
         _database.syncFeedCursors,
       )..where((t) => t.userId.equals(userId))).getSingleOrNull();

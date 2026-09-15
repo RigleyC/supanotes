@@ -4,6 +4,24 @@ import 'package:supanotes/core/sync/sync_feed_client.dart';
 import 'package:supanotes/core/sync/sync_inbox_store.dart';
 import 'package:supanotes/core/sync/sync_inbox_worker.dart';
 
+/// A remote bootstrap fetched before the local checkpoint transaction starts.
+///
+/// The callbacks must only apply already-materialized data to the open local
+/// transaction. Network fetches belong in [NoteRemoteSyncBootstrapFetcher],
+/// before [SyncInboxStore.completeBootstrap] opens that transaction.
+final class NoteRemoteSyncBootstrap {
+  const NoteRemoteSyncBootstrap({
+    required this.applyNotesInTransaction,
+    this.applyTasksInTransaction,
+  });
+
+  final Future<void> Function() applyNotesInTransaction;
+  final Future<void> Function()? applyTasksInTransaction;
+}
+
+typedef NoteRemoteSyncBootstrapFetcher =
+    Future<NoteRemoteSyncBootstrap> Function();
+
 /// Coordinates one account's remote synchronization lifecycle.
 ///
 /// A new local account snapshot is bootstrapped once from the complete catalog
@@ -14,26 +32,26 @@ final class NoteRemoteSyncCoordinator {
     required this.userId,
     required SyncInboxStore store,
     required SyncChangesFetcher fetchChanges,
-    required Future<void> Function() bootstrapCatalog,
+    required NoteRemoteSyncBootstrapFetcher fetchBootstrap,
     required bool Function(String noteId) isNoteActive,
     required Future<void> Function(String noteId) syncPending,
     required Future<int?> Function(String noteId) confirmedRevision,
     required Future<void> Function(String noteId) pollAndReconcile,
     required Future<void> Function(String noteId) hydrateRemote,
     required Future<void> Function(String noteId) deleteLocal,
-    Future<void> Function()? bootstrapTasks,
+    bool bootstrapTasksAvailable = false,
     Future<void> Function(String taskId)? applyTaskChanged,
     Future<void> Function(String taskId)? applyTaskDeleted,
     void Function(SyncInboxEntry change)? onApplied,
   }) : _store = store,
        _fetchChanges = fetchChanges,
-       _bootstrapCatalog = bootstrapCatalog,
+       _fetchBootstrap = fetchBootstrap,
        _syncPending = syncPending,
        _confirmedRevision = confirmedRevision,
        _pollAndReconcile = pollAndReconcile,
        _hydrateRemote = hydrateRemote,
        _deleteLocal = deleteLocal,
-       _bootstrapTasks = bootstrapTasks,
+       _bootstrapTasksAvailable = bootstrapTasksAvailable,
        _applyTaskChanged = applyTaskChanged,
        _applyTaskDeleted = applyTaskDeleted,
        _onApplied = onApplied {
@@ -50,13 +68,13 @@ final class NoteRemoteSyncCoordinator {
   final String userId;
   final SyncInboxStore _store;
   final SyncChangesFetcher _fetchChanges;
-  final Future<void> Function() _bootstrapCatalog;
+  final NoteRemoteSyncBootstrapFetcher _fetchBootstrap;
   final Future<void> Function(String noteId) _syncPending;
   final Future<int?> Function(String noteId) _confirmedRevision;
   final Future<void> Function(String noteId) _pollAndReconcile;
   final Future<void> Function(String noteId) _hydrateRemote;
   final Future<void> Function(String noteId) _deleteLocal;
-  final Future<void> Function()? _bootstrapTasks;
+  final bool _bootstrapTasksAvailable;
   final Future<void> Function(String taskId)? _applyTaskChanged;
   final Future<void> Function(String taskId)? _applyTaskDeleted;
   final void Function(SyncInboxEntry change)? _onApplied;
@@ -74,7 +92,7 @@ final class NoteRemoteSyncCoordinator {
 
   Future<void> _syncOnce() async {
     final bootstrapVersion = await _store.getBootstrapVersion(userId);
-    if (bootstrapVersion < 2 && _bootstrapTasks != null) {
+    if (bootstrapVersion < 2 && _bootstrapTasksAvailable) {
       await _bootstrap();
     } else if (!await _store.isBootstrapComplete(userId)) {
       await _bootstrap();
@@ -100,14 +118,21 @@ final class NoteRemoteSyncCoordinator {
       throw StateError('Sync feed bootstrap response is missing a watermark');
     }
 
-    final version = _bootstrapTasks == null ? 0 : 2;
+    // Fetch and materialize remote snapshots before opening the local
+    // transaction. The returned callbacks only write those snapshots locally.
+    final snapshot = await _fetchBootstrap();
+    if (_bootstrapTasksAvailable && snapshot.applyTasksInTransaction == null) {
+      throw StateError(
+        'Task bootstrap is enabled but the remote snapshot has no task apply callback',
+      );
+    }
     await _store.completeBootstrap(
       userId: userId,
       cursor: watermark,
-      bootstrapVersion: version,
-      applySnapshot: () async {
-        await _bootstrapCatalog();
-        await _bootstrapTasks?.call();
+      bootstrapVersion: _bootstrapTasksAvailable ? 2 : 0,
+      applySnapshotInTransaction: () async {
+        await snapshot.applyNotesInTransaction();
+        await snapshot.applyTasksInTransaction?.call();
       },
     );
   }

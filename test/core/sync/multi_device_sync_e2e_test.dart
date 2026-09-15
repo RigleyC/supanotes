@@ -87,10 +87,12 @@ NoteRemoteSyncCoordinator _buildCoordinator({
     userId: 'user-1',
     store: store,
     fetchChanges: server.fetchChanges,
-    bootstrapCatalog: () => _writeLocalSnapshot(
-      database,
-      revision: server.revision,
-      document: server.document,
+    fetchBootstrap: () async => NoteRemoteSyncBootstrap(
+      applyNotesInTransaction: () => _writeLocalSnapshot(
+        database,
+        revision: server.revision,
+        document: server.document,
+      ),
     ),
     isNoteActive: (_) => false,
     syncPending: (_) async {},

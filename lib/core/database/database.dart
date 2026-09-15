@@ -226,7 +226,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 32;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -249,9 +249,29 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _migrateSyncInbox(Migrator m, int from) async {
-    if (from >= 31) return;
-    await _rebuildSyncFeedCursors(m);
-    await _rebuildSyncInbox(m);
+    // Version 31 introduced the typed sync tables in the declarations, but
+    // did not bump the physical database version. Version 32 is therefore a
+    // compatibility migration for databases that were already at v31 before
+    // these columns shipped. Keep this step additive so Task 5 can extend the
+    // same 31 -> 32 upgrade with the standalone-task tables.
+    if (from < 31) {
+      await _rebuildSyncFeedCursors(m);
+      await _rebuildSyncInbox(m);
+    }
+    if (from < 32) {
+      await _addColumnIfMissing(
+        m,
+        syncFeedCursors,
+        'sync_feed_cursors',
+        syncFeedCursors.bootstrapVersion,
+      );
+      await _addColumnIfMissing(
+        m,
+        syncInbox,
+        'sync_inbox',
+        syncInbox.taskId,
+      );
+    }
   }
 
   Future<void> _rebuildSyncFeedCursors(Migrator m) async {

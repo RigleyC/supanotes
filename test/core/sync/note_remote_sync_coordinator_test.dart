@@ -12,6 +12,7 @@ void main() {
       addTearDown(db.close);
       final store = SyncInboxStore(db);
       final fetchAfter = <int>[];
+      final bootstrapPhases = <String>[];
       var catalogPulls = 0;
       var newChangeExists = false;
       final applied = <int>[];
@@ -56,9 +57,15 @@ void main() {
                 changes: const [],
               );
             },
-        bootstrapCatalog: () async {
+        fetchBootstrap: () async {
+          bootstrapPhases.add('fetch');
           catalogPulls++;
-          newChangeExists = true;
+          return NoteRemoteSyncBootstrap(
+            applyNotesInTransaction: () async {
+              bootstrapPhases.add('apply');
+              newChangeExists = true;
+            },
+          );
         },
         isNoteActive: (_) => false,
         syncPending: (_) async {},
@@ -73,6 +80,7 @@ void main() {
       await coordinator.syncOnce();
 
       expect(catalogPulls, 1);
+      expect(bootstrapPhases, ['fetch', 'apply']);
       expect(fetchAfter.take(2), [0, 12]);
       expect(applied, [13]);
       expect(await store.isBootstrapComplete('user-1'), isTrue);
@@ -111,7 +119,9 @@ void main() {
                 ),
               ],
             ),
-        bootstrapCatalog: () async {},
+        fetchBootstrap: () async => NoteRemoteSyncBootstrap(
+          applyNotesInTransaction: () async {},
+        ),
         isNoteActive: (_) => false,
         syncPending: (id) async => calls.add('outbox:$id'),
         confirmedRevision: (_) async => 6,
@@ -161,7 +171,9 @@ void main() {
               ),
             ],
           ),
-      bootstrapCatalog: () async {},
+      fetchBootstrap: () async => NoteRemoteSyncBootstrap(
+        applyNotesInTransaction: () async {},
+      ),
       isNoteActive: (_) => false,
       syncPending: (_) async {},
       confirmedRevision: (_) async => null,
@@ -224,8 +236,11 @@ void main() {
                 ],
               );
             },
-        bootstrapCatalog: () async {},
-        bootstrapTasks: () async => bootstrappedTasks++,
+        fetchBootstrap: () async => NoteRemoteSyncBootstrap(
+          applyNotesInTransaction: () async {},
+          applyTasksInTransaction: () async => bootstrappedTasks++,
+        ),
+        bootstrapTasksAvailable: true,
         applyTaskChanged: (id) async => applied.add('changed:$id'),
         applyTaskDeleted: (id) async => applied.add('deleted:$id'),
         isNoteActive: (_) => false,
@@ -279,11 +294,14 @@ void main() {
                 changes: const [],
               );
             },
-        bootstrapCatalog: () async {},
-        bootstrapTasks: () async {
-          taskAttempts++;
-          if (taskAttempts == 1) throw StateError('offline');
-        },
+        fetchBootstrap: () async => NoteRemoteSyncBootstrap(
+          applyNotesInTransaction: () async {},
+          applyTasksInTransaction: () async {
+            taskAttempts++;
+            if (taskAttempts == 1) throw StateError('offline');
+          },
+        ),
+        bootstrapTasksAvailable: true,
         isNoteActive: (_) => false,
         syncPending: (_) async {},
         confirmedRevision: (_) async => null,

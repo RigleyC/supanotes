@@ -54,6 +54,68 @@ void main() {
   );
 
   test(
+    'v31 databases receive feed columns before the store queries them',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+
+      await db.customStatement('DROP TABLE sync_inbox');
+      await db.customStatement('DROP TABLE sync_feed_cursors');
+      await db.customStatement('''
+        CREATE TABLE sync_feed_cursors (
+          user_id TEXT PRIMARY KEY,
+          receive_cursor INTEGER NOT NULL DEFAULT 0,
+          bootstrap_complete INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+      await db.customStatement('''
+        CREATE TABLE sync_inbox (
+          user_id TEXT NOT NULL,
+          sequence INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          note_id TEXT,
+          revision INTEGER,
+          created_at INTEGER NOT NULL,
+          applied_at INTEGER,
+          PRIMARY KEY (user_id, sequence)
+        )
+      ''');
+      await db.customStatement('''
+        INSERT INTO sync_feed_cursors(user_id, receive_cursor, bootstrap_complete)
+        VALUES ('u1', 7, 1)
+      ''');
+      await db.customStatement('''
+        INSERT INTO sync_inbox(
+          user_id, sequence, type, note_id, revision, created_at
+        ) VALUES ('u1', 7, 'note_changed', 'n1', 3, 0)
+      ''');
+
+      await db.migration.onUpgrade(Migrator(db), 31, 32);
+
+      final store = SyncInboxStore(db);
+      expect(await store.getCursor('u1'), 7);
+      expect(await store.getBootstrapVersion('u1'), 0);
+      expect((await store.listPending('u1')).single.taskId, equals(null));
+      final cursorColumns = await db
+          .customSelect('PRAGMA table_info(sync_feed_cursors)')
+          .get();
+      final inboxColumns = await db
+          .customSelect('PRAGMA table_info(sync_inbox)')
+          .get();
+      expect(
+        cursorColumns.any(
+          (column) => column.data['name'] == 'bootstrap_version',
+        ),
+        isTrue,
+      );
+      expect(
+        inboxColumns.any((column) => column.data['name'] == 'task_id'),
+        isTrue,
+      );
+    },
+  );
+
+  test(
     'ingest persists cursor and deduplicates changes transactionally',
     () async {
       final db = AppDatabase.test();
@@ -135,7 +197,7 @@ void main() {
         userId: 'u1',
         cursor: 12,
         bootstrapVersion: 2,
-        applySnapshot: () async {
+        applySnapshotInTransaction: () async {
           await db
               .into(db.syncInbox)
               .insert(

@@ -95,7 +95,19 @@ final noteRemoteSyncCoordinatorProvider =
         userId: userId,
         store: store,
         fetchChanges: ref.watch(syncChangesFetcherProvider),
-        bootstrapCatalog: () => catalog.pullRemoteNotes(userId),
+        fetchBootstrap: () async {
+          // Materialize all remote data before completeBootstrap opens its
+          // local transaction. The returned callback only applies that
+          // snapshot through the transaction-owned catalog path.
+          final snapshot = await catalog.fetchRemoteNotes();
+          return NoteRemoteSyncBootstrap(
+            applyNotesInTransaction: () =>
+                catalog.applyRemoteNotesSnapshotInTransaction(
+                  userId: userId,
+                  snapshot: snapshot,
+                ),
+          );
+        },
         isNoteActive: activityTracker.isActive,
         syncPending: syncPending,
         confirmedRevision: (noteId) async =>
