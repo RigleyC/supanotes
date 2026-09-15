@@ -44,14 +44,22 @@ type Querier interface {
 	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetRefreshTokenRecord(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetSharedLinkIngestion(ctx context.Context, arg GetSharedLinkIngestionParams) (SharedLinkIngestion, error)
+	GetTaskForOwner(ctx context.Context, arg GetTaskForOwnerParams) (Task, error)
+	GetTaskOperation(ctx context.Context, operationID pgtype.UUID) (TaskOperation, error)
+	GetTaskWatermark(ctx context.Context, targetUserID pgtype.UUID) (int64, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserSettings(ctx context.Context, userID pgtype.UUID) (UserSetting, error)
 	HardDeleteOldNotes(ctx context.Context) error
 	InsertAttachment(ctx context.Context, arg InsertAttachmentParams) (Attachment, error)
 	InsertOperation(ctx context.Context, arg InsertOperationParams) (NoteOperation, error)
+	InsertTask(ctx context.Context, arg InsertTaskParams) (Task, error)
+	InsertTaskOperation(ctx context.Context, arg InsertTaskOperationParams) error
+	InsertTaskSyncChange(ctx context.Context, arg InsertTaskSyncChangeParams) error
 	ListAttachmentsByNote(ctx context.Context, noteID pgtype.UUID) ([]Attachment, error)
+	ListTasksForBootstrap(ctx context.Context, ownerUserID pgtype.UUID) ([]Task, error)
 	LockNote(ctx context.Context, id pgtype.UUID) (LockNoteRow, error)
+	LockTaskForOwner(ctx context.Context, arg LockTaskForOwnerParams) (Task, error)
 	ReserveSharedLinkIngestion(ctx context.Context, arg ReserveSharedLinkIngestionParams) (SharedLinkIngestion, error)
 	RevokeAllUserRefreshTokens(ctx context.Context, userID pgtype.UUID) error
 	RevokeRefreshToken(ctx context.Context, id pgtype.UUID) error
@@ -60,6 +68,7 @@ type Querier interface {
 	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
 	UpdateNoteContent(ctx context.Context, arg UpdateNoteContentParams) error
 	UpdateNoteDocument(ctx context.Context, arg UpdateNoteDocumentParams) error
+	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
 	UpdateUserSettings(ctx context.Context, arg UpdateUserSettingsParams) (UserSetting, error)
 	UpsertNoteShareLink(ctx context.Context, arg UpsertNoteShareLinkParams) (NoteShareLink, error)
 	UpsertUserNotePreference(ctx context.Context, arg UpsertUserNotePreferenceParams) (UserNotePreference, error)

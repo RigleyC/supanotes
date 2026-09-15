@@ -146,7 +146,51 @@ type SharedLinkIngestion struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
+type SyncChange struct {
+	Sequence     int64              `json:"sequence"`
+	TargetUserID pgtype.UUID        `json:"target_user_id"`
+	Kind         string             `json:"kind"`
+	NoteID       pgtype.UUID        `json:"note_id"`
+	Revision     pgtype.Int8        `json:"revision"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	TaskID       pgtype.UUID        `json:"task_id"`
+}
+
 type Task struct {
+	ID                 pgtype.UUID        `json:"id"`
+	OwnerUserID        pgtype.UUID        `json:"owner_user_id"`
+	Title              string             `json:"title"`
+	DueDate            pgtype.Timestamp   `json:"due_date"`
+	HasTime            bool               `json:"has_time"`
+	RecurrenceRule     pgtype.Text        `json:"recurrence_rule"`
+	Reminder           pgtype.Text        `json:"reminder"`
+	Completions        []byte             `json:"completions"`
+	IsCompleted        bool               `json:"is_completed"`
+	LastCompletedAt    pgtype.Timestamptz `json:"last_completed_at"`
+	Revision           int64              `json:"revision"`
+	ScheduleGeneration int64              `json:"schedule_generation"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type TaskCompletionsLegacyQuarantineV31 struct {
+	ID          pgtype.UUID        `json:"id"`
+	TaskID      pgtype.UUID        `json:"task_id"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	DueDate     pgtype.Date        `json:"due_date"`
+	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
+}
+
+type TaskOperation struct {
+	TaskID       pgtype.UUID        `json:"task_id"`
+	OperationID  pgtype.UUID        `json:"operation_id"`
+	PayloadHash  string             `json:"payload_hash"`
+	ResponseJson []byte             `json:"response_json"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type TasksLegacyQuarantineV31 struct {
 	ID          pgtype.UUID        `json:"id"`
 	NoteID      pgtype.UUID        `json:"note_id"`
 	UserID      pgtype.UUID        `json:"user_id"`
@@ -161,14 +205,6 @@ type Task struct {
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	HasTime     bool               `json:"has_time"`
 	Reminder    pgtype.Text        `json:"reminder"`
-}
-
-type TaskCompletion struct {
-	ID          pgtype.UUID        `json:"id"`
-	TaskID      pgtype.UUID        `json:"task_id"`
-	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	DueDate     pgtype.Date        `json:"due_date"`
-	ScheduledAt pgtype.Timestamptz `json:"scheduled_at"`
 }
 
 type User struct {

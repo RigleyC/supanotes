@@ -35,6 +35,7 @@ import (
 	"github.com/RigleyC/supanotes/internal/sharelinks"
 	"github.com/RigleyC/supanotes/internal/shares"
 	"github.com/RigleyC/supanotes/internal/shoppinglist"
+	"github.com/RigleyC/supanotes/internal/tasks"
 	authpkg "github.com/RigleyC/supanotes/pkg/auth"
 	"github.com/RigleyC/supanotes/pkg/config"
 	"github.com/RigleyC/supanotes/pkg/db"
@@ -183,6 +184,10 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	protected := api.Group("")
 	protected.Use(auth.JWT(cfg))
 	protected.POST("/auth/revoke-sessions", authH.RevokeAllSessions)
+
+	// Standalone tasks
+	tasksH := tasks.NewHandler(tasks.NewService(tasks.NewRepository(queries, pool)))
+	tasksH.RegisterRoutes(protected)
 
 	// Notes
 	notesRepo := notes.NewRepository(queries)
