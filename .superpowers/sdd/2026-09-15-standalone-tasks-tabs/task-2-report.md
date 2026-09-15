@@ -30,6 +30,15 @@
   promotion, successful empty down migration restoration, and atomic down
   guards for task rows, operation rows and task feed events.
 
+## Round 2 fixes
+
+- Rollback-guard scenarios now run in a fresh PostgreSQL schema per scenario.
+  This intentionally preserves golang-migrate's dirty state after a failed
+  down migration and then discards only that isolated schema, instead of
+  trying to continue from a dirty migration version.
+- The legacy fixture now includes one `task_completions` row. The test checks
+  both quarantine counts after up and restored row counts after an empty down.
+
 ## Validation
 
 Command (from `backend`):
