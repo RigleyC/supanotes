@@ -182,6 +182,102 @@ void main() {
   );
 
   test(
+    'remote rebase blocks chained schedule edits after the first conflict',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      final repository = TaskRepository(db.tasksDao, 'user-a');
+      final base = _task().copyWith(
+        dueDate: DateTime.utc(2026, 9, 15, 9),
+        hasTime: true,
+        recurrenceRule: 'daily',
+      );
+      await repository.applyRemoteTask(base);
+      await repository.update(
+        base.copyWith(dueDate: DateTime.utc(2026, 9, 16, 9)),
+      );
+      await repository.update(
+        base.copyWith(dueDate: DateTime.utc(2026, 9, 17, 9)),
+      );
+
+      final remote = base.copyWith(
+        dueDate: DateTime.utc(2026, 9, 18, 9),
+        revision: 1,
+        scheduleGeneration: 1,
+        updatedAt: DateTime.utc(2026, 9, 15, 12),
+      );
+      await repository.applyRemoteTask(remote);
+
+      final stored = await repository.get('task-1');
+      expect(stored!.dueDate, remote.dueDate);
+      expect(stored.scheduleGeneration, remote.scheduleGeneration);
+      final operations = await db.tasksDao.getPendingOperations(
+        'user-a',
+        'task-1',
+      );
+      expect(operations.map((operation) => operation.status), [
+        'blocked',
+        'blocked',
+      ]);
+      expect(repository.lastRebaseDiagnostic!.conflicts, hasLength(2));
+      expect(
+        repository.lastRebaseDiagnostic!.conflicts.map(
+          (conflict) => conflict.operationId,
+        ),
+        operations.map((operation) => operation.operationId),
+      );
+    },
+  );
+
+  test(
+    'remote rebase blocks completion after a conflicting schedule edit',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      final repository = TaskRepository(db.tasksDao, 'user-a');
+      final base = _task().copyWith(
+        dueDate: DateTime.utc(2026, 9, 15, 9),
+        hasTime: true,
+        recurrenceRule: 'daily',
+      );
+      await repository.applyRemoteTask(base);
+      await repository.update(
+        base.copyWith(dueDate: DateTime.utc(2026, 9, 16, 9)),
+      );
+      await repository.completeOccurrence(
+        taskId: 'task-1',
+        scheduledAt: '2026-09-16T09:00:00',
+        completedAt: DateTime.utc(2026, 9, 15, 10),
+      );
+
+      final remote = base.copyWith(
+        dueDate: DateTime.utc(2026, 9, 17, 9),
+        revision: 1,
+        scheduleGeneration: 1,
+        updatedAt: DateTime.utc(2026, 9, 15, 12),
+      );
+      await repository.applyRemoteTask(remote);
+
+      final stored = await repository.get('task-1');
+      expect(stored!.dueDate, remote.dueDate);
+      expect(stored.completions, isEmpty);
+      final operations = await db.tasksDao.getPendingOperations(
+        'user-a',
+        'task-1',
+      );
+      expect(operations.map((operation) => operation.status), [
+        'blocked',
+        'blocked',
+      ]);
+      expect(repository.lastRebaseDiagnostic!.conflicts, hasLength(2));
+      expect(
+        repository.lastRebaseDiagnostic!.conflicts.last.operationKind,
+        'complete_occurrence',
+      );
+    },
+  );
+
+  test(
     'remote rebase reapplies schedule operation from matching generation',
     () async {
       final db = AppDatabase.test();

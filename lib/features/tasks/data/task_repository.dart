@@ -95,8 +95,26 @@ class TaskRepository {
           _ownerUserId,
           task.id,
         );
+        var blockedByScheduleConflict = false;
         for (final operation in pending) {
+          if (blockedByScheduleConflict) {
+            conflicts.add(
+              TaskRebaseConflict(
+                operationId: operation.operationId,
+                operationKind: operation.kind,
+                operationScheduleGeneration: operation.scheduleGeneration,
+                currentScheduleGeneration: rebased.scheduleGeneration,
+              ),
+            );
+            await _dao.updatePendingStatus(operation.operationId, 'blocked');
+            continue;
+          }
           final fields = _decodePendingPayload(operation);
+          final isScheduleOperation = _isScheduleOperation(
+            rebased,
+            operation,
+            fields,
+          );
           if (!_isCompatibleWithScheduleGeneration(
             rebased,
             operation,
@@ -111,6 +129,9 @@ class TaskRepository {
               ),
             );
             await _dao.updatePendingStatus(operation.operationId, 'blocked');
+            if (isScheduleOperation) {
+              blockedByScheduleConflict = true;
+            }
             continue;
           }
           rebased = _reapplyPendingOperation(rebased, operation, fields);
@@ -387,6 +408,24 @@ class TaskRepository {
     return scheduleChanged
         ? operation.scheduleGeneration == current.scheduleGeneration + 1
         : operation.scheduleGeneration == current.scheduleGeneration;
+  }
+
+  static bool _isScheduleOperation(
+    Task current,
+    PendingTaskOperationData operation,
+    Map<String, dynamic> fields,
+  ) {
+    final isPatch = operation.kind == 'create' || operation.kind == 'upsert';
+    if (!isPatch) return false;
+
+    final hasTime = fields['hasTime'] as bool? ?? current.hasTime;
+    final dueDate = _parseWallClock(fields['dueDate'], hasTime: hasTime);
+    final recurrence = fields.containsKey('recurrenceRule')
+        ? fields['recurrenceRule'] as String?
+        : current.recurrenceRule;
+    return !sameScheduledAtOrNull(current.dueDate, dueDate, hasTime: hasTime) ||
+        current.hasTime != hasTime ||
+        current.recurrenceRule != recurrence;
   }
 
   static Task _reapplyPatch(
