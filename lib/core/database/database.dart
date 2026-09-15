@@ -252,8 +252,9 @@ class AppDatabase extends _$AppDatabase {
     // Version 31 introduced the typed sync tables in the declarations, but
     // did not bump the physical database version. Version 32 is therefore a
     // compatibility migration for databases that were already at v31 before
-    // these columns shipped. Keep this step additive so Task 5 can extend the
-    // same 31 -> 32 upgrade with the standalone-task tables.
+    // these columns shipped. This upgrade is feed-only; Task 5 must start from
+    // physical schema v32 and use one separate 32 -> 33 upgrade for the
+    // standalone-task tables and quarantine, not extend this 31 -> 32 path.
     if (from < 31) {
       await _rebuildSyncFeedCursors(m);
       await _rebuildSyncInbox(m);

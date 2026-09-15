@@ -59,9 +59,10 @@ Windows foram preservadas fora deste escopo.
   fisicamente `sync_feed_cursors.bootstrap_version` e `sync_inbox.task_id`
   quando ainda não existem; a migração legada `30 -> 31` continua reconstruindo
   as tabelas com as colunas completas e não as duplica.
-- O ponto de extensão do `31 -> 32` permanece único e aditivo: a Task 5 deve
-  acrescentar as tabelas de tasks/quarentena nesse mesmo upgrade, sem criar uma
-  segunda versão ou uma migração concorrente.
+- O caminho `31 -> 32` permanece exclusivo e aditivo para as colunas do feed.
+  A Task 5 deve partir do schema físico `32` e fazer um único upgrade `32 -> 33`
+  para tabelas/quarentena de tasks, sem acrescentar essas tabelas ao `31 -> 32`
+  nem criar uma migração concorrente.
 - `NoteRemoteSyncCoordinator` agora recebe um `fetchBootstrap` que busca e
   materializa o snapshot antes da transação. O retorno contém apenas callbacks
   de aplicação local (`applyNotesInTransaction` e, quando disponível,
@@ -92,3 +93,32 @@ erros de analyzer (somente infos de documentação/style já existentes). O
 `git -c core.whitespace=cr-at-eol diff --check` não encontrou whitespace
 inválido. A validação PostgreSQL do feed continua dependente de
 `SUPANOTES_SYNC_TEST_DATABASE_URL`, conforme registrado acima.
+
+## Fix round 2
+
+- O marcador do bootstrap usa `scope=all` quando o bootstrap de tasks está
+  habilitado, para ancorar o cursor no maior watermark combinado de notas e
+  tasks. Clientes sem tasks continuam usando `scope=notes`.
+- As mudanças retornadas pelo marker não são ingeridas: o coordenador usa
+  somente o `watermark`; o snapshot remoto continua sendo buscado antes e
+  aplicado dentro da transação de checkpoint, e o worker lê eventos posteriores
+  depois de habilitar `scope=all`.
+- O teste do coordenador cobre o marker `all`, garante que uma mudança histórica
+  do próprio marker não seja aplicada e mantém a cobertura do caminho `notes`.
+
+### Verificação do fix round 2
+
+Executada serialmente com `--concurrency=1`:
+
+```text
+flutter test --no-pub --concurrency=1 test/core/sync/sync_feed_client_test.dart \
+  test/core/sync/sync_inbox_store_test.dart \
+  test/core/sync/note_remote_sync_coordinator_test.dart \
+  test/core/sync/sync_inbox_worker_test.dart \
+  test/core/sync/multi_device_sync_e2e_test.dart \
+  test/features/notes/data/note_catalog_sync_test.dart
+```
+
+Resultado: **PASS**, 46 testes. O analyzer focado terminou com exit code 0;
+foram reportadas apenas infos preexistentes de documentação/style. O diff
+check com `core.whitespace=cr-at-eol` também passou sem whitespace inválido.

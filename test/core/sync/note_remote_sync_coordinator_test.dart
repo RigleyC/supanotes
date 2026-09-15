@@ -12,6 +12,7 @@ void main() {
       addTearDown(db.close);
       final store = SyncInboxStore(db);
       final fetchAfter = <int>[];
+      final scopes = <SyncFeedScope>[];
       final bootstrapPhases = <String>[];
       var catalogPulls = 0;
       var newChangeExists = false;
@@ -27,6 +28,7 @@ void main() {
               scope = SyncFeedScope.notes,
             }) async {
               fetchAfter.add(after);
+              scopes.add(scope);
               if (after == 0) {
                 return const SyncChangePage(
                   cursor: 1,
@@ -81,6 +83,11 @@ void main() {
 
       expect(catalogPulls, 1);
       expect(bootstrapPhases, ['fetch', 'apply']);
+      expect(scopes, [
+        SyncFeedScope.notes,
+        SyncFeedScope.notes,
+        SyncFeedScope.notes,
+      ]);
       expect(fetchAfter.take(2), [0, 12]);
       expect(applied, [13]);
       expect(await store.isBootstrapComplete('user-1'), isTrue);
@@ -189,7 +196,7 @@ void main() {
   });
 
   test(
-    'enables all scope after task bootstrap and routes task events',
+    'task bootstrap uses all watermark and ignores marker changes',
     () async {
       final db = AppDatabase.test();
       addTearDown(db.close);
@@ -208,32 +215,47 @@ void main() {
               scope = SyncFeedScope.notes,
             }) async {
               scopes.add(scope);
-              if (scope == SyncFeedScope.notes) {
-                return const SyncChangePage(
-                  cursor: 3,
-                  watermark: 3,
+              if (after == 0) {
+                return SyncChangePage(
+                  cursor: 4,
+                  watermark: 9,
                   hasMore: false,
-                  changes: [],
+                  changes: [
+                    SyncChange(
+                      sequence: 4,
+                      type: 'task_changed',
+                      taskId: 'marker-task',
+                      createdAt: DateTime.utc(2026, 9, 2),
+                    ),
+                  ],
+                );
+              }
+              if (after == 9) {
+                return SyncChangePage(
+                  cursor: 11,
+                  watermark: 11,
+                  hasMore: false,
+                  changes: [
+                    SyncChange(
+                      sequence: 10,
+                      type: 'task_changed',
+                      taskId: 'task-1',
+                      createdAt: DateTime.utc(2026, 9, 2),
+                    ),
+                    SyncChange(
+                      sequence: 11,
+                      type: 'task_deleted',
+                      taskId: 'task-2',
+                      createdAt: DateTime.utc(2026, 9, 2),
+                    ),
+                  ],
                 );
               }
               return SyncChangePage(
-                cursor: 6,
-                watermark: 6,
+                cursor: after,
+                watermark: after,
                 hasMore: false,
-                changes: [
-                  SyncChange(
-                    sequence: 5,
-                    type: 'task_changed',
-                    taskId: 'task-1',
-                    createdAt: DateTime.utc(2026, 9, 2),
-                  ),
-                  SyncChange(
-                    sequence: 6,
-                    type: 'task_deleted',
-                    taskId: 'task-2',
-                    createdAt: DateTime.utc(2026, 9, 2),
-                  ),
-                ],
+                changes: const [],
               );
             },
         fetchBootstrap: () async => NoteRemoteSyncBootstrap(
@@ -254,9 +276,10 @@ void main() {
       await coordinator.syncOnce();
 
       expect(bootstrappedTasks, 1);
-      expect(scopes, [SyncFeedScope.notes, SyncFeedScope.all]);
+      expect(scopes, [SyncFeedScope.all, SyncFeedScope.all]);
       expect(applied, ['changed:task-1', 'deleted:task-2']);
       expect(await store.getBootstrapVersion('user-1'), 2);
+      expect(await store.getCursor('user-1'), 11);
     },
   );
 
@@ -318,8 +341,8 @@ void main() {
       expect(taskAttempts, 2);
       expect(await store.getBootstrapVersion('user-1'), 2);
       expect(scopes, [
-        SyncFeedScope.notes,
-        SyncFeedScope.notes,
+        SyncFeedScope.all,
+        SyncFeedScope.all,
         SyncFeedScope.all,
       ]);
     },

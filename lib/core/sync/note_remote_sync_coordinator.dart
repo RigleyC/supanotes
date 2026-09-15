@@ -104,14 +104,15 @@ final class NoteRemoteSyncCoordinator {
   }
 
   Future<void> _bootstrap() async {
-    // Notes scope is enough to establish the initial cursor while the task
-    // snapshot is being fetched. Any task event before this cursor is already
-    // represented by that snapshot; later task events are read once scope=all
-    // is enabled.
+    // Task-enabled clients need the all-resource watermark. A notes-only
+    // marker could leave the cursor below the newest task event, causing the
+    // task bootstrap snapshot to be replayed as historical changes after the
+    // checkpoint. Marker changes are intentionally ignored; only its
+    // watermark anchors the snapshot and subsequent feed reads.
     final marker = await _fetchChanges(
       after: 0,
       limit: 1,
-      scope: SyncFeedScope.notes,
+      scope: _bootstrapTasksAvailable ? SyncFeedScope.all : SyncFeedScope.notes,
     );
     final watermark = marker.watermark;
     if (watermark == null) {
