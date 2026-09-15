@@ -44,6 +44,25 @@ final class _RemoteNoteWriteResult {
 
 enum _NoteIconPushOutcome { completed, retry }
 
+/// A complete remote note snapshot prepared before the local bootstrap
+/// transaction starts.
+final class RemoteNoteBootstrapEntry {
+  const RemoteNoteBootstrapEntry({
+    required this.metadata,
+    required this.document,
+  });
+
+  final RemoteNoteMetadata metadata;
+  final NoteDocumentResponse document;
+}
+
+/// Remote catalog data is fetched independently from its local commit.
+final class RemoteNoteBootstrapSnapshot {
+  const RemoteNoteBootstrapSnapshot({required this.entries});
+
+  final List<RemoteNoteBootstrapEntry> entries;
+}
+
 class NoteCatalogSync {
   NoteCatalogSync({
     required NoteSyncClient syncClient,
@@ -199,6 +218,113 @@ class NoteCatalogSync {
     final rows = await _listAllRemoteNotes();
     final remoteNotes = rows.map(RemoteNoteMetadata.fromJson).toList();
     _remoteCatalog = {for (final remote in remoteNotes) remote.id: remote};
+  }
+
+  /// Fetches all catalog metadata and documents without changing local state.
+  ///
+  /// The caller can pass the returned snapshot to
+  /// [applyRemoteNotesSnapshot] together with other resources (for example,
+  /// standalone tasks) and commit them through one database transaction.
+  Future<RemoteNoteBootstrapSnapshot> fetchRemoteNotes() async {
+    final rows = await _listAllRemoteNotes();
+    final remoteNotes = rows.map(RemoteNoteMetadata.fromJson).toList();
+    _remoteCatalog = {for (final remote in remoteNotes) remote.id: remote};
+    final entries = <RemoteNoteBootstrapEntry>[];
+    for (final metadata in remoteNotes) {
+      final document = await _syncClient.getDocument(metadata.id);
+      if (document.noteId != metadata.id) {
+        throw StateError(
+          'Remote document id ${document.noteId} does not match catalog id '
+          '${metadata.id}',
+        );
+      }
+      entries.add(
+        RemoteNoteBootstrapEntry(metadata: metadata, document: document),
+      );
+    }
+    return RemoteNoteBootstrapSnapshot(entries: List.unmodifiable(entries));
+  }
+
+  /// Applies a previously fetched catalog snapshot in one local transaction.
+  ///
+  /// Local edits and active editor sessions retain precedence, matching the
+  /// incremental hydration path. A failure rolls back every note written by
+  /// this snapshot, allowing the caller to retry the bootstrap safely.
+  Future<void> applyRemoteNotesSnapshot({
+    required String userId,
+    required RemoteNoteBootstrapSnapshot snapshot,
+  }) => _applyRemoteNotesSnapshot(
+    userId: userId,
+    snapshot: snapshot,
+    inTransaction: false,
+  );
+
+  /// Same operation as [applyRemoteNotesSnapshot], for a transaction already
+  /// opened by the sync coordinator.
+  Future<void> applyRemoteNotesSnapshotInTransaction({
+    required String userId,
+    required RemoteNoteBootstrapSnapshot snapshot,
+  }) => _applyRemoteNotesSnapshot(
+    userId: userId,
+    snapshot: snapshot,
+    inTransaction: true,
+  );
+
+  Future<void> _applyRemoteNotesSnapshot({
+    required String userId,
+    required RemoteNoteBootstrapSnapshot snapshot,
+    required bool inTransaction,
+  }) async {
+    final remoteIds = snapshot.entries
+        .map((entry) => entry.metadata.id)
+        .toSet();
+    Future<void> write() async {
+      for (final entry in snapshot.entries) {
+        final metadata = entry.metadata;
+        final local = await _readLocalRemoteNote(metadata);
+        if (_activityTracker.isActive(metadata.id)) {
+          await _updateRemoteMetadata(
+            userId: userId,
+            catalog: metadata,
+            shouldReadRemoteIcon: local.shouldReadRemoteIcon,
+          );
+          continue;
+        }
+        if (local.existing != null &&
+            (local.existing!.isDirty ||
+                (local.existing!.hasRemoteCopy &&
+                    local.localDocument != null &&
+                    !metadata.updatedAt.isAfter(local.existing!.updatedAt)))) {
+          await _updateRemoteMetadata(
+            userId: userId,
+            catalog: metadata,
+            shouldReadRemoteIcon: local.shouldReadRemoteIcon,
+          );
+          continue;
+        }
+        await _saveFetchedRemoteNote(
+          userId: userId,
+          catalog: metadata,
+          local: local,
+          documentResponse: entry.document,
+          inTransaction: true,
+        );
+      }
+
+      final localRemoteNotes = await _database.notesDao.getRemoteNotes(userId);
+      for (final note in localRemoteNotes) {
+        if (!remoteIds.contains(note.id) &&
+            !_activityTracker.isActive(note.id)) {
+          await _database.noteLifecycleDao.deleteNoteDataInTransaction(note.id);
+        }
+      }
+    }
+
+    if (inTransaction) {
+      await write();
+    } else {
+      await _database.transaction(write);
+    }
   }
 
   Future<void> pullRemoteNotes(String userId) async {
@@ -470,6 +596,33 @@ class NoteCatalogSync {
       return const _RemoteNoteWriteResult(_RemoteNoteWriteOutcome.becameActive);
     }
 
+    return _saveFetchedRemoteNote(
+      userId: userId,
+      catalog: catalog,
+      local: local,
+      documentResponse: documentResponse,
+      inTransaction: false,
+    );
+  }
+
+  Future<_RemoteNoteWriteResult> _saveFetchedRemoteNote({
+    required String userId,
+    required RemoteNoteMetadata catalog,
+    required _LocalRemoteNoteState local,
+    required NoteDocumentResponse documentResponse,
+    required bool inTransaction,
+  }) async {
+    final id = catalog.id;
+    if (documentResponse.noteId != id) {
+      throw StateError(
+        'Remote document id ${documentResponse.noteId} does not match catalog id $id',
+      );
+    }
+    if (_activityTracker.isActive(id)) {
+      dev.log('[NoteCatalogSync] Note became active during hydration $id');
+      return const _RemoteNoteWriteResult(_RemoteNoteWriteOutcome.becameActive);
+    }
+
     final projection = _projectContent(
       documentResponse.document['blocks'] as List<dynamic>? ?? [],
     );
@@ -483,36 +636,50 @@ class NoteCatalogSync {
       materializedUpdatedAt: Value(documentResponse.serverTime),
     );
     final ownerUserId = local.existing?.userId ?? userId;
-    final applied = await _database.saveRemoteNote(
-      noteId: id,
-      mode: local.existing == null
-          ? const InsertRemoteNote()
-          : UpdateRemoteNote(expectedUpdatedAt: local.existing!.updatedAt),
-      document: document,
-      userId: userId,
-      note: NotesCompanion(
-        id: Value(catalog.id),
-        userId: Value(ownerUserId),
-        content: Value(projection.content),
-        excerpt: Value(projection.excerpt),
-        createdAt: Value(catalog.createdAt),
-        updatedAt: Value(
-          local.existing?.noteIconDirty == true
-              ? local.existing!.updatedAt
-              : catalog.updatedAt,
-        ),
-        isDirty: const Value(false),
-        hasRemoteCopy: const Value(true),
-        permission: _permissionValueFor(catalog),
-        sharedByEmail: _sharedByEmailValueFor(catalog),
-        sharedByName: _sharedByNameValueFor(catalog),
-        noteIconJson: _noteIconValue(
-          catalog,
-          apply: local.shouldReadRemoteIcon,
-        ),
-        noteIconDirty: Value(local.existing?.noteIconDirty ?? false),
+    final note = NotesCompanion(
+      id: Value(catalog.id),
+      userId: Value(ownerUserId),
+      content: Value(projection.content),
+      excerpt: Value(projection.excerpt),
+      createdAt: Value(catalog.createdAt),
+      updatedAt: Value(
+        local.existing?.noteIconDirty == true
+            ? local.existing!.updatedAt
+            : catalog.updatedAt,
       ),
+      isDirty: const Value(false),
+      hasRemoteCopy: const Value(true),
+      permission: _permissionValueFor(catalog),
+      sharedByEmail: _sharedByEmailValueFor(catalog),
+      sharedByName: _sharedByNameValueFor(catalog),
+      noteIconJson: _noteIconValue(
+        catalog,
+        apply: local.shouldReadRemoteIcon,
+      ),
+      noteIconDirty: Value(local.existing?.noteIconDirty ?? false),
     );
+    final applied = inTransaction
+        ? await _database.saveRemoteNoteInTransaction(
+            noteId: id,
+            mode: local.existing == null
+                ? const InsertRemoteNote()
+                : UpdateRemoteNote(
+                    expectedUpdatedAt: local.existing!.updatedAt,
+                  ),
+            document: document,
+            note: note,
+          )
+        : await _database.saveRemoteNote(
+            noteId: id,
+            mode: local.existing == null
+                ? const InsertRemoteNote()
+                : UpdateRemoteNote(
+                    expectedUpdatedAt: local.existing!.updatedAt,
+                  ),
+            document: document,
+            userId: userId,
+            note: note,
+          );
     if (!applied) {
       dev.log('[NoteCatalogSync] Skipped stale remote hydration $id');
       return _RemoteNoteWriteResult(

@@ -9,6 +9,7 @@ final class SyncInboxEntry {
     required this.type,
     required this.createdAt,
     this.noteId,
+    this.taskId,
     this.revision,
   });
 
@@ -16,6 +17,7 @@ final class SyncInboxEntry {
   final int sequence;
   final String type;
   final String? noteId;
+  final String? taskId;
   final int? revision;
   final DateTime createdAt;
 }
@@ -44,11 +46,31 @@ final class SyncInboxStore {
     return row?.bootstrapComplete ?? false;
   }
 
+  Future<int> getBootstrapVersion(String userId) async {
+    final row = await (_database.select(
+      _database.syncFeedCursors,
+    )..where((t) => t.userId.equals(userId))).getSingleOrNull();
+    return row?.bootstrapVersion ?? 0;
+  }
+
   Future<void> completeBootstrap({
     required String userId,
     required int cursor,
+    int bootstrapVersion = 0,
+    Future<void> Function()? applySnapshot,
   }) async {
+    if (bootstrapVersion < 0) {
+      throw ArgumentError.value(
+        bootstrapVersion,
+        'bootstrapVersion',
+        'must not be negative',
+      );
+    }
     await _database.transaction(() async {
+      // Snapshot writes are supplied by the coordinator and intentionally run
+      // in this transaction. If they fail, neither the cursor nor the
+      // bootstrap marker is committed, making the operation resumable.
+      await applySnapshot?.call();
       final current = await (_database.select(
         _database.syncFeedCursors,
       )..where((t) => t.userId.equals(userId))).getSingleOrNull();
@@ -59,6 +81,9 @@ final class SyncInboxStore {
               userId: userId,
               receiveCursor: Value(_maxCursor(current?.receiveCursor, cursor)),
               bootstrapComplete: const Value(true),
+              bootstrapVersion: Value(
+                _maxVersion(current?.bootstrapVersion, bootstrapVersion),
+              ),
             ),
           );
     });
@@ -78,6 +103,7 @@ final class SyncInboxStore {
                 sequence: change.sequence,
                 type: change.type,
                 noteId: Value(change.noteId),
+                taskId: Value(change.taskId),
                 revision: Value(change.revision),
                 createdAt: change.createdAt.toUtc(),
               ),
@@ -97,6 +123,7 @@ final class SyncInboxStore {
                 _maxCursor(current?.receiveCursor, page.cursor),
               ),
               bootstrapComplete: Value(current?.bootstrapComplete ?? false),
+              bootstrapVersion: Value(current?.bootstrapVersion ?? 0),
             ),
           );
     });
@@ -115,6 +142,7 @@ final class SyncInboxStore {
             sequence: row.sequence,
             type: row.type,
             noteId: row.noteId,
+            taskId: row.taskId,
             revision: row.revision,
             createdAt: row.createdAt.toUtc(),
           ),
@@ -143,5 +171,8 @@ final class SyncInboxStore {
   }
 
   int _maxCursor(int? current, int candidate) =>
+      current == null || candidate > current ? candidate : current;
+
+  int _maxVersion(int? current, int candidate) =>
       current == null || candidate > current ? candidate : current;
 }

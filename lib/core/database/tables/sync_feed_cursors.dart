@@ -6,6 +6,7 @@ class SyncFeedCursors extends Table {
   IntColumn get receiveCursor => integer().withDefault(const Constant(0))();
   BoolColumn get bootstrapComplete =>
       boolean().withDefault(const Constant(false))();
+  IntColumn get bootstrapVersion => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {userId};

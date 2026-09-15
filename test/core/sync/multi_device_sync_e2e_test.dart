@@ -8,67 +8,73 @@ import 'package:supanotes/core/sync/sync_feed_client.dart';
 import 'package:supanotes/core/sync/sync_inbox_store.dart';
 
 void main() {
-  test('device B converges after device A publishes a remote note change', () async {
-    final deviceA = AppDatabase.test();
-    final deviceB = AppDatabase.test();
-    addTearDown(deviceA.close);
-    addTearDown(deviceB.close);
-    final server = _FakeRemoteServer();
+  test(
+    'device B converges after device A publishes a remote note change',
+    () async {
+      final deviceA = AppDatabase.test();
+      final deviceB = AppDatabase.test();
+      addTearDown(deviceA.close);
+      addTearDown(deviceB.close);
+      final server = _FakeRemoteServer();
 
-    await _writeLocalSnapshot(
-      deviceA,
-      revision: server.revision,
-      document: server.document,
-    );
+      await _writeLocalSnapshot(
+        deviceA,
+        revision: server.revision,
+        document: server.document,
+      );
 
-    final storeB = SyncInboxStore(deviceB);
-    var pollCount = 0;
-    var coordinatorB = _buildCoordinator(
-      database: deviceB,
-      store: storeB,
-      server: server,
-      onPoll: () => pollCount++,
-    );
-    await coordinatorB.syncOnce();
+      final storeB = SyncInboxStore(deviceB);
+      var pollCount = 0;
+      var coordinatorB = _buildCoordinator(
+        database: deviceB,
+        store: storeB,
+        server: server,
+        onPoll: () => pollCount++,
+      );
+      await coordinatorB.syncOnce();
 
-    final initialB = await deviceB.noteOperationsDao
-        .watchNoteDocument('shared-note')
-        .first;
-    expect(initialB!.revision, 1);
-    expect(initialB.materializedDocumentJson, contains('before'));
+      final initialB = await deviceB.noteOperationsDao
+          .watchNoteDocument('shared-note')
+          .first;
+      expect(initialB!.revision, 1);
+      expect(initialB.materializedDocumentJson, contains('before'));
 
-    server.publishEditFromDeviceA('after from device A');
-    await _writeLocalSnapshot(
-      deviceA,
-      revision: server.revision,
-      document: server.document,
-    );
+      server.publishEditFromDeviceA('after from device A');
+      await _writeLocalSnapshot(
+        deviceA,
+        revision: server.revision,
+        document: server.document,
+      );
 
-    await coordinatorB.syncOnce();
+      await coordinatorB.syncOnce();
 
-    final convergedB = await deviceB.noteOperationsDao
-        .watchNoteDocument('shared-note')
-        .first;
-    expect(convergedB!.revision, 2);
-    expect(convergedB.materializedDocumentJson, contains('after from device A'));
-    expect(await storeB.getCursor('user-1'), 1);
-    expect(pollCount, 1);
+      final convergedB = await deviceB.noteOperationsDao
+          .watchNoteDocument('shared-note')
+          .first;
+      expect(convergedB!.revision, 2);
+      expect(
+        convergedB.materializedDocumentJson,
+        contains('after from device A'),
+      );
+      expect(await storeB.getCursor('user-1'), 1);
+      expect(pollCount, 1);
 
-    // Recreate the device-B sync process. The durable cursor prevents the
-    // already-applied change from being replayed after an app restart.
-    await coordinatorB.dispose();
-    coordinatorB = _buildCoordinator(
-      database: deviceB,
-      store: SyncInboxStore(deviceB),
-      server: server,
-      onPoll: () => pollCount++,
-    );
-    await coordinatorB.syncOnce();
-    await coordinatorB.dispose();
+      // Recreate the device-B sync process. The durable cursor prevents the
+      // already-applied change from being replayed after an app restart.
+      await coordinatorB.dispose();
+      coordinatorB = _buildCoordinator(
+        database: deviceB,
+        store: SyncInboxStore(deviceB),
+        server: server,
+        onPoll: () => pollCount++,
+      );
+      await coordinatorB.syncOnce();
+      await coordinatorB.dispose();
 
-    expect(pollCount, 1);
-    expect(await SyncInboxStore(deviceB).getCursor('user-1'), 1);
-  });
+      expect(pollCount, 1);
+      expect(await SyncInboxStore(deviceB).getCursor('user-1'), 1);
+    },
+  );
 }
 
 NoteRemoteSyncCoordinator _buildCoordinator({
@@ -163,6 +169,7 @@ final class _FakeRemoteServer {
   Future<SyncChangePage> fetchChanges({
     required int after,
     required int limit,
+    SyncFeedScope scope = SyncFeedScope.notes,
   }) async {
     final pending = _changes
         .where((change) => change.sequence > after)

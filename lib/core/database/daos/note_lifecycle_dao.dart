@@ -29,18 +29,23 @@ final class NoteLifecycleDao extends DatabaseAccessor<AppDatabase> {
       ).get();
       if (matchingDraft.isEmpty) return false;
 
-      await _deleteNoteDataInTransaction(noteId);
+      await deleteNoteDataInTransaction(noteId);
       return true;
     });
   }
 
   Future<void> deleteNoteData(String noteId) {
     return attachedDatabase.transaction(
-      () => _deleteNoteDataInTransaction(noteId),
+      () => deleteNoteDataInTransaction(noteId),
     );
   }
 
-  Future<void> _deleteNoteDataInTransaction(String noteId) async {
+  /// Deletes a note aggregate while a caller-owned transaction is active.
+  ///
+  /// The public transaction-free [deleteNoteData] remains the normal entry
+  /// point. Bootstrap uses this method to remove stale catalog rows atomically
+  /// with the fetched snapshot and its feed checkpoint.
+  Future<void> deleteNoteDataInTransaction(String noteId) async {
     await (delete(
       attachedDatabase.attachments,
     )..where((attachment) => attachment.noteId.equals(noteId))).go();

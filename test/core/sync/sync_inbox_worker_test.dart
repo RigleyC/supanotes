@@ -16,27 +16,32 @@ void main() {
       final worker = SyncInboxWorker(
         userId: 'u1',
         store: store,
-        fetchChanges: ({required after, required limit}) async {
-          calls++;
-          return SyncChangePage(
-            cursor: 2,
-            hasMore: false,
-            changes: [
-              SyncChange(
-                sequence: 1,
-                type: 'note_changed',
-                noteId: 'n1',
-                createdAt: DateTime.utc(2026, 9, 1),
-              ),
-              SyncChange(
-                sequence: 2,
-                type: 'note_changed',
-                noteId: 'n2',
-                createdAt: DateTime.utc(2026, 9, 1),
-              ),
-            ],
-          );
-        },
+        fetchChanges:
+            ({
+              required after,
+              required limit,
+              scope = SyncFeedScope.notes,
+            }) async {
+              calls++;
+              return SyncChangePage(
+                cursor: 2,
+                hasMore: false,
+                changes: [
+                  SyncChange(
+                    sequence: 1,
+                    type: 'note_changed',
+                    noteId: 'n1',
+                    createdAt: DateTime.utc(2026, 9, 1),
+                  ),
+                  SyncChange(
+                    sequence: 2,
+                    type: 'note_changed',
+                    noteId: 'n2',
+                    createdAt: DateTime.utc(2026, 9, 1),
+                  ),
+                ],
+              );
+            },
         isNoteActive: (_) => false,
         applyChange: (change) async => applied.add(change.sequence),
       );
@@ -59,18 +64,23 @@ void main() {
     final worker = SyncInboxWorker(
       userId: 'u1',
       store: store,
-      fetchChanges: ({required after, required limit}) async => SyncChangePage(
-        cursor: 3,
-        hasMore: false,
-        changes: [
-          SyncChange(
-            sequence: 3,
-            type: 'note_changed',
-            noteId: 'n1',
-            createdAt: DateTime.utc(2026, 9, 1),
+      fetchChanges:
+          ({
+            required after,
+            required limit,
+            scope = SyncFeedScope.notes,
+          }) async => SyncChangePage(
+            cursor: 3,
+            hasMore: false,
+            changes: [
+              SyncChange(
+                sequence: 3,
+                type: 'note_changed',
+                noteId: 'n1',
+                createdAt: DateTime.utc(2026, 9, 1),
+              ),
+            ],
           ),
-        ],
-      ),
       isNoteActive: (_) => active,
       applyChange: (_) async => applied++,
     );
@@ -111,8 +121,16 @@ void main() {
       final worker = SyncInboxWorker(
         userId: 'u1',
         store: SyncInboxStore(db),
-        fetchChanges: ({required after, required limit}) async =>
-            SyncChangePage(cursor: after, hasMore: false, changes: const []),
+        fetchChanges:
+            ({
+              required after,
+              required limit,
+              scope = SyncFeedScope.notes,
+            }) async => SyncChangePage(
+              cursor: after,
+              hasMore: false,
+              changes: const [],
+            ),
         isNoteActive: (_) => false,
         applyChange: (change) async => applied.add(change.sequence),
       );

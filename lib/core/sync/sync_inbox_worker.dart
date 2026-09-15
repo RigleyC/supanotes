@@ -11,6 +11,7 @@ final class SyncInboxWorker {
     required bool Function(String noteId) isNoteActive,
     required Future<void> Function(SyncInboxEntry change) applyChange,
     this.pageSize = 100,
+    this.scope = SyncFeedScope.notes,
   }) : _store = store,
        _fetchChanges = fetchChanges,
        _isNoteActive = isNoteActive,
@@ -22,6 +23,7 @@ final class SyncInboxWorker {
   final bool Function(String noteId) _isNoteActive;
   final Future<void> Function(SyncInboxEntry change) _applyChange;
   final int pageSize;
+  SyncFeedScope scope;
 
   Future<void> _tail = Future<void>.value();
   bool _disposed = false;
@@ -38,7 +40,11 @@ final class SyncInboxWorker {
 
     while (!_disposed) {
       final before = await _store.getCursor(userId);
-      final page = await _fetchChanges(after: before, limit: pageSize);
+      final page = await _fetchChanges(
+        after: before,
+        limit: pageSize,
+        scope: scope,
+      );
       if (page.cursor < before) {
         throw StateError(
           'Sync feed cursor moved backwards (${page.cursor} < $before)',

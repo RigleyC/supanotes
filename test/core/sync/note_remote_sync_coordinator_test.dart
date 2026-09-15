@@ -5,110 +5,126 @@ import 'package:supanotes/core/sync/sync_feed_client.dart';
 import 'package:supanotes/core/sync/sync_inbox_store.dart';
 
 void main() {
-  test('bootstrap snapshots catalog at watermark then catches concurrent changes', () async {
-    final db = AppDatabase.test();
-    addTearDown(db.close);
-    final store = SyncInboxStore(db);
-    final fetchAfter = <int>[];
-    var catalogPulls = 0;
-    var newChangeExists = false;
-    final applied = <int>[];
+  test(
+    'bootstrap snapshots catalog at watermark then catches concurrent changes',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      final store = SyncInboxStore(db);
+      final fetchAfter = <int>[];
+      var catalogPulls = 0;
+      var newChangeExists = false;
+      final applied = <int>[];
 
-    final coordinator = NoteRemoteSyncCoordinator(
-      userId: 'user-1',
-      store: store,
-      fetchChanges: ({required after, required limit}) async {
-        fetchAfter.add(after);
-        if (after == 0) {
-          return const SyncChangePage(
-            cursor: 1,
-            watermark: 12,
-            hasMore: false,
-            changes: [],
-          );
-        }
-        if (after == 12 && newChangeExists) {
-          return SyncChangePage(
-            cursor: 13,
-            watermark: 13,
-            hasMore: false,
-            changes: [
-              SyncChange(
-                sequence: 13,
-                type: 'note_preferences_changed',
-                noteId: 'n1',
-                createdAt: DateTime.utc(2026, 9, 2),
-              ),
-            ],
-          );
-        }
-        return SyncChangePage(
-          cursor: after,
-          watermark: after,
-          hasMore: false,
-          changes: const [],
-        );
-      },
-      bootstrapCatalog: () async {
-        catalogPulls++;
-        newChangeExists = true;
-      },
-      isNoteActive: (_) => false,
-      syncPending: (_) async {},
-      confirmedRevision: (_) async => 0,
-      pollAndReconcile: (_) async {},
-      hydrateRemote: (_) async {},
-      deleteLocal: (_) async {},
-      onApplied: (change) => applied.add(change.sequence),
-    );
+      final coordinator = NoteRemoteSyncCoordinator(
+        userId: 'user-1',
+        store: store,
+        fetchChanges:
+            ({
+              required after,
+              required limit,
+              scope = SyncFeedScope.notes,
+            }) async {
+              fetchAfter.add(after);
+              if (after == 0) {
+                return const SyncChangePage(
+                  cursor: 1,
+                  watermark: 12,
+                  hasMore: false,
+                  changes: [],
+                );
+              }
+              if (after == 12 && newChangeExists) {
+                return SyncChangePage(
+                  cursor: 13,
+                  watermark: 13,
+                  hasMore: false,
+                  changes: [
+                    SyncChange(
+                      sequence: 13,
+                      type: 'note_preferences_changed',
+                      noteId: 'n1',
+                      createdAt: DateTime.utc(2026, 9, 2),
+                    ),
+                  ],
+                );
+              }
+              return SyncChangePage(
+                cursor: after,
+                watermark: after,
+                hasMore: false,
+                changes: const [],
+              );
+            },
+        bootstrapCatalog: () async {
+          catalogPulls++;
+          newChangeExists = true;
+        },
+        isNoteActive: (_) => false,
+        syncPending: (_) async {},
+        confirmedRevision: (_) async => 0,
+        pollAndReconcile: (_) async {},
+        hydrateRemote: (_) async {},
+        deleteLocal: (_) async {},
+        onApplied: (change) => applied.add(change.sequence),
+      );
 
-    await coordinator.syncOnce();
-    await coordinator.syncOnce();
+      await coordinator.syncOnce();
+      await coordinator.syncOnce();
 
-    expect(catalogPulls, 1);
-    expect(fetchAfter.take(2), [0, 12]);
-    expect(applied, [13]);
-    expect(await store.isBootstrapComplete('user-1'), isTrue);
-    expect(await store.getCursor('user-1'), 13);
-  });
+      expect(catalogPulls, 1);
+      expect(fetchAfter.take(2), [0, 12]);
+      expect(applied, [13]);
+      expect(await store.isBootstrapComplete('user-1'), isTrue);
+      expect(await store.getCursor('user-1'), 13);
+    },
+  );
 
-  test('note change drains local outbox before polling and hydration', () async {
-    final db = AppDatabase.test();
-    addTearDown(db.close);
-    final store = SyncInboxStore(db);
-    await store.completeBootstrap(userId: 'user-1', cursor: 0);
-    final calls = <String>[];
+  test(
+    'note change drains local outbox before polling and hydration',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      final store = SyncInboxStore(db);
+      await store.completeBootstrap(userId: 'user-1', cursor: 0);
+      final calls = <String>[];
 
-    final coordinator = NoteRemoteSyncCoordinator(
-      userId: 'user-1',
-      store: store,
-      fetchChanges: ({required after, required limit}) async => SyncChangePage(
-        cursor: 4,
-        watermark: 4,
-        hasMore: false,
-        changes: [
-          SyncChange(
-            sequence: 4,
-            type: 'note_changed',
-            noteId: 'n1',
-            revision: 8,
-            createdAt: DateTime.utc(2026, 9, 2),
-          ),
-        ],
-      ),
-      bootstrapCatalog: () async {},
-      isNoteActive: (_) => false,
-      syncPending: (id) async => calls.add('outbox:$id'),
-      confirmedRevision: (_) async => 6,
-      pollAndReconcile: (id) async => calls.add('poll:$id'),
-      hydrateRemote: (id) async => calls.add('hydrate:$id'),
-      deleteLocal: (_) async {},
-    );
+      final coordinator = NoteRemoteSyncCoordinator(
+        userId: 'user-1',
+        store: store,
+        fetchChanges:
+            ({
+              required after,
+              required limit,
+              scope = SyncFeedScope.notes,
+            }) async => SyncChangePage(
+              cursor: 4,
+              watermark: 4,
+              hasMore: false,
+              changes: [
+                SyncChange(
+                  sequence: 4,
+                  type: 'note_changed',
+                  noteId: 'n1',
+                  revision: 8,
+                  createdAt: DateTime.utc(2026, 9, 2),
+                ),
+              ],
+            ),
+        bootstrapCatalog: () async {},
+        isNoteActive: (_) => false,
+        syncPending: (id) async => calls.add('outbox:$id'),
+        confirmedRevision: (_) async => 6,
+        pollAndReconcile: (id) async => calls.add('poll:$id'),
+        hydrateRemote: (id) async => calls.add('hydrate:$id'),
+        deleteLocal: (_) async {},
+      );
 
-    await coordinator.syncOnce();
+      await coordinator.syncOnce();
 
-    expect(calls, ['outbox:n1', 'poll:n1', 'hydrate:n1']);
-  });
+      expect(calls, ['outbox:n1', 'poll:n1', 'hydrate:n1']);
+    },
+  );
 
   test('deleted and revoked notes are removed without hydration', () async {
     final db = AppDatabase.test();
@@ -121,15 +137,30 @@ void main() {
     final coordinator = NoteRemoteSyncCoordinator(
       userId: 'user-1',
       store: store,
-      fetchChanges: ({required after, required limit}) async => SyncChangePage(
-        cursor: 2,
-        watermark: 2,
-        hasMore: false,
-        changes: [
-          SyncChange(sequence: 1, type: 'note_deleted', noteId: 'n1', createdAt: DateTime.utc(2026, 9, 2)),
-          SyncChange(sequence: 2, type: 'note_access_revoked', noteId: 'n2', createdAt: DateTime.utc(2026, 9, 2)),
-        ],
-      ),
+      fetchChanges:
+          ({
+            required after,
+            required limit,
+            scope = SyncFeedScope.notes,
+          }) async => SyncChangePage(
+            cursor: 2,
+            watermark: 2,
+            hasMore: false,
+            changes: [
+              SyncChange(
+                sequence: 1,
+                type: 'note_deleted',
+                noteId: 'n1',
+                createdAt: DateTime.utc(2026, 9, 2),
+              ),
+              SyncChange(
+                sequence: 2,
+                type: 'note_access_revoked',
+                noteId: 'n2',
+                createdAt: DateTime.utc(2026, 9, 2),
+              ),
+            ],
+          ),
       bootstrapCatalog: () async {},
       isNoteActive: (_) => false,
       syncPending: (_) async {},
@@ -144,4 +175,135 @@ void main() {
     expect(deleted, ['n1', 'n2']);
     expect(hydrated, 0);
   });
+
+  test(
+    'enables all scope after task bootstrap and routes task events',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      final store = SyncInboxStore(db);
+      final scopes = <SyncFeedScope>[];
+      final applied = <String>[];
+      var bootstrappedTasks = 0;
+
+      final coordinator = NoteRemoteSyncCoordinator(
+        userId: 'user-1',
+        store: store,
+        fetchChanges:
+            ({
+              required after,
+              required limit,
+              scope = SyncFeedScope.notes,
+            }) async {
+              scopes.add(scope);
+              if (scope == SyncFeedScope.notes) {
+                return const SyncChangePage(
+                  cursor: 3,
+                  watermark: 3,
+                  hasMore: false,
+                  changes: [],
+                );
+              }
+              return SyncChangePage(
+                cursor: 6,
+                watermark: 6,
+                hasMore: false,
+                changes: [
+                  SyncChange(
+                    sequence: 5,
+                    type: 'task_changed',
+                    taskId: 'task-1',
+                    createdAt: DateTime.utc(2026, 9, 2),
+                  ),
+                  SyncChange(
+                    sequence: 6,
+                    type: 'task_deleted',
+                    taskId: 'task-2',
+                    createdAt: DateTime.utc(2026, 9, 2),
+                  ),
+                ],
+              );
+            },
+        bootstrapCatalog: () async {},
+        bootstrapTasks: () async => bootstrappedTasks++,
+        applyTaskChanged: (id) async => applied.add('changed:$id'),
+        applyTaskDeleted: (id) async => applied.add('deleted:$id'),
+        isNoteActive: (_) => false,
+        syncPending: (_) async {},
+        confirmedRevision: (_) async => null,
+        pollAndReconcile: (_) async {},
+        hydrateRemote: (_) async {},
+        deleteLocal: (_) async {},
+      );
+
+      await coordinator.syncOnce();
+
+      expect(bootstrappedTasks, 1);
+      expect(scopes, [SyncFeedScope.notes, SyncFeedScope.all]);
+      expect(applied, ['changed:task-1', 'deleted:task-2']);
+      expect(await store.getBootstrapVersion('user-1'), 2);
+    },
+  );
+
+  test(
+    'retries a failed task bootstrap without committing version two',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      final store = SyncInboxStore(db);
+      var taskAttempts = 0;
+      final scopes = <SyncFeedScope>[];
+
+      final coordinator = NoteRemoteSyncCoordinator(
+        userId: 'user-1',
+        store: store,
+        fetchChanges:
+            ({
+              required after,
+              required limit,
+              scope = SyncFeedScope.notes,
+            }) async {
+              scopes.add(scope);
+              if (scope == SyncFeedScope.notes) {
+                return const SyncChangePage(
+                  cursor: 2,
+                  watermark: 2,
+                  hasMore: false,
+                  changes: [],
+                );
+              }
+              return SyncChangePage(
+                cursor: after,
+                watermark: after,
+                hasMore: false,
+                changes: const [],
+              );
+            },
+        bootstrapCatalog: () async {},
+        bootstrapTasks: () async {
+          taskAttempts++;
+          if (taskAttempts == 1) throw StateError('offline');
+        },
+        isNoteActive: (_) => false,
+        syncPending: (_) async {},
+        confirmedRevision: (_) async => null,
+        pollAndReconcile: (_) async {},
+        hydrateRemote: (_) async {},
+        deleteLocal: (_) async {},
+      );
+
+      await expectLater(coordinator.syncOnce(), throwsStateError);
+      expect(await store.getBootstrapVersion('user-1'), 0);
+      expect(await store.isBootstrapComplete('user-1'), isFalse);
+
+      await coordinator.syncOnce();
+      expect(taskAttempts, 2);
+      expect(await store.getBootstrapVersion('user-1'), 2);
+      expect(scopes, [
+        SyncFeedScope.notes,
+        SyncFeedScope.notes,
+        SyncFeedScope.all,
+      ]);
+    },
+  );
 }

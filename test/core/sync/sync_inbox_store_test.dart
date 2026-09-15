@@ -48,6 +48,7 @@ void main() {
       expect(await store.isBootstrapComplete('u1'), isTrue);
       final pending = await store.listPending('u1');
       expect(pending.single.noteId, 'n1');
+      expect(pending.single.taskId, equals(null));
       expect(pending.single.createdAt, DateTime.utc(2026, 9, 2, 12));
     },
   );
@@ -59,7 +60,7 @@ void main() {
       addTearDown(db.close);
       final store = SyncInboxStore(db);
       final page = SyncChangePage(
-        cursor: 2,
+        cursor: 3,
         hasMore: false,
         changes: [
           SyncChange(
@@ -75,16 +76,23 @@ void main() {
             noteId: 'n2',
             createdAt: DateTime.utc(2026, 9, 1),
           ),
+          SyncChange(
+            sequence: 3,
+            type: 'task_changed',
+            taskId: 'task-1',
+            createdAt: DateTime.utc(2026, 9, 1),
+          ),
         ],
       );
 
       await store.ingestPage(userId: 'u1', page: page);
       await store.ingestPage(userId: 'u1', page: page);
 
-      expect(await store.getCursor('u1'), 2);
+      expect(await store.getCursor('u1'), 3);
       expect(await store.isBootstrapComplete('u1'), isFalse);
       final pending = await store.listPending('u1');
-      expect(pending.map((e) => e.sequence).toList(), [1, 2]);
+      expect(pending.map((e) => e.sequence).toList(), [1, 2, 3]);
+      expect(pending.last.taskId, 'task-1');
     },
   );
 
@@ -106,6 +114,48 @@ void main() {
     await store.completeBootstrap(userId: 'u1', cursor: 9);
     expect(await store.isBootstrapComplete('u1'), isTrue);
     expect(await store.getCursor('u1'), 9);
+    expect(await store.getBootstrapVersion('u1'), 0);
+
+    await store.completeBootstrap(
+      userId: 'u1',
+      cursor: 8,
+      bootstrapVersion: 2,
+    );
+    expect(await store.getCursor('u1'), 9);
+    expect(await store.getBootstrapVersion('u1'), 2);
+  });
+
+  test('snapshot writes and cursor checkpoint roll back together', () async {
+    final db = AppDatabase.test();
+    addTearDown(db.close);
+    final store = SyncInboxStore(db);
+
+    await expectLater(
+      store.completeBootstrap(
+        userId: 'u1',
+        cursor: 12,
+        bootstrapVersion: 2,
+        applySnapshot: () async {
+          await db
+              .into(db.syncInbox)
+              .insert(
+                SyncInboxCompanion.insert(
+                  userId: 'u1',
+                  sequence: 12,
+                  type: 'task_changed',
+                  taskId: const Value('task-1'),
+                  createdAt: DateTime.utc(2026, 9, 2),
+                ),
+              );
+          throw StateError('snapshot failed');
+        },
+      ),
+      throwsStateError,
+    );
+
+    expect(await store.getCursor('u1'), 0);
+    expect(await store.getBootstrapVersion('u1'), 0);
+    expect(await store.listPending('u1'), isEmpty);
   });
 
   test(

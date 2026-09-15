@@ -10,6 +10,7 @@ class SyncInbox extends Table {
   IntColumn get sequence => integer()();
   TextColumn get type => text()();
   TextColumn get noteId => text().nullable()();
+  TextColumn get taskId => text().nullable()();
   IntColumn get revision => integer().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get appliedAt => dateTime().nullable()();

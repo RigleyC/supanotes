@@ -157,19 +157,39 @@ class AppDatabase extends _$AppDatabase {
     required LocalNoteDocumentsCompanion document,
     String userId = '',
   }) {
-    return transaction(() async {
-      _validateRemoteNoteWrite(noteId: noteId, note: note, document: document);
-      if (!await _writeRemoteNoteCatalog(
+    return transaction(
+      () => saveRemoteNoteInTransaction(
         noteId: noteId,
         mode: mode,
         note: note,
-      )) {
-        return false;
-      }
+        document: document,
+      ),
+    );
+  }
 
-      await noteOperationsDao.upsertNoteDocument(document);
-      return true;
-    });
+  /// Applies a remote note while the caller-owned transaction is active.
+  ///
+  /// This is intentionally separate from [saveRemoteNote], whose transaction
+  /// wrapper remains the safe default for ordinary incremental hydration.
+  /// Bootstrap uses this entry point so note snapshots, task snapshots and the
+  /// feed checkpoint can commit or roll back as one local unit.
+  Future<bool> saveRemoteNoteInTransaction({
+    required String noteId,
+    required RemoteNoteWriteMode mode,
+    required NotesCompanion note,
+    required LocalNoteDocumentsCompanion document,
+  }) async {
+    _validateRemoteNoteWrite(noteId: noteId, note: note, document: document);
+    if (!await _writeRemoteNoteCatalog(
+      noteId: noteId,
+      mode: mode,
+      note: note,
+    )) {
+      return false;
+    }
+
+    await noteOperationsDao.upsertNoteDocument(document);
+    return true;
   }
 
   void _validateRemoteNoteWrite({
@@ -243,12 +263,15 @@ class AppDatabase extends _$AppDatabase {
       CREATE TABLE sync_feed_cursors_v31 (
         user_id TEXT NOT NULL PRIMARY KEY,
         receive_cursor INTEGER NOT NULL DEFAULT 0,
-        bootstrap_complete INTEGER NOT NULL DEFAULT 0
+        bootstrap_complete INTEGER NOT NULL DEFAULT 0,
+        bootstrap_version INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await customStatement('''
-      INSERT INTO sync_feed_cursors_v31(user_id, receive_cursor, bootstrap_complete)
-      SELECT user_id, receive_cursor, bootstrap_complete
+      INSERT INTO sync_feed_cursors_v31(
+        user_id, receive_cursor, bootstrap_complete, bootstrap_version
+      )
+      SELECT user_id, receive_cursor, bootstrap_complete, 0
       FROM sync_feed_cursors
     ''');
     await customStatement('DROP TABLE sync_feed_cursors');
@@ -268,6 +291,7 @@ class AppDatabase extends _$AppDatabase {
         sequence INTEGER NOT NULL,
         type TEXT NOT NULL,
         note_id TEXT,
+        task_id TEXT,
         revision INTEGER,
         created_at INTEGER NOT NULL,
         applied_at INTEGER,
@@ -276,10 +300,10 @@ class AppDatabase extends _$AppDatabase {
     ''');
     await customStatement('''
       INSERT INTO sync_inbox_v31(
-        user_id, sequence, type, note_id, revision, created_at, applied_at
+        user_id, sequence, type, note_id, task_id, revision, created_at, applied_at
       )
       SELECT
-        user_id, sequence, type, note_id, revision,
+        user_id, sequence, type, note_id, NULL, revision,
         CAST(strftime('%s', created_at) AS INTEGER),
         CASE WHEN applied_at IS NULL THEN NULL
           ELSE CAST(strftime('%s', applied_at) AS INTEGER) END

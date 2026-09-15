@@ -22,6 +22,61 @@ Future<void> _noopNoteIconUpdate(
 ) async {}
 
 void main() {
+  test('fetches a catalog snapshot before its atomic local write', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+
+    when(client.listNotes).thenAnswer(
+      (_) async => [
+        {
+          'id': 'bootstrap-note',
+          'user_id': 'owner-user',
+          'created_at': '2026-08-10T11:00:00.000Z',
+          'updated_at': '2026-08-10T12:00:00.000Z',
+        },
+      ],
+    );
+    when(() => client.getDocument('bootstrap-note')).thenAnswer(
+      (_) async => NoteDocumentResponse(
+        noteId: 'bootstrap-note',
+        revision: 2,
+        document: const {
+          'schemaVersion': 1,
+          'blocks': [
+            {
+              'id': 'block-1',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'Bootstrap'},
+              ],
+            },
+          ],
+        },
+        serverTime: DateTime.utc(2026, 8, 10, 12),
+      ),
+    );
+
+    final snapshot = await sync.fetchRemoteNotes();
+    expect(await database.notesDao.getNoteById('bootstrap-note'), isNull);
+
+    await sync.applyRemoteNotesSnapshot(
+      userId: 'owner-user',
+      snapshot: snapshot,
+    );
+
+    expect(
+      (await database.notesDao.getNoteById('bootstrap-note'))?.content,
+      'Bootstrap',
+    );
+  });
+
   test('materializes a clean remote document for offline task reads', () async {
     final database = AppDatabase.test();
     final client = _MockNoteSyncClient();
@@ -1318,71 +1373,74 @@ void main() {
     verifyNever(() => client.getDocument('owner-metadata-refresh-note'));
   });
 
-  test('pushes the complete dirty preference row and clears its matching version', () async {
-    final database = AppDatabase.test();
-    final client = _MockNoteSyncClient();
-    final sync = NoteCatalogSync(
-      syncClient: client,
-      database: database,
-      activityTracker: NoteSessionActivityTracker(),
-      updateNoteIcon: _noopNoteIconUpdate,
-    );
-    addTearDown(database.close);
-    final timestamp = DateTime.utc(2026, 8, 10, 12);
-    await database.notesDao.createNote(
-      NotesCompanion.insert(
-        id: 'preference-note',
+  test(
+    'pushes the complete dirty preference row and clears its matching version',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
+      );
+      addTearDown(database.close);
+      final timestamp = DateTime.utc(2026, 8, 10, 12);
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'preference-note',
+          userId: 'owner-user',
+          content: 'content',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        ),
+      );
+      await database.userNotePreferencesDao.setPreferences(
         userId: 'owner-user',
-        content: 'content',
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      ),
-    );
-    await database.userNotePreferencesDao.setPreferences(
-      userId: 'owner-user',
-      noteId: 'preference-note',
-      favorite: true,
-      archived: false,
-      hideCompleted: true,
-      collapseImages: true,
-    );
-    when(
-      () => client.updatePreferences(
         noteId: 'preference-note',
         favorite: true,
         archived: false,
         hideCompleted: true,
         collapseImages: true,
-      ),
-    ).thenAnswer(
-      (_) async => NotePreferencesResponse(
-        favorite: true,
-        archived: false,
-        hideCompleted: true,
-        collapseImages: true,
-        updatedAt: timestamp,
-      ),
-    );
+      );
+      when(
+        () => client.updatePreferences(
+          noteId: 'preference-note',
+          favorite: true,
+          archived: false,
+          hideCompleted: true,
+          collapseImages: true,
+        ),
+      ).thenAnswer(
+        (_) async => NotePreferencesResponse(
+          favorite: true,
+          archived: false,
+          hideCompleted: true,
+          collapseImages: true,
+          updatedAt: timestamp,
+        ),
+      );
 
-    await sync.pushDirtyPreferences();
+      await sync.pushDirtyPreferences();
 
-    verify(
-      () => client.updatePreferences(
-        noteId: 'preference-note',
-        favorite: true,
-        archived: false,
-        hideCompleted: true,
-        collapseImages: true,
-      ),
-    ).called(1);
-    expect(
-      (await database.userNotePreferencesDao.getPreference(
-        'owner-user',
-        'preference-note',
-      ))!.isDirty,
-      isFalse,
-    );
-  });
+      verify(
+        () => client.updatePreferences(
+          noteId: 'preference-note',
+          favorite: true,
+          archived: false,
+          hideCompleted: true,
+          collapseImages: true,
+        ),
+      ).called(1);
+      expect(
+        (await database.userNotePreferencesDao.getPreference(
+          'owner-user',
+          'preference-note',
+        ))!.isDirty,
+        isFalse,
+      );
+    },
+  );
 
   test('keeps dirty preferences when the remote push fails', () async {
     final database = AppDatabase.test();

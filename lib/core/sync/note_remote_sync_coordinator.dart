@@ -21,6 +21,9 @@ final class NoteRemoteSyncCoordinator {
     required Future<void> Function(String noteId) pollAndReconcile,
     required Future<void> Function(String noteId) hydrateRemote,
     required Future<void> Function(String noteId) deleteLocal,
+    Future<void> Function()? bootstrapTasks,
+    Future<void> Function(String taskId)? applyTaskChanged,
+    Future<void> Function(String taskId)? applyTaskDeleted,
     void Function(SyncInboxEntry change)? onApplied,
   }) : _store = store,
        _fetchChanges = fetchChanges,
@@ -30,6 +33,9 @@ final class NoteRemoteSyncCoordinator {
        _pollAndReconcile = pollAndReconcile,
        _hydrateRemote = hydrateRemote,
        _deleteLocal = deleteLocal,
+       _bootstrapTasks = bootstrapTasks,
+       _applyTaskChanged = applyTaskChanged,
+       _applyTaskDeleted = applyTaskDeleted,
        _onApplied = onApplied {
     _worker = SyncInboxWorker(
       userId: userId,
@@ -37,6 +43,7 @@ final class NoteRemoteSyncCoordinator {
       fetchChanges: fetchChanges,
       isNoteActive: isNoteActive,
       applyChange: _applyChange,
+      scope: SyncFeedScope.notes,
     );
   }
 
@@ -49,6 +56,9 @@ final class NoteRemoteSyncCoordinator {
   final Future<void> Function(String noteId) _pollAndReconcile;
   final Future<void> Function(String noteId) _hydrateRemote;
   final Future<void> Function(String noteId) _deleteLocal;
+  final Future<void> Function()? _bootstrapTasks;
+  final Future<void> Function(String taskId)? _applyTaskChanged;
+  final Future<void> Function(String taskId)? _applyTaskDeleted;
   final void Function(SyncInboxEntry change)? _onApplied;
 
   late final SyncInboxWorker _worker;
@@ -63,24 +73,70 @@ final class NoteRemoteSyncCoordinator {
   }
 
   Future<void> _syncOnce() async {
-    if (!await _store.isBootstrapComplete(userId)) {
+    final bootstrapVersion = await _store.getBootstrapVersion(userId);
+    if (bootstrapVersion < 2 && _bootstrapTasks != null) {
+      await _bootstrap();
+    } else if (!await _store.isBootstrapComplete(userId)) {
       await _bootstrap();
     }
+    _worker.scope = (await _store.getBootstrapVersion(userId)) >= 2
+        ? SyncFeedScope.all
+        : SyncFeedScope.notes;
     await _worker.syncOnce();
   }
 
   Future<void> _bootstrap() async {
-    final marker = await _fetchChanges(after: 0, limit: 1);
+    // Notes scope is enough to establish the initial cursor while the task
+    // snapshot is being fetched. Any task event before this cursor is already
+    // represented by that snapshot; later task events are read once scope=all
+    // is enabled.
+    final marker = await _fetchChanges(
+      after: 0,
+      limit: 1,
+      scope: SyncFeedScope.notes,
+    );
     final watermark = marker.watermark;
     if (watermark == null) {
       throw StateError('Sync feed bootstrap response is missing a watermark');
     }
 
-    await _bootstrapCatalog();
-    await _store.completeBootstrap(userId: userId, cursor: watermark);
+    final version = _bootstrapTasks == null ? 0 : 2;
+    await _store.completeBootstrap(
+      userId: userId,
+      cursor: watermark,
+      bootstrapVersion: version,
+      applySnapshot: () async {
+        await _bootstrapCatalog();
+        await _bootstrapTasks?.call();
+      },
+    );
   }
 
   Future<void> _applyChange(SyncInboxEntry change) async {
+    if (change.type == 'task_changed' || change.type == 'task_deleted') {
+      final taskId = change.taskId;
+      if (taskId == null || taskId.isEmpty) {
+        throw StateError(
+          'Sync change ${change.sequence} (${change.type}) is missing taskId',
+        );
+      }
+      if (change.type == 'task_changed') {
+        final applyTaskChanged = _applyTaskChanged;
+        if (applyTaskChanged == null) {
+          throw StateError('No handler registered for task_changed');
+        }
+        await applyTaskChanged(taskId);
+      } else {
+        final applyTaskDeleted = _applyTaskDeleted;
+        if (applyTaskDeleted == null) {
+          throw StateError('No handler registered for task_deleted');
+        }
+        await applyTaskDeleted(taskId);
+      }
+      _onApplied?.call(change);
+      return;
+    }
+
     final noteId = change.noteId;
     if (noteId == null || noteId.isEmpty) {
       throw StateError(

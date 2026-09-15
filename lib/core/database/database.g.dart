@@ -4703,11 +4703,24 @@ class $SyncFeedCursorsTable extends SyncFeedCursors
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _bootstrapVersionMeta = const VerificationMeta(
+    'bootstrapVersion',
+  );
+  @override
+  late final GeneratedColumn<int> bootstrapVersion = GeneratedColumn<int>(
+    'bootstrap_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     userId,
     receiveCursor,
     bootstrapComplete,
+    bootstrapVersion,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4747,6 +4760,15 @@ class $SyncFeedCursorsTable extends SyncFeedCursors
         ),
       );
     }
+    if (data.containsKey('bootstrap_version')) {
+      context.handle(
+        _bootstrapVersionMeta,
+        bootstrapVersion.isAcceptableOrUnknown(
+          data['bootstrap_version']!,
+          _bootstrapVersionMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -4768,6 +4790,10 @@ class $SyncFeedCursorsTable extends SyncFeedCursors
         DriftSqlType.bool,
         data['${effectivePrefix}bootstrap_complete'],
       )!,
+      bootstrapVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}bootstrap_version'],
+      )!,
     );
   }
 
@@ -4782,10 +4808,12 @@ class SyncFeedCursorData extends DataClass
   final String userId;
   final int receiveCursor;
   final bool bootstrapComplete;
+  final int bootstrapVersion;
   const SyncFeedCursorData({
     required this.userId,
     required this.receiveCursor,
     required this.bootstrapComplete,
+    required this.bootstrapVersion,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4793,6 +4821,7 @@ class SyncFeedCursorData extends DataClass
     map['user_id'] = Variable<String>(userId);
     map['receive_cursor'] = Variable<int>(receiveCursor);
     map['bootstrap_complete'] = Variable<bool>(bootstrapComplete);
+    map['bootstrap_version'] = Variable<int>(bootstrapVersion);
     return map;
   }
 
@@ -4801,6 +4830,7 @@ class SyncFeedCursorData extends DataClass
       userId: Value(userId),
       receiveCursor: Value(receiveCursor),
       bootstrapComplete: Value(bootstrapComplete),
+      bootstrapVersion: Value(bootstrapVersion),
     );
   }
 
@@ -4813,6 +4843,7 @@ class SyncFeedCursorData extends DataClass
       userId: serializer.fromJson<String>(json['userId']),
       receiveCursor: serializer.fromJson<int>(json['receiveCursor']),
       bootstrapComplete: serializer.fromJson<bool>(json['bootstrapComplete']),
+      bootstrapVersion: serializer.fromJson<int>(json['bootstrapVersion']),
     );
   }
   @override
@@ -4822,6 +4853,7 @@ class SyncFeedCursorData extends DataClass
       'userId': serializer.toJson<String>(userId),
       'receiveCursor': serializer.toJson<int>(receiveCursor),
       'bootstrapComplete': serializer.toJson<bool>(bootstrapComplete),
+      'bootstrapVersion': serializer.toJson<int>(bootstrapVersion),
     };
   }
 
@@ -4829,10 +4861,12 @@ class SyncFeedCursorData extends DataClass
     String? userId,
     int? receiveCursor,
     bool? bootstrapComplete,
+    int? bootstrapVersion,
   }) => SyncFeedCursorData(
     userId: userId ?? this.userId,
     receiveCursor: receiveCursor ?? this.receiveCursor,
     bootstrapComplete: bootstrapComplete ?? this.bootstrapComplete,
+    bootstrapVersion: bootstrapVersion ?? this.bootstrapVersion,
   );
   SyncFeedCursorData copyWithCompanion(SyncFeedCursorsCompanion data) {
     return SyncFeedCursorData(
@@ -4843,6 +4877,9 @@ class SyncFeedCursorData extends DataClass
       bootstrapComplete: data.bootstrapComplete.present
           ? data.bootstrapComplete.value
           : this.bootstrapComplete,
+      bootstrapVersion: data.bootstrapVersion.present
+          ? data.bootstrapVersion.value
+          : this.bootstrapVersion,
     );
   }
 
@@ -4851,49 +4888,57 @@ class SyncFeedCursorData extends DataClass
     return (StringBuffer('SyncFeedCursorData(')
           ..write('userId: $userId, ')
           ..write('receiveCursor: $receiveCursor, ')
-          ..write('bootstrapComplete: $bootstrapComplete')
+          ..write('bootstrapComplete: $bootstrapComplete, ')
+          ..write('bootstrapVersion: $bootstrapVersion')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(userId, receiveCursor, bootstrapComplete);
+  int get hashCode =>
+      Object.hash(userId, receiveCursor, bootstrapComplete, bootstrapVersion);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SyncFeedCursorData &&
           other.userId == this.userId &&
           other.receiveCursor == this.receiveCursor &&
-          other.bootstrapComplete == this.bootstrapComplete);
+          other.bootstrapComplete == this.bootstrapComplete &&
+          other.bootstrapVersion == this.bootstrapVersion);
 }
 
 class SyncFeedCursorsCompanion extends UpdateCompanion<SyncFeedCursorData> {
   final Value<String> userId;
   final Value<int> receiveCursor;
   final Value<bool> bootstrapComplete;
+  final Value<int> bootstrapVersion;
   final Value<int> rowid;
   const SyncFeedCursorsCompanion({
     this.userId = const Value.absent(),
     this.receiveCursor = const Value.absent(),
     this.bootstrapComplete = const Value.absent(),
+    this.bootstrapVersion = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SyncFeedCursorsCompanion.insert({
     required String userId,
     this.receiveCursor = const Value.absent(),
     this.bootstrapComplete = const Value.absent(),
+    this.bootstrapVersion = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : userId = Value(userId);
   static Insertable<SyncFeedCursorData> custom({
     Expression<String>? userId,
     Expression<int>? receiveCursor,
     Expression<bool>? bootstrapComplete,
+    Expression<int>? bootstrapVersion,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (userId != null) 'user_id': userId,
       if (receiveCursor != null) 'receive_cursor': receiveCursor,
       if (bootstrapComplete != null) 'bootstrap_complete': bootstrapComplete,
+      if (bootstrapVersion != null) 'bootstrap_version': bootstrapVersion,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4902,12 +4947,14 @@ class SyncFeedCursorsCompanion extends UpdateCompanion<SyncFeedCursorData> {
     Value<String>? userId,
     Value<int>? receiveCursor,
     Value<bool>? bootstrapComplete,
+    Value<int>? bootstrapVersion,
     Value<int>? rowid,
   }) {
     return SyncFeedCursorsCompanion(
       userId: userId ?? this.userId,
       receiveCursor: receiveCursor ?? this.receiveCursor,
       bootstrapComplete: bootstrapComplete ?? this.bootstrapComplete,
+      bootstrapVersion: bootstrapVersion ?? this.bootstrapVersion,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4924,6 +4971,9 @@ class SyncFeedCursorsCompanion extends UpdateCompanion<SyncFeedCursorData> {
     if (bootstrapComplete.present) {
       map['bootstrap_complete'] = Variable<bool>(bootstrapComplete.value);
     }
+    if (bootstrapVersion.present) {
+      map['bootstrap_version'] = Variable<int>(bootstrapVersion.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4936,6 +4986,7 @@ class SyncFeedCursorsCompanion extends UpdateCompanion<SyncFeedCursorData> {
           ..write('userId: $userId, ')
           ..write('receiveCursor: $receiveCursor, ')
           ..write('bootstrapComplete: $bootstrapComplete, ')
+          ..write('bootstrapVersion: $bootstrapVersion, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4986,6 +5037,15 @@ class $SyncInboxTable extends SyncInbox
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _taskIdMeta = const VerificationMeta('taskId');
+  @override
+  late final GeneratedColumn<String> taskId = GeneratedColumn<String>(
+    'task_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _revisionMeta = const VerificationMeta(
     'revision',
   );
@@ -5025,6 +5085,7 @@ class $SyncInboxTable extends SyncInbox
     sequence,
     type,
     noteId,
+    taskId,
     revision,
     createdAt,
     appliedAt,
@@ -5069,6 +5130,12 @@ class $SyncInboxTable extends SyncInbox
       context.handle(
         _noteIdMeta,
         noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    }
+    if (data.containsKey('task_id')) {
+      context.handle(
+        _taskIdMeta,
+        taskId.isAcceptableOrUnknown(data['task_id']!, _taskIdMeta),
       );
     }
     if (data.containsKey('revision')) {
@@ -5116,6 +5183,10 @@ class $SyncInboxTable extends SyncInbox
         DriftSqlType.string,
         data['${effectivePrefix}note_id'],
       ),
+      taskId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}task_id'],
+      ),
       revision: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}revision'],
@@ -5142,6 +5213,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
   final int sequence;
   final String type;
   final String? noteId;
+  final String? taskId;
   final int? revision;
   final DateTime createdAt;
   final DateTime? appliedAt;
@@ -5150,6 +5222,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
     required this.sequence,
     required this.type,
     this.noteId,
+    this.taskId,
     this.revision,
     required this.createdAt,
     this.appliedAt,
@@ -5162,6 +5235,9 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
     map['type'] = Variable<String>(type);
     if (!nullToAbsent || noteId != null) {
       map['note_id'] = Variable<String>(noteId);
+    }
+    if (!nullToAbsent || taskId != null) {
+      map['task_id'] = Variable<String>(taskId);
     }
     if (!nullToAbsent || revision != null) {
       map['revision'] = Variable<int>(revision);
@@ -5181,6 +5257,9 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
       noteId: noteId == null && nullToAbsent
           ? const Value.absent()
           : Value(noteId),
+      taskId: taskId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(taskId),
       revision: revision == null && nullToAbsent
           ? const Value.absent()
           : Value(revision),
@@ -5201,6 +5280,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
       sequence: serializer.fromJson<int>(json['sequence']),
       type: serializer.fromJson<String>(json['type']),
       noteId: serializer.fromJson<String?>(json['noteId']),
+      taskId: serializer.fromJson<String?>(json['taskId']),
       revision: serializer.fromJson<int?>(json['revision']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       appliedAt: serializer.fromJson<DateTime?>(json['appliedAt']),
@@ -5214,6 +5294,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
       'sequence': serializer.toJson<int>(sequence),
       'type': serializer.toJson<String>(type),
       'noteId': serializer.toJson<String?>(noteId),
+      'taskId': serializer.toJson<String?>(taskId),
       'revision': serializer.toJson<int?>(revision),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'appliedAt': serializer.toJson<DateTime?>(appliedAt),
@@ -5225,6 +5306,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
     int? sequence,
     String? type,
     Value<String?> noteId = const Value.absent(),
+    Value<String?> taskId = const Value.absent(),
     Value<int?> revision = const Value.absent(),
     DateTime? createdAt,
     Value<DateTime?> appliedAt = const Value.absent(),
@@ -5233,6 +5315,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
     sequence: sequence ?? this.sequence,
     type: type ?? this.type,
     noteId: noteId.present ? noteId.value : this.noteId,
+    taskId: taskId.present ? taskId.value : this.taskId,
     revision: revision.present ? revision.value : this.revision,
     createdAt: createdAt ?? this.createdAt,
     appliedAt: appliedAt.present ? appliedAt.value : this.appliedAt,
@@ -5243,6 +5326,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
       sequence: data.sequence.present ? data.sequence.value : this.sequence,
       type: data.type.present ? data.type.value : this.type,
       noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      taskId: data.taskId.present ? data.taskId.value : this.taskId,
       revision: data.revision.present ? data.revision.value : this.revision,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       appliedAt: data.appliedAt.present ? data.appliedAt.value : this.appliedAt,
@@ -5256,6 +5340,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
           ..write('sequence: $sequence, ')
           ..write('type: $type, ')
           ..write('noteId: $noteId, ')
+          ..write('taskId: $taskId, ')
           ..write('revision: $revision, ')
           ..write('createdAt: $createdAt, ')
           ..write('appliedAt: $appliedAt')
@@ -5269,6 +5354,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
     sequence,
     type,
     noteId,
+    taskId,
     revision,
     createdAt,
     appliedAt,
@@ -5281,6 +5367,7 @@ class SyncInboxData extends DataClass implements Insertable<SyncInboxData> {
           other.sequence == this.sequence &&
           other.type == this.type &&
           other.noteId == this.noteId &&
+          other.taskId == this.taskId &&
           other.revision == this.revision &&
           other.createdAt == this.createdAt &&
           other.appliedAt == this.appliedAt);
@@ -5291,6 +5378,7 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
   final Value<int> sequence;
   final Value<String> type;
   final Value<String?> noteId;
+  final Value<String?> taskId;
   final Value<int?> revision;
   final Value<DateTime> createdAt;
   final Value<DateTime?> appliedAt;
@@ -5300,6 +5388,7 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
     this.sequence = const Value.absent(),
     this.type = const Value.absent(),
     this.noteId = const Value.absent(),
+    this.taskId = const Value.absent(),
     this.revision = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.appliedAt = const Value.absent(),
@@ -5310,6 +5399,7 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
     required int sequence,
     required String type,
     this.noteId = const Value.absent(),
+    this.taskId = const Value.absent(),
     this.revision = const Value.absent(),
     required DateTime createdAt,
     this.appliedAt = const Value.absent(),
@@ -5323,6 +5413,7 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
     Expression<int>? sequence,
     Expression<String>? type,
     Expression<String>? noteId,
+    Expression<String>? taskId,
     Expression<int>? revision,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? appliedAt,
@@ -5333,6 +5424,7 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
       if (sequence != null) 'sequence': sequence,
       if (type != null) 'type': type,
       if (noteId != null) 'note_id': noteId,
+      if (taskId != null) 'task_id': taskId,
       if (revision != null) 'revision': revision,
       if (createdAt != null) 'created_at': createdAt,
       if (appliedAt != null) 'applied_at': appliedAt,
@@ -5345,6 +5437,7 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
     Value<int>? sequence,
     Value<String>? type,
     Value<String?>? noteId,
+    Value<String?>? taskId,
     Value<int?>? revision,
     Value<DateTime>? createdAt,
     Value<DateTime?>? appliedAt,
@@ -5355,6 +5448,7 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
       sequence: sequence ?? this.sequence,
       type: type ?? this.type,
       noteId: noteId ?? this.noteId,
+      taskId: taskId ?? this.taskId,
       revision: revision ?? this.revision,
       createdAt: createdAt ?? this.createdAt,
       appliedAt: appliedAt ?? this.appliedAt,
@@ -5376,6 +5470,9 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
     }
     if (noteId.present) {
       map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (taskId.present) {
+      map['task_id'] = Variable<String>(taskId.value);
     }
     if (revision.present) {
       map['revision'] = Variable<int>(revision.value);
@@ -5399,6 +5496,7 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
           ..write('sequence: $sequence, ')
           ..write('type: $type, ')
           ..write('noteId: $noteId, ')
+          ..write('taskId: $taskId, ')
           ..write('revision: $revision, ')
           ..write('createdAt: $createdAt, ')
           ..write('appliedAt: $appliedAt, ')
@@ -7970,6 +8068,7 @@ typedef $$SyncFeedCursorsTableCreateCompanionBuilder =
       required String userId,
       Value<int> receiveCursor,
       Value<bool> bootstrapComplete,
+      Value<int> bootstrapVersion,
       Value<int> rowid,
     });
 typedef $$SyncFeedCursorsTableUpdateCompanionBuilder =
@@ -7977,6 +8076,7 @@ typedef $$SyncFeedCursorsTableUpdateCompanionBuilder =
       Value<String> userId,
       Value<int> receiveCursor,
       Value<bool> bootstrapComplete,
+      Value<int> bootstrapVersion,
       Value<int> rowid,
     });
 
@@ -8001,6 +8101,11 @@ class $$SyncFeedCursorsTableFilterComposer
 
   ColumnFilters<bool> get bootstrapComplete => $composableBuilder(
     column: $table.bootstrapComplete,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get bootstrapVersion => $composableBuilder(
+    column: $table.bootstrapVersion,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -8028,6 +8133,11 @@ class $$SyncFeedCursorsTableOrderingComposer
     column: $table.bootstrapComplete,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get bootstrapVersion => $composableBuilder(
+    column: $table.bootstrapVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SyncFeedCursorsTableAnnotationComposer
@@ -8049,6 +8159,11 @@ class $$SyncFeedCursorsTableAnnotationComposer
 
   GeneratedColumn<bool> get bootstrapComplete => $composableBuilder(
     column: $table.bootstrapComplete,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get bootstrapVersion => $composableBuilder(
+    column: $table.bootstrapVersion,
     builder: (column) => column,
   );
 }
@@ -8093,11 +8208,13 @@ class $$SyncFeedCursorsTableTableManager
                 Value<String> userId = const Value.absent(),
                 Value<int> receiveCursor = const Value.absent(),
                 Value<bool> bootstrapComplete = const Value.absent(),
+                Value<int> bootstrapVersion = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncFeedCursorsCompanion(
                 userId: userId,
                 receiveCursor: receiveCursor,
                 bootstrapComplete: bootstrapComplete,
+                bootstrapVersion: bootstrapVersion,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8105,11 +8222,13 @@ class $$SyncFeedCursorsTableTableManager
                 required String userId,
                 Value<int> receiveCursor = const Value.absent(),
                 Value<bool> bootstrapComplete = const Value.absent(),
+                Value<int> bootstrapVersion = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncFeedCursorsCompanion.insert(
                 userId: userId,
                 receiveCursor: receiveCursor,
                 bootstrapComplete: bootstrapComplete,
+                bootstrapVersion: bootstrapVersion,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -8147,6 +8266,7 @@ typedef $$SyncInboxTableCreateCompanionBuilder =
       required int sequence,
       required String type,
       Value<String?> noteId,
+      Value<String?> taskId,
       Value<int?> revision,
       required DateTime createdAt,
       Value<DateTime?> appliedAt,
@@ -8158,6 +8278,7 @@ typedef $$SyncInboxTableUpdateCompanionBuilder =
       Value<int> sequence,
       Value<String> type,
       Value<String?> noteId,
+      Value<String?> taskId,
       Value<int?> revision,
       Value<DateTime> createdAt,
       Value<DateTime?> appliedAt,
@@ -8190,6 +8311,11 @@ class $$SyncInboxTableFilterComposer
 
   ColumnFilters<String> get noteId => $composableBuilder(
     column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get taskId => $composableBuilder(
+    column: $table.taskId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8238,6 +8364,11 @@ class $$SyncInboxTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get taskId => $composableBuilder(
+    column: $table.taskId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get revision => $composableBuilder(
     column: $table.revision,
     builder: (column) => ColumnOrderings(column),
@@ -8274,6 +8405,9 @@ class $$SyncInboxTableAnnotationComposer
 
   GeneratedColumn<String> get noteId =>
       $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<String> get taskId =>
+      $composableBuilder(column: $table.taskId, builder: (column) => column);
 
   GeneratedColumn<int> get revision =>
       $composableBuilder(column: $table.revision, builder: (column) => column);
@@ -8320,6 +8454,7 @@ class $$SyncInboxTableTableManager
                 Value<int> sequence = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String?> noteId = const Value.absent(),
+                Value<String?> taskId = const Value.absent(),
                 Value<int?> revision = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> appliedAt = const Value.absent(),
@@ -8329,6 +8464,7 @@ class $$SyncInboxTableTableManager
                 sequence: sequence,
                 type: type,
                 noteId: noteId,
+                taskId: taskId,
                 revision: revision,
                 createdAt: createdAt,
                 appliedAt: appliedAt,
@@ -8340,6 +8476,7 @@ class $$SyncInboxTableTableManager
                 required int sequence,
                 required String type,
                 Value<String?> noteId = const Value.absent(),
+                Value<String?> taskId = const Value.absent(),
                 Value<int?> revision = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> appliedAt = const Value.absent(),
@@ -8349,6 +8486,7 @@ class $$SyncInboxTableTableManager
                 sequence: sequence,
                 type: type,
                 noteId: noteId,
+                taskId: taskId,
                 revision: revision,
                 createdAt: createdAt,
                 appliedAt: appliedAt,
