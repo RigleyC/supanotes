@@ -49,6 +49,11 @@
 - Empty rollback verification now checks restored legacy task title/status and
   completion timestamps/date, including `scheduled_at`.
 
+## Round 4 fixes
+
+- Restored completion assertions now compare the complete UTC timestamp values
+  (date, hour, minute and second) and the exact wall-clock due date.
+
 ## Validation
 
 Command (from `backend`):

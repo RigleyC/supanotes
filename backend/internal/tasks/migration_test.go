@@ -204,13 +204,9 @@ func runTaskMigrationScenario(t *testing.T, databaseURL, migrationPath, guardLab
 	var completedAt, scheduledAt time.Time
 	var dueDate time.Time
 	require.NoError(t, pool.QueryRow(ctx, `SELECT completed_at, due_date, scheduled_at FROM task_completions WHERE task_id = $1`, legacyTaskID).Scan(&completedAt, &dueDate, &scheduledAt))
-	require.Equal(t, 2026, completedAt.UTC().Year())
-	require.Equal(t, time.September, completedAt.UTC().Month())
-	require.Equal(t, 15, completedAt.UTC().Day())
-	require.Equal(t, 15, dueDate.UTC().Day())
-	require.Equal(t, time.September, dueDate.UTC().Month())
-	require.Equal(t, 2026, dueDate.UTC().Year())
-	require.Equal(t, 9, scheduledAt.UTC().Hour())
+	require.Equal(t, time.Date(2026, time.September, 15, 12, 0, 0, 0, time.UTC), completedAt.UTC())
+	require.Equal(t, time.Date(2026, time.September, 15, 0, 0, 0, 0, time.UTC), dueDate.UTC())
+	require.Equal(t, time.Date(2026, time.September, 15, 9, 0, 0, 0, time.UTC), scheduledAt.UTC())
 	var restoredCount int
 	require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE id = $1`, legacyTaskID).Scan(&restoredCount))
 	require.Equal(t, 1, restoredCount)
