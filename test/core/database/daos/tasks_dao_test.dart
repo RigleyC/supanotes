@@ -69,35 +69,60 @@ void main() {
     expect(operations.single.payloadHash, 'hash-1');
   });
 
-  test('schema 32 quarantines non-empty legacy task tables without dropping notes outbox', () async {
+  test(
+    'schema 32 quarantines non-empty legacy task tables without dropping notes outbox',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+
+      await db.customStatement('DROP TABLE tasks');
+      await db.customStatement(
+        'CREATE TABLE tasks (id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL)',
+      );
+      await db.customStatement(
+        "INSERT INTO tasks(id, title) VALUES ('legacy', 'Old')",
+      );
+      await db.customStatement(
+        'CREATE TABLE task_completions (task_id TEXT NOT NULL, completed_at INTEGER)',
+      );
+      await db.customStatement(
+        "INSERT INTO task_completions(task_id, completed_at) VALUES ('legacy', 1)",
+      );
+      await db.customStatement(
+        'CREATE TABLE local_task_completions (task_id TEXT NOT NULL, completed_at INTEGER)',
+      );
+
+      await db.migration.onUpgrade(Migrator(db), 32, 33);
+
+      expect(db.taskStorageDiagnostic.isBlocked, isTrue);
+      expect(db.taskStorageDiagnostic.quarantinedRows.values, contains(1));
+      expect(
+        (await db
+                .customSelect(
+                  'SELECT COUNT(*) AS count FROM tasks_legacy_quarantine_v32',
+                )
+                .getSingle())
+            .data['count'],
+        1,
+      );
+      expect(await db.select(db.tasks).get(), isEmpty);
+    },
+  );
+
+  test('task diagnostic includes suffixed quarantine tables', () async {
     final db = AppDatabase.test();
     addTearDown(db.close);
 
-    await db.customStatement('DROP TABLE tasks');
     await db.customStatement(
-      'CREATE TABLE tasks (id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL)',
-    );
-    await db.customStatement("INSERT INTO tasks(id, title) VALUES ('legacy', 'Old')");
-    await db.customStatement(
-      'CREATE TABLE task_completions (task_id TEXT NOT NULL, completed_at INTEGER)',
+      'CREATE TABLE tasks_legacy_quarantine_v32_1 (id TEXT NOT NULL)',
     );
     await db.customStatement(
-      "INSERT INTO task_completions(task_id, completed_at) VALUES ('legacy', 1)",
-    );
-    await db.customStatement(
-      'CREATE TABLE local_task_completions (task_id TEXT NOT NULL, completed_at INTEGER)',
+      "INSERT INTO tasks_legacy_quarantine_v32_1(id) VALUES ('legacy')",
     );
 
-    await db.migration.onUpgrade(Migrator(db), 32, 33);
+    final diagnostic = await db.readTaskStorageDiagnostic();
 
-    expect(db.taskStorageDiagnostic.isBlocked, isTrue);
-    expect(db.taskStorageDiagnostic.quarantinedRows.values, contains(1));
-    expect(
-      (await db.customSelect(
-        'SELECT COUNT(*) AS count FROM tasks_legacy_quarantine_v32',
-      ).getSingle()).data['count'],
-      1,
-    );
-    expect(await db.select(db.tasks).get(), isEmpty);
+    expect(diagnostic.isBlocked, isTrue);
+    expect(diagnostic.quarantinedRows['tasks_legacy_quarantine_v32_1'], 1);
   });
 }

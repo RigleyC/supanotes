@@ -7,6 +7,54 @@ import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_operation.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
+/// A pending operation that could not be rebased because its schedule was
+/// based on a different generation than the remote snapshot.
+class TaskRebaseConflict {
+  const TaskRebaseConflict({
+    required this.operationId,
+    required this.operationKind,
+    required this.operationScheduleGeneration,
+    required this.currentScheduleGeneration,
+  });
+
+  /// Durable outbox identifier for the conflicting operation.
+  final String operationId;
+
+  /// Serialized operation kind, such as `upsert` or `complete_occurrence`.
+  final String operationKind;
+
+  /// Generation recorded by the pending operation.
+  final int operationScheduleGeneration;
+
+  /// Generation observed while rebasing the remote snapshot.
+  final int currentScheduleGeneration;
+}
+
+/// Read-only result of the most recent remote rebase.
+///
+/// Conflicting operations remain in the durable outbox with `blocked` status;
+/// this value gives the sync layer a lightweight explanation without changing
+/// the canonical task representation.
+class TaskRebaseDiagnostic {
+  const TaskRebaseDiagnostic({
+    required this.taskId,
+    required this.remoteScheduleGeneration,
+    required this.conflicts,
+  });
+
+  /// Task whose snapshot was rebased.
+  final String taskId;
+
+  /// Generation from the remote snapshot before local operations were tested.
+  final int remoteScheduleGeneration;
+
+  /// Pending operations that were left blocked by the generation mismatch.
+  final List<TaskRebaseConflict> conflicts;
+
+  /// Whether at least one pending operation was incompatible.
+  bool get hasConflicts => conflicts.isNotEmpty;
+}
+
 /// Local-first repository for independent tasks.
 ///
 /// Every public mutation writes the optimistic task and its outbox operation
@@ -17,8 +65,12 @@ class TaskRepository {
 
   final TasksDao _dao;
   final String _ownerUserId;
+  TaskRebaseDiagnostic? _lastRebaseDiagnostic;
 
   String get userId => _ownerUserId;
+
+  /// Describes incompatible operations from the latest remote rebase, if any.
+  TaskRebaseDiagnostic? get lastRebaseDiagnostic => _lastRebaseDiagnostic;
 
   Stream<List<TaskData>> watchTasks() => _dao.watchTasks(_ownerUserId);
 
@@ -35,6 +87,7 @@ class TaskRepository {
   /// the task sync service, which has the matching operation id.
   Future<void> applyRemoteTask(Task task) async {
     _assertOwner(task);
+    final conflicts = <TaskRebaseConflict>[];
     await _dao.runInTransaction(
       () async {
         var rebased = task;
@@ -43,11 +96,35 @@ class TaskRepository {
           task.id,
         );
         for (final operation in pending) {
-          rebased = _reapplyPendingOperation(rebased, operation);
+          final fields = _decodePendingPayload(operation);
+          if (!_isCompatibleWithScheduleGeneration(
+            rebased,
+            operation,
+            fields,
+          )) {
+            conflicts.add(
+              TaskRebaseConflict(
+                operationId: operation.operationId,
+                operationKind: operation.kind,
+                operationScheduleGeneration: operation.scheduleGeneration,
+                currentScheduleGeneration: rebased.scheduleGeneration,
+              ),
+            );
+            await _dao.updatePendingStatus(operation.operationId, 'blocked');
+            continue;
+          }
+          rebased = _reapplyPendingOperation(rebased, operation, fields);
         }
         await _dao.applyRemoteTask(_toCompanion(rebased));
       },
     );
+    _lastRebaseDiagnostic = conflicts.isEmpty
+        ? null
+        : TaskRebaseDiagnostic(
+            taskId: task.id,
+            remoteScheduleGeneration: task.scheduleGeneration,
+            conflicts: List.unmodifiable(conflicts),
+          );
   }
 
   /// Creates an optimistic task. The editor owns task construction so the
@@ -69,7 +146,19 @@ class TaskRepository {
     final current = await _requireTask(draft.id);
     _assertOwner(draft);
     final now = DateTime.now().toUtc();
-    final updated = draft.copyWith(updatedAt: now);
+    final updated = current
+        .withSchedule(
+          dueDate: draft.dueDate,
+          hasTime: draft.hasTime,
+          recurrenceRule: draft.recurrenceRule,
+        )
+        .copyWith(
+          title: draft.title,
+          reminder: draft.reminder,
+          isCompleted: draft.isCompleted,
+          lastCompletedAt: draft.lastCompletedAt,
+          updatedAt: now,
+        );
     final operation = TaskOperation.upsert(
       taskId: updated.id,
       observedRevision: current.revision,
@@ -193,13 +282,14 @@ class TaskRepository {
     }
   }
 
-  static String _operationKind(TaskOperation operation) => switch (operation.type) {
-    TaskOperationType.create => 'create',
-    TaskOperationType.upsert => 'upsert',
-    TaskOperationType.completeOccurrence => 'complete_occurrence',
-    TaskOperationType.reopenOccurrence => 'reopen_occurrence',
-    TaskOperationType.delete => 'delete',
-  };
+  static String _operationKind(TaskOperation operation) =>
+      switch (operation.type) {
+        TaskOperationType.create => 'create',
+        TaskOperationType.upsert => 'upsert',
+        TaskOperationType.completeOccurrence => 'complete_occurrence',
+        TaskOperationType.reopenOccurrence => 'reopen_occurrence',
+        TaskOperationType.delete => 'delete',
+      };
 
   static Map<String, dynamic> _taskPayload(Task task) {
     final json = task.toJson();
@@ -233,15 +323,21 @@ class TaskRepository {
     scheduleGeneration: Value(task.scheduleGeneration),
   );
 
-  static Task _reapplyPendingOperation(
-    Task current,
+  static Map<String, dynamic> _decodePendingPayload(
     PendingTaskOperationData operation,
   ) {
     final payload = jsonDecode(operation.payloadJson);
     if (payload is! Map) {
       throw const FormatException('Pending task payload must be a JSON object');
     }
-    final fields = payload.cast<String, dynamic>();
+    return payload.cast<String, dynamic>();
+  }
+
+  static Task _reapplyPendingOperation(
+    Task current,
+    PendingTaskOperationData operation,
+    Map<String, dynamic> fields,
+  ) {
     switch (operation.kind) {
       case 'create':
       case 'upsert':
@@ -258,8 +354,39 @@ class TaskRepository {
           updatedAt: operation.createdAt,
         );
       default:
-        throw FormatException('Unknown pending task operation: ${operation.kind}');
+        throw FormatException(
+          'Unknown pending task operation: ${operation.kind}',
+        );
     }
+  }
+
+  static bool _isCompatibleWithScheduleGeneration(
+    Task current,
+    PendingTaskOperationData operation,
+    Map<String, dynamic> fields,
+  ) {
+    final isPatch = operation.kind == 'create' || operation.kind == 'upsert';
+    if (!isPatch) {
+      return operation.scheduleGeneration == current.scheduleGeneration;
+    }
+
+    final hasTime = fields['hasTime'] as bool? ?? current.hasTime;
+    final dueDate = _parseWallClock(fields['dueDate'], hasTime: hasTime);
+    final recurrence = fields.containsKey('recurrenceRule')
+        ? fields['recurrenceRule'] as String?
+        : current.recurrenceRule;
+    final scheduleChanged =
+        !sameScheduledAtOrNull(current.dueDate, dueDate, hasTime: hasTime) ||
+        current.hasTime != hasTime ||
+        current.recurrenceRule != recurrence;
+
+    // A schedule patch stores the generation after its local increment. All
+    // other operations store the generation they observed. This distinguishes
+    // a compatible local schedule edit from one based on another device's
+    // already-advanced schedule.
+    return scheduleChanged
+        ? operation.scheduleGeneration == current.scheduleGeneration + 1
+        : operation.scheduleGeneration == current.scheduleGeneration;
   }
 
   static Task _reapplyPatch(
@@ -384,5 +511,4 @@ class TaskRepository {
       scheduleGeneration: row.scheduleGeneration,
     );
   }
-
 }

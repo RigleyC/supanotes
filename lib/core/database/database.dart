@@ -128,8 +128,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test({QueryExecutor? executor})
     : super(executor ?? NativeDatabase.memory());
 
-  TaskStorageDiagnostic _taskStorageDiagnostic =
-      const TaskStorageDiagnostic();
+  TaskStorageDiagnostic _taskStorageDiagnostic = const TaskStorageDiagnostic();
 
   /// Independent-task migration status, kept separate from note sync errors.
   TaskStorageDiagnostic get taskStorageDiagnostic => _taskStorageDiagnostic;
@@ -138,10 +137,22 @@ class AppDatabase extends _$AppDatabase {
   /// physical quarantine names are the durable source of truth.
   Future<TaskStorageDiagnostic> readTaskStorageDiagnostic() async {
     final rows = <String, int>{};
-    for (final table in _taskQuarantineNames.values) {
-      if (await _tableExists(table)) {
-        rows[table] = await _countRows(table);
-      }
+    final prefixes = _taskQuarantineNames.values.toList(growable: false);
+    final tables = await customSelect(
+      '''
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND (${List.filled(prefixes.length, 'name LIKE ?').join(' OR ')})
+      ORDER BY name
+      ''',
+      variables: [
+        for (final prefix in prefixes) Variable.withString('$prefix%'),
+      ],
+    ).get();
+    for (final row in tables) {
+      final table = row.data['name'] as String;
+      rows[table] = await _countRows(table);
     }
     _taskStorageDiagnostic = TaskStorageDiagnostic(
       availability: rows.values.any((count) => count > 0)
@@ -308,8 +319,7 @@ class AppDatabase extends _$AppDatabase {
   static const _taskQuarantineNames = <String, String>{
     'tasks': 'tasks_legacy_quarantine_v32',
     'task_completions': 'task_completions_legacy_quarantine_v32',
-    'local_task_completions':
-        'local_task_completions_legacy_quarantine_v32',
+    'local_task_completions': 'local_task_completions_legacy_quarantine_v32',
   };
 
   Future<void> _migrateTasks(Migrator m, int from, int to) async {
