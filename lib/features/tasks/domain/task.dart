@@ -1,8 +1,8 @@
 import 'dart:collection';
 
-import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
-import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
+
+const _unset = Object();
 
 /// The canonical independently persisted task.
 class Task {
@@ -10,7 +10,7 @@ class Task {
     required this.id,
     required this.ownerUserId,
     required String title,
-    this.dueDate,
+    DateTime? dueDate,
     this.hasTime = false,
     this.recurrenceRule,
     this.reminder,
@@ -23,6 +23,9 @@ class Task {
     this.deletedAt,
     this.scheduleGeneration = 0,
   }) : title = _requireTitle(title),
+       dueDate = dueDate == null
+           ? null
+           : canonicalScheduledAt(dueDate, hasTime: hasTime),
        completions = UnmodifiableMapView(_normalizeCompletions(completions)) {
     _requireGeneration(scheduleGeneration);
     if (revision < 0)
@@ -78,7 +81,9 @@ class Task {
     'id': id,
     'owner_user_id': ownerUserId,
     'title': title,
-    'due_date': dueDate?.toUtc().toIso8601String(),
+    'due_date': dueDate == null
+        ? null
+        : scheduledAtKey(dueDate!, hasTime: hasTime),
     'has_time': hasTime,
     'recurrence_rule': recurrenceRule,
     'reminder': reminder,
@@ -96,33 +101,39 @@ class Task {
     String? id,
     String? ownerUserId,
     String? title,
-    DateTime? dueDate,
+    Object? dueDate = _unset,
     bool? hasTime,
-    String? recurrenceRule,
-    String? reminder,
+    Object? recurrenceRule = _unset,
+    Object? reminder = _unset,
     Map<String, Object?>? completions,
     bool? isCompleted,
-    DateTime? lastCompletedAt,
+    Object? lastCompletedAt = _unset,
     int? revision,
     DateTime? createdAt,
     DateTime? updatedAt,
-    DateTime? deletedAt,
+    Object? deletedAt = _unset,
     int? scheduleGeneration,
   }) => Task(
     id: id ?? this.id,
     ownerUserId: ownerUserId ?? this.ownerUserId,
     title: title ?? this.title,
-    dueDate: dueDate ?? this.dueDate,
+    dueDate: identical(dueDate, _unset) ? this.dueDate : dueDate as DateTime?,
     hasTime: hasTime ?? this.hasTime,
-    recurrenceRule: recurrenceRule ?? this.recurrenceRule,
-    reminder: reminder ?? this.reminder,
+    recurrenceRule: identical(recurrenceRule, _unset)
+        ? this.recurrenceRule
+        : recurrenceRule as String?,
+    reminder: identical(reminder, _unset) ? this.reminder : reminder as String?,
     completions: completions ?? this.completions,
     isCompleted: isCompleted ?? this.isCompleted,
-    lastCompletedAt: lastCompletedAt ?? this.lastCompletedAt,
+    lastCompletedAt: identical(lastCompletedAt, _unset)
+        ? this.lastCompletedAt
+        : lastCompletedAt as DateTime?,
     revision: revision ?? this.revision,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
-    deletedAt: deletedAt ?? this.deletedAt,
+    deletedAt: identical(deletedAt, _unset)
+        ? this.deletedAt
+        : deletedAt as DateTime?,
     scheduleGeneration: scheduleGeneration ?? this.scheduleGeneration,
   );
 
@@ -169,10 +180,28 @@ void _requireGeneration(int value) {
 
 Map<String, String> _normalizeCompletions(Map<String, Object?> values) => {
   for (final entry in values.entries)
-    entry.key: entry.value is DateTime
-        ? (entry.value! as DateTime).toUtc().toIso8601String()
-        : entry.value.toString(),
+    _canonicalScheduledKey(entry.key): _canonicalInstant(entry.value),
 };
+
+String _canonicalScheduledKey(String value) {
+  try {
+    final parsed = DateTime.parse(value);
+    return scheduledAtKey(parsed, hasTime: true);
+  } on FormatException {
+    throw const FormatException('invalid scheduledAt key');
+  }
+}
+
+String _canonicalInstant(Object? value) {
+  try {
+    final parsed = value is DateTime ? value : DateTime.parse(value as String);
+    return parsed.toUtc().toIso8601String();
+  } on FormatException {
+    throw const FormatException('invalid completion timestamp');
+  } on TypeError {
+    throw const FormatException('invalid completion timestamp');
+  }
+}
 
 DateTime? _parseDate(Object? value) =>
     value == null ? null : DateTime.parse(value as String);

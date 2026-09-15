@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 enum TaskOperationType {
   create,
@@ -17,8 +18,9 @@ class TaskOperation {
     required this.taskId,
     required this.observedRevision,
     required this.scheduleGeneration,
-    required this.payload,
-  }) : payloadHash = _hash(payload) {
+    required Map<String, dynamic> payload,
+  }) : payload = _freeze(payload),
+       payloadHash = _hash(_freeze(payload)) {
     if (observedRevision < 0 || scheduleGeneration < 0) {
       throw const FormatException(
         'operation revisions and generations must not be negative',
@@ -66,7 +68,7 @@ class TaskOperation {
     taskId: taskId,
     observedRevision: observedRevision,
     scheduleGeneration: scheduleGeneration,
-    payload: {'scheduledAt': scheduledAt},
+    payload: {'scheduledAt': _canonicalScheduledAt(scheduledAt)},
   );
   factory TaskOperation.reopenOccurrence({
     required String taskId,
@@ -80,7 +82,7 @@ class TaskOperation {
     taskId: taskId,
     observedRevision: observedRevision,
     scheduleGeneration: scheduleGeneration,
-    payload: {'scheduledAt': scheduledAt},
+    payload: {'scheduledAt': _canonicalScheduledAt(scheduledAt)},
   );
   factory TaskOperation.delete({
     required String taskId,
@@ -126,3 +128,24 @@ Object? _sorted(Object? value) => value is Map
     : value is Iterable
     ? value.map((item) => _sorted(item)).toList()
     : value;
+
+Map<String, dynamic> _freeze(Map<String, dynamic> value) => Map.unmodifiable({
+  for (final entry in value.entries) entry.key: _freezeValue(entry.value),
+});
+
+Object? _freezeValue(Object? value) => value is Map
+    ? Map.unmodifiable({
+        for (final entry in value.entries)
+          entry.key.toString(): _freezeValue(entry.value),
+      })
+    : value is Iterable
+    ? List.unmodifiable(value.map(_freezeValue))
+    : value;
+
+String _canonicalScheduledAt(String value) {
+  try {
+    return scheduledAtKey(DateTime.parse(value), hasTime: true);
+  } on FormatException {
+    throw const FormatException('invalid scheduledAt');
+  }
+}

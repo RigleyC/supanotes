@@ -25,4 +25,18 @@ void main() {
     );
     expect(first.payloadHash, isNot(second.payloadHash));
   });
+
+  test('snapshots payloads before exposing or hashing them', () {
+    final payload = <String, dynamic>{
+      'nested': <String, dynamic>{'value': 1},
+    };
+    final operation = TaskOperation.upsert(
+      taskId: 'task-1',
+      operationId: 'op-1',
+      payload: payload,
+    );
+    payload['nested']['value'] = 2;
+    expect(operation.payload['nested']['value'], 1);
+    expect(operation.payloadHash, isNotEmpty);
+  });
 }

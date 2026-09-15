@@ -24,3 +24,25 @@ Também foi executado `dart analyze` nos quatro arquivos de domínio; não resta
 
 - Instantes são serializados em UTC ISO-8601; chaves de `completions` preservam o formato de wall-clock.
 - O `flutter test` atualizou dependências/arquivos gerados localmente; essas alterações foram restauradas e não fazem parte deste commit.
+
+## Fix round 1
+
+Arquivos alterados:
+
+- `lib/features/tasks/domain/task.dart`: `dueDate` agora usa a chave wall-clock canônica sem conversão UTC; instantes continuam UTC. `copyWith` usa sentinel para permitir limpar campos nulos; completions são canonicalizados/validados.
+- `lib/features/tasks/domain/task_operation.dart`: payload é deep-snapshot imutável antes do hash e da exposição; `scheduledAt` das operações é canonicalizado.
+- `lib/features/tasks/domain/task_list_item.dart`: construtores da união exigem fonte não nula.
+- `test/features/tasks/domain/task_test.dart`, `task_operation_test.dart` e `task_list_item_test.dart`: regressões para os cinco achados da revisão.
+
+Comandos e saída:
+
+```text
+dart format lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_operation.dart lib/features/tasks/domain/task_list_item.dart test/features/tasks/domain/task_test.dart test/features/tasks/domain/task_operation_test.dart test/features/tasks/domain/task_list_item_test.dart
+# Formatted 6 files (4 changed)
+
+flutter test test/features/tasks/domain/task_test.dart test/features/tasks/domain/task_operation_test.dart test/features/tasks/domain/task_list_item_test.dart
+# All tests passed! (10 tests)
+
+dart analyze lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_operation.dart lib/features/tasks/domain/task_list_item.dart lib/features/tasks/domain/task_history_entry.dart
+# No analyzer errors (only existing documentation/style infos)
+```

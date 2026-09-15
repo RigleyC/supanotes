@@ -38,4 +38,48 @@ void main() {
     expect(changed.scheduleGeneration, task.scheduleGeneration + 1);
     expect(changed.completions, isEmpty);
   });
+
+  test(
+    'preserves scheduled wall-clock values while UTC normalizes instants',
+    () {
+      final task = fixtureRecurringTask();
+      final json = task.toJson();
+      expect(json['due_date'], '2026-09-15T09:00:00.000');
+      expect(Task.fromJson(json).dueDate, task.dueDate);
+    },
+  );
+
+  test('copyWith can clear nullable schedule metadata', () {
+    final task = fixtureRecurringTask().copyWith(
+      dueDate: null,
+      recurrenceRule: null,
+      reminder: null,
+    );
+    expect(task.dueDate, isNull);
+    expect(task.recurrenceRule, isNull);
+    expect(task.reminder, isNull);
+  });
+
+  test('canonicalizes equivalent completion representations', () {
+    final first = fixtureRecurringTask(
+      completions: {
+        '2026-09-15T09:00:00.000-03:00': '2026-09-14T09:00:00-03:00',
+      },
+    );
+    final second = fixtureRecurringTask(
+      completions: {
+        '2026-09-15T12:00:00.000Z': '2026-09-14T12:00:00Z',
+      },
+    );
+    expect(first.completions, second.completions);
+  });
+
+  test('rejects invalid completion representations', () {
+    expect(
+      () => fixtureRecurringTask(
+        completions: {'not-a-date': '2026-09-14T12:00:00Z'},
+      ),
+      throwsFormatException,
+    );
+  });
 }

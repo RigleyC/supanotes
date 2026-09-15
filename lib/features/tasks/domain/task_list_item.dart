@@ -20,8 +20,8 @@ class NoteTask {
 }
 
 class TaskListItem {
-  const TaskListItem.task(this.task) : note = null;
-  const TaskListItem.note(this.note) : task = null;
+  const TaskListItem.task(Task value) : task = value, note = null;
+  const TaskListItem.note(NoteTask value) : note = value, task = null;
   final Task? task;
   final NoteTask? note;
   bool get isStandalone => task != null;
