@@ -116,7 +116,7 @@ class TaskOperation {
     'operationId': operationId,
     'taskId': taskId,
     'observedRevision': observedRevision,
-    'type': type.name,
+    'kind': type.name,
     'scheduleGeneration': scheduleGeneration,
     'payload': payload,
     'payloadHash': payloadHash,

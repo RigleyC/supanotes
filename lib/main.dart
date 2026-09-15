@@ -105,6 +105,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      ref.read(taskOutboxWorkerProvider)?.wake();
       ref.read(noteOutboxWorkerProvider)?.wake();
       ref.read(noteRemoteSyncCoordinatorProvider)?.wake();
       final coordinator = ref.read(shareIntakeCoordinatorProvider);

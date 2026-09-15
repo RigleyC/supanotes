@@ -12,12 +12,12 @@ final class TaskBootstrapResponse {
   factory TaskBootstrapResponse.fromJson(Map<String, dynamic> json) {
     final rawWatermark = json['watermark'];
     final rawTasks = json['tasks'];
-    if (rawWatermark is! num || rawWatermark < 0 || rawTasks is! List) {
+    if (rawTasks is! List) {
       throw const FormatException('Invalid task bootstrap response');
     }
     try {
       return TaskBootstrapResponse(
-        watermark: rawWatermark.toInt(),
+        watermark: _parseNonNegativeInt64(rawWatermark, 'watermark'),
         tasks: List.unmodifiable(
           rawTasks.map((value) => Task.fromJson(_asMap(value))),
         ),
@@ -45,17 +45,13 @@ final class TaskMutationResponse {
     final operationId = json['operationId'];
     final revision = json['revision'];
     final task = json['task'];
-    if (operationId is! String ||
-        operationId.isEmpty ||
-        revision is! num ||
-        revision < 0 ||
-        task is! Map) {
+    if (operationId is! String || operationId.isEmpty || task is! Map) {
       throw const FormatException('Invalid task mutation response');
     }
     try {
       return TaskMutationResponse(
         operationId: operationId,
-        revision: revision.toInt(),
+        revision: _parseNonNegativeInt64(revision, 'revision'),
         task: Task.fromJson(_asMap(task)),
       );
     } on FormatException {
@@ -143,4 +139,11 @@ Map<String, dynamic> _asMap(Object? value) {
   } on TypeError {
     throw const FormatException('Response object has invalid keys');
   }
+}
+
+int _parseNonNegativeInt64(Object? value, String field) {
+  if (value is! int || value < 0 || value > 9223372036854775807) {
+    throw FormatException('Invalid $field');
+  }
+  return value;
 }

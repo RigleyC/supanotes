@@ -9,6 +9,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/note_remote_sync_runtime.dart';
 import 'package:supanotes/core/sync/sync_feed_client.dart';
+import 'package:supanotes/core/sync/task_outbox_worker.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
@@ -27,11 +28,21 @@ void main() {
   test('incremental runtime bootstraps a remote note once', () async {
     final database = AppDatabase.test();
     final client = _MockNoteSyncClient();
+    final lifecycle = <String>[];
+    final taskWorker = TaskOutboxWorker(
+      loadPendingTaskIds: () async {
+        lifecycle.add('task-drain');
+        return const [];
+      },
+      syncTask: (_) async {},
+    );
     final feedCalls = <int>[];
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
         noteSyncClientProvider.overrideWithValue(client),
+        taskOutboxWorkerProvider.overrideWithValue(taskWorker),
+        taskSyncServiceProvider.overrideWithValue(null),
         authControllerProvider.overrideWith(_StubAuthController.new),
         noteOutboxConnectivityChangesProvider.overrideWithValue(
           const Stream<List<ConnectivityResult>>.empty(),
@@ -39,7 +50,9 @@ void main() {
         syncChangesFetcherProvider.overrideWithValue(({
           required int after,
           required int limit,
+          SyncFeedScope scope = SyncFeedScope.notes,
         }) async {
+          lifecycle.add('feed');
           feedCalls.add(after);
           return SyncChangePage(
             cursor: after,
@@ -57,19 +70,23 @@ void main() {
 
     addTearDown(() async {
       container.dispose();
+      await taskWorker.dispose();
       await database.close();
     });
 
     when(client.listNotes).thenAnswer(
-      (_) async => [
-        {
-          'id': 'remote-note',
-          'user_id': 'user-1',
-          'created_at': '2026-08-01T12:00:00.000Z',
-          'updated_at': '2026-08-01T12:00:00.000Z',
-          'collapse_images': false,
-        },
-      ],
+      (_) async {
+        lifecycle.add('notes');
+        return [
+          {
+            'id': 'remote-note',
+            'user_id': 'user-1',
+            'created_at': '2026-08-01T12:00:00.000Z',
+            'updated_at': '2026-08-01T12:00:00.000Z',
+            'collapse_images': false,
+          },
+        ];
+      },
     );
     when(() => client.getDocument('remote-note')).thenAnswer(
       (_) async => NoteDocumentResponse(
@@ -99,6 +116,14 @@ void main() {
     expect(note!.userId, 'user-1');
     expect(note.hasRemoteCopy, isTrue);
     expect(feedCalls, [0, 0]);
+    expect(
+      lifecycle.indexOf('task-drain'),
+      lessThan(lifecycle.indexOf('notes')),
+    );
+    expect(
+      lifecycle.indexOf('task-drain'),
+      lessThan(lifecycle.indexOf('feed')),
+    );
     verify(client.listNotes).called(1);
     verify(() => client.getDocument('remote-note')).called(1);
   });

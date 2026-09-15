@@ -63,6 +63,23 @@ void main() {
     expect(result.tasks.single.id, 'task-1');
   });
 
+  test('rejects non-integer or overflowing bootstrap watermarks', () {
+    for (final watermark in <Object?>[
+      42.5,
+      '42',
+      BigInt.parse('9223372036854775808'),
+    ]) {
+      expect(
+        () => TaskBootstrapResponse.fromJson({
+          'watermark': watermark,
+          'tasks': <dynamic>[],
+        }),
+        throwsFormatException,
+        reason: 'watermark=$watermark',
+      );
+    }
+  });
+
   test('parses mutation response and sends operation payload', () async {
     final client = _MockApiClient();
     final response = _MockResponse<Map<String, dynamic>>();
@@ -100,6 +117,24 @@ void main() {
         cancelToken: any(named: 'cancelToken'),
       ),
     ).called(1);
+  });
+
+  test('rejects non-integer or overflowing mutation revisions', () {
+    for (final revision in <Object?>[
+      2.5,
+      '2',
+      BigInt.parse('9223372036854775808'),
+    ]) {
+      expect(
+        () => TaskMutationResponse.fromJson({
+          'operationId': 'op-1',
+          'revision': revision,
+          'task': _taskJson(),
+        }),
+        throwsFormatException,
+        reason: 'revision=$revision',
+      );
+    }
   });
 
   test('maps schedule conflict and deleted task protocol responses', () async {

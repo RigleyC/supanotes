@@ -26,6 +26,19 @@ void main() {
     expect(first.payloadHash, isNot(second.payloadHash));
   });
 
+  test('serializes the backend mutation kind field', () {
+    final operation = TaskOperation.upsert(
+      operationId: 'op-1',
+      taskId: 'task-1',
+      payload: {'title': 'Updated'},
+    );
+
+    expect(
+      operation.toJson(),
+      allOf(containsPair('kind', 'upsert'), isNot(contains('type'))),
+    );
+  });
+
   test('snapshots payloads before exposing or hashing them', () {
     final payload = <String, dynamic>{
       'nested': <String, dynamic>{'value': 1},
