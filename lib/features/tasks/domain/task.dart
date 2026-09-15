@@ -227,7 +227,7 @@ DateTime _parseScheduledLexically(String value) {
     );
   }
   final fraction = (match.group(7) ?? '').padRight(6, '0');
-  return DateTime(
+  final result = DateTime(
     int.parse(match.group(1)!),
     int.parse(match.group(2)!),
     int.parse(match.group(3)!),
@@ -237,6 +237,15 @@ DateTime _parseScheduledLexically(String value) {
     int.parse(fraction.substring(0, 3)),
     int.parse(fraction.substring(3)),
   );
+  if (result.year != int.parse(match.group(1)!) ||
+      result.month != int.parse(match.group(2)!) ||
+      result.day != int.parse(match.group(3)!) ||
+      result.hour != int.parse(match.group(4)!) ||
+      result.minute != int.parse(match.group(5)!) ||
+      result.second != int.parse(match.group(6) ?? '0')) {
+    throw const FormatException('scheduledAt contains invalid components');
+  }
+  return result;
 }
 
 DateTime? _parseScheduledDate(Object? value) =>
@@ -246,8 +255,41 @@ DateTime? _parseInstant(Object? value) =>
     value == null ? null : _parseInstantString(value as String);
 
 DateTime _parseInstantString(String value) {
-  if (!RegExp(r'(?:Z|[+-]\d{2}:\d{2})$').hasMatch(value)) {
+  final match = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?(Z|[+-]\d{2}:\d{2})$',
+  ).firstMatch(value);
+  if (match == null) {
     throw const FormatException('instant must include an explicit offset');
+  }
+  final year = int.parse(match.group(1)!);
+  final month = int.parse(match.group(2)!);
+  final day = int.parse(match.group(3)!);
+  final hour = int.parse(match.group(4)!);
+  final minute = int.parse(match.group(5)!);
+  final second = int.parse(match.group(6) ?? '0');
+  final offset = match.group(8)!;
+  final offsetHour = offset == 'Z' ? 0 : int.parse(offset.substring(1, 3));
+  final offsetMinute = offset == 'Z' ? 0 : int.parse(offset.substring(4, 6));
+  final fraction = (match.group(7) ?? '').padRight(6, '0');
+  final local = DateTime(
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    int.parse(fraction.substring(0, 3)),
+    int.parse(fraction.substring(3)),
+  );
+  if (local.year != year ||
+      local.month != month ||
+      local.day != day ||
+      local.hour != hour ||
+      local.minute != minute ||
+      local.second != second ||
+      offsetHour > 23 ||
+      offsetMinute > 59) {
+    throw const FormatException('invalid instant components');
   }
   try {
     return DateTime.parse(value).toUtc();

@@ -134,5 +134,11 @@ void main() {
     final localInstant = fixtureRecurringTask().toJson()
       ..['created_at'] = '2026-09-01T00:00:00.000';
     expect(() => Task.fromJson(localInstant), throwsFormatException);
+    final invalidInstant = fixtureRecurringTask().toJson()
+      ..['created_at'] = '2026-09-42T25:00:00.000Z';
+    expect(() => Task.fromJson(invalidInstant), throwsFormatException);
+    final invalidDate = fixtureRecurringTask().toJson()
+      ..['due_date'] = '2026-09-31T09:00:00.000';
+    expect(() => Task.fromJson(invalidDate), throwsFormatException);
   });
 }

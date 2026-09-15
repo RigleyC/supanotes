@@ -165,6 +165,14 @@ String _canonicalScheduledAt(String value, {required bool hasTime}) {
       int.parse(fraction.substring(0, 3)),
       int.parse(fraction.substring(3)),
     );
+    if (parsed.year != int.parse(match.group(1)!) ||
+        parsed.month != int.parse(match.group(2)!) ||
+        parsed.day != int.parse(match.group(3)!) ||
+        parsed.hour != int.parse(match.group(4)!) ||
+        parsed.minute != int.parse(match.group(5)!) ||
+        parsed.second != int.parse(match.group(6) ?? '0')) {
+      throw const FormatException('scheduledAt contains invalid components');
+    }
     return scheduledAtKey(parsed, hasTime: hasTime);
   } on FormatException {
     throw const FormatException('invalid scheduledAt');

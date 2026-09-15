@@ -59,4 +59,16 @@ void main() {
       expect(timed.payload['scheduledAt'], '2026-09-15T09:00:00.000');
     },
   );
+
+  test('rejects overflowing scheduled components', () {
+    expect(
+      () => TaskOperation.completeOccurrence(
+        taskId: 'task-1',
+        scheduledAt: '2026-09-31T09:00:00',
+        hasTime: true,
+        scheduleGeneration: 0,
+      ),
+      throwsFormatException,
+    );
+  });
 }

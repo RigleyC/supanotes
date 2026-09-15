@@ -100,3 +100,29 @@ dart analyze lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_
 
 Artefatos alterados pelo `flutter test` (`pubspec.lock` e arquivos gerados do
 Windows) foram restaurados antes do commit.
+
+## Fix round 4
+
+Arquivos alterados:
+
+- `lib/features/tasks/domain/task.dart`: validação estrita compara todos os componentes capturados de agendas e instantes com o valor reconstruído, rejeitando overflow de data/hora antes da persistência.
+- `lib/features/tasks/domain/task_operation.dart`: operações de ocorrência também rejeitam datas wall-clock com componentes inválidos.
+- `test/features/tasks/domain/task_test.dart` e `task_operation_test.dart`: regressões para dia/hora inválidos em JSON e operações.
+
+Comandos e saída:
+
+```text
+dart format lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_operation.dart test/features/tasks/domain/task_test.dart test/features/tasks/domain/task_operation_test.dart
+# Formatted successfully
+
+dart analyze lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_operation.dart lib/features/tasks/domain/task_list_item.dart lib/features/tasks/domain/task_history_entry.dart
+# No analyzer errors (only existing documentation/style infos)
+
+flutter test --concurrency=1 test/features/tasks/domain/task_test.dart
+# All tests passed! (12 tests)
+
+flutter test --concurrency=1 test/features/tasks/domain/task_operation_test.dart
+# All tests passed! (5 tests)
+```
+
+Artefatos ambientais foram restaurados antes do commit.
