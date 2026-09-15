@@ -122,15 +122,15 @@ func TestTaskMigrationQuarantineAndRollbackGuards(t *testing.T) {
 		}},
 	} {
 		t.Run(scenario.name+" rollback guard", func(t *testing.T) {
-			runTaskMigrationScenario(t, databaseURL, migrationPath, scenario.guard, false)
+			runTaskMigrationScenario(t, databaseURL, migrationPath, scenario.name, scenario.guard, false)
 		})
 	}
 	t.Run("empty rollback restores legacy rows", func(t *testing.T) {
-		runTaskMigrationScenario(t, databaseURL, migrationPath, nil, true)
+		runTaskMigrationScenario(t, databaseURL, migrationPath, "", nil, true)
 	})
 }
 
-func runTaskMigrationScenario(t *testing.T, databaseURL, migrationPath string, guard func(context.Context, *pgxpool.Pool, string), expectDown bool) {
+func runTaskMigrationScenario(t *testing.T, databaseURL, migrationPath, guardLabel string, guard func(context.Context, *pgxpool.Pool, string), expectDown bool) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -181,25 +181,40 @@ func runTaskMigrationScenario(t *testing.T, databaseURL, migrationPath string, g
 
 	if guard != nil {
 		guard(ctx, pool, ownerID)
-		require.Error(t, m.Steps(-1))
+		downErr := m.Steps(-1)
+		require.Error(t, downErr)
+		require.Contains(t, downErr.Error(), guardLabel)
 		_, dirty, versionErr := m.Version()
 		require.NoError(t, versionErr)
 		require.True(t, dirty, "golang-migrate marks a failed down migration dirty")
 		require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM tasks_legacy_quarantine_v31 WHERE id = $1`, legacyTaskID).Scan(&count))
 		require.Equal(t, 1, count)
 		var taskColumnExists bool
-		require.NoError(t, pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sync_changes' AND column_name = 'task_id')`).Scan(&taskColumnExists))
+		require.NoError(t, pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'sync_changes' AND column_name = 'task_id')`).Scan(&taskColumnExists))
 		require.True(t, taskColumnExists)
 		return
 	}
 
 	require.True(t, expectDown)
 	require.NoError(t, m.Steps(-1))
-	require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE id = $1`, legacyTaskID).Scan(&count))
-	require.Equal(t, 1, count)
-	require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM task_completions WHERE task_id = $1`, legacyTaskID).Scan(&count))
-	require.Equal(t, 1, count)
+	var restoredTitle, restoredStatus string
+	require.NoError(t, pool.QueryRow(ctx, `SELECT title, status FROM tasks WHERE id = $1`, legacyTaskID).Scan(&restoredTitle, &restoredStatus))
+	require.Equal(t, "legacy task", restoredTitle)
+	require.Equal(t, "open", restoredStatus)
+	var completedAt, scheduledAt time.Time
+	var dueDate time.Time
+	require.NoError(t, pool.QueryRow(ctx, `SELECT completed_at, due_date, scheduled_at FROM task_completions WHERE task_id = $1`, legacyTaskID).Scan(&completedAt, &dueDate, &scheduledAt))
+	require.Equal(t, 2026, completedAt.UTC().Year())
+	require.Equal(t, time.September, completedAt.UTC().Month())
+	require.Equal(t, 15, completedAt.UTC().Day())
+	require.Equal(t, 15, dueDate.UTC().Day())
+	require.Equal(t, time.September, dueDate.UTC().Month())
+	require.Equal(t, 2026, dueDate.UTC().Year())
+	require.Equal(t, 9, scheduledAt.UTC().Hour())
+	var restoredCount int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE id = $1`, legacyTaskID).Scan(&restoredCount))
+	require.Equal(t, 1, restoredCount)
 	var taskColumnExists bool
-	require.NoError(t, pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sync_changes' AND column_name = 'task_id')`).Scan(&taskColumnExists))
+	require.NoError(t, pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'sync_changes' AND column_name = 'task_id')`).Scan(&taskColumnExists))
 	require.False(t, taskColumnExists)
 }

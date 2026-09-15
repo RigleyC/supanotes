@@ -39,6 +39,16 @@
 - The legacy fixture now includes one `task_completions` row. The test checks
   both quarantine counts after up and restored row counts after an empty down.
 
+## Round 3 fixes
+
+- The isolated-schema assertions now filter `information_schema` by
+  `table_schema = current_schema()`.
+- The down migration checks `task_operations` before `tasks`, so the
+  operation-guard scenario is independently observable despite its foreign
+  key; the test asserts the guard cause.
+- Empty rollback verification now checks restored legacy task title/status and
+  completion timestamps/date, including `scheduled_at`.
+
 ## Validation
 
 Command (from `backend`):

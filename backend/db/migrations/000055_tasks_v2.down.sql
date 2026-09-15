@@ -2,8 +2,14 @@ BEGIN;
 
 DO $$
 BEGIN
-  IF (SELECT COUNT(*) FROM tasks) <> 0
-     OR (SELECT COUNT(*) FROM task_operations) <> 0 THEN
+  -- Check the operation log first. This makes the independent guard
+  -- observable even though task_operations has a task_id foreign key.
+  IF (SELECT COUNT(*) FROM task_operations) <> 0 THEN
+    RAISE EXCEPTION
+      'cannot roll back tasks_v2 while task operation data exists';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM tasks) <> 0 THEN
     RAISE EXCEPTION
       'cannot roll back tasks_v2 while independent task data exists';
   END IF;
