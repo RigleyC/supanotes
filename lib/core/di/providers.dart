@@ -21,7 +21,9 @@ import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/daos/note_operations_pending_query.dart';
+import 'package:supanotes/core/database/daos/tasks_dao.dart';
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/tables/tasks.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/core/sync/note_outbox_worker.dart';
@@ -37,6 +39,7 @@ import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/share/application/native_share_bridge.dart';
 import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
 import 'package:supanotes/features/notes/share/application/shared_link_delivery.dart';
+import 'package:supanotes/features/tasks/data/task_repository.dart';
 import 'package:uuid/uuid.dart';
 
 // ---------------------------------------------------------------------------
@@ -124,6 +127,30 @@ final Provider<NoteLifecycleStore> noteLifecycleStoreProvider =
     Provider.autoDispose<NoteLifecycleStore>(
       (ref) => DatabaseNoteLifecycleStore(ref.watch(appDatabaseProvider)),
     );
+
+// ---------------------------------------------------------------------------
+// Independent task persistence
+// ---------------------------------------------------------------------------
+
+final tasksDaoProvider = Provider<TasksDao>((ref) {
+  return ref.watch(appDatabaseProvider).tasksDao;
+});
+
+final taskRepositoryProvider = Provider.autoDispose<TaskRepository>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null || userId.isEmpty) {
+    throw StateError('TaskRepository requires an authenticated user');
+  }
+  return TaskRepository(ref.watch(tasksDaoProvider), userId);
+});
+
+/// Independent tasks can be disabled after a legacy SQLite table is
+/// quarantined with rows. This provider intentionally does not wrap note
+/// errors, so the notes experience can continue independently.
+final taskStorageDiagnosticProvider =
+    FutureProvider.autoDispose<TaskStorageDiagnostic>((ref) {
+      return ref.watch(appDatabaseProvider).readTaskStorageDiagnostic();
+    });
 
 // ---------------------------------------------------------------------------
 // Note sync client

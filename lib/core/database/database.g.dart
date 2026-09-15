@@ -5506,6 +5506,1685 @@ class SyncInboxCompanion extends UpdateCompanion<SyncInboxData> {
   }
 }
 
+class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TasksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dueDateMeta = const VerificationMeta(
+    'dueDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> dueDate = GeneratedColumn<DateTime>(
+    'due_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _hasTimeMeta = const VerificationMeta(
+    'hasTime',
+  );
+  @override
+  late final GeneratedColumn<bool> hasTime = GeneratedColumn<bool>(
+    'has_time',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_time" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _recurrenceRuleMeta = const VerificationMeta(
+    'recurrenceRule',
+  );
+  @override
+  late final GeneratedColumn<String> recurrenceRule = GeneratedColumn<String>(
+    'recurrence_rule',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reminderMeta = const VerificationMeta(
+    'reminder',
+  );
+  @override
+  late final GeneratedColumn<String> reminder = GeneratedColumn<String>(
+    'reminder',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completionsMeta = const VerificationMeta(
+    'completions',
+  );
+  @override
+  late final GeneratedColumn<String> completions = GeneratedColumn<String>(
+    'completions',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _isCompletedMeta = const VerificationMeta(
+    'isCompleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isCompleted = GeneratedColumn<bool>(
+    'is_completed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_completed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _lastCompletedAtMeta = const VerificationMeta(
+    'lastCompletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastCompletedAt =
+      GeneratedColumn<DateTime>(
+        'last_completed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _scheduleGenerationMeta =
+      const VerificationMeta('scheduleGeneration');
+  @override
+  late final GeneratedColumn<int> scheduleGeneration = GeneratedColumn<int>(
+    'schedule_generation',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    ownerUserId,
+    title,
+    dueDate,
+    hasTime,
+    recurrenceRule,
+    reminder,
+    completions,
+    isCompleted,
+    lastCompletedAt,
+    revision,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    scheduleGeneration,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tasks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TaskData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('due_date')) {
+      context.handle(
+        _dueDateMeta,
+        dueDate.isAcceptableOrUnknown(data['due_date']!, _dueDateMeta),
+      );
+    }
+    if (data.containsKey('has_time')) {
+      context.handle(
+        _hasTimeMeta,
+        hasTime.isAcceptableOrUnknown(data['has_time']!, _hasTimeMeta),
+      );
+    }
+    if (data.containsKey('recurrence_rule')) {
+      context.handle(
+        _recurrenceRuleMeta,
+        recurrenceRule.isAcceptableOrUnknown(
+          data['recurrence_rule']!,
+          _recurrenceRuleMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reminder')) {
+      context.handle(
+        _reminderMeta,
+        reminder.isAcceptableOrUnknown(data['reminder']!, _reminderMeta),
+      );
+    }
+    if (data.containsKey('completions')) {
+      context.handle(
+        _completionsMeta,
+        completions.isAcceptableOrUnknown(
+          data['completions']!,
+          _completionsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_completed')) {
+      context.handle(
+        _isCompletedMeta,
+        isCompleted.isAcceptableOrUnknown(
+          data['is_completed']!,
+          _isCompletedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_completed_at')) {
+      context.handle(
+        _lastCompletedAtMeta,
+        lastCompletedAt.isAcceptableOrUnknown(
+          data['last_completed_at']!,
+          _lastCompletedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('schedule_generation')) {
+      context.handle(
+        _scheduleGenerationMeta,
+        scheduleGeneration.isAcceptableOrUnknown(
+          data['schedule_generation']!,
+          _scheduleGenerationMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TaskData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TaskData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      dueDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}due_date'],
+      ),
+      hasTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_time'],
+      )!,
+      recurrenceRule: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence_rule'],
+      ),
+      reminder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reminder'],
+      ),
+      completions: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}completions'],
+      )!,
+      isCompleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_completed'],
+      )!,
+      lastCompletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_completed_at'],
+      ),
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      scheduleGeneration: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}schedule_generation'],
+      )!,
+    );
+  }
+
+  @override
+  $TasksTable createAlias(String alias) {
+    return $TasksTable(attachedDatabase, alias);
+  }
+}
+
+class TaskData extends DataClass implements Insertable<TaskData> {
+  final String id;
+  final String ownerUserId;
+  final String title;
+  final DateTime? dueDate;
+  final bool hasTime;
+  final String? recurrenceRule;
+  final String? reminder;
+
+  /// Canonical JSON object containing scheduledAt -> completedAt entries.
+  final String completions;
+  final bool isCompleted;
+  final DateTime? lastCompletedAt;
+  final int revision;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final int scheduleGeneration;
+  const TaskData({
+    required this.id,
+    required this.ownerUserId,
+    required this.title,
+    this.dueDate,
+    required this.hasTime,
+    this.recurrenceRule,
+    this.reminder,
+    required this.completions,
+    required this.isCompleted,
+    this.lastCompletedAt,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.scheduleGeneration,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || dueDate != null) {
+      map['due_date'] = Variable<DateTime>(dueDate);
+    }
+    map['has_time'] = Variable<bool>(hasTime);
+    if (!nullToAbsent || recurrenceRule != null) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule);
+    }
+    if (!nullToAbsent || reminder != null) {
+      map['reminder'] = Variable<String>(reminder);
+    }
+    map['completions'] = Variable<String>(completions);
+    map['is_completed'] = Variable<bool>(isCompleted);
+    if (!nullToAbsent || lastCompletedAt != null) {
+      map['last_completed_at'] = Variable<DateTime>(lastCompletedAt);
+    }
+    map['revision'] = Variable<int>(revision);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['schedule_generation'] = Variable<int>(scheduleGeneration);
+    return map;
+  }
+
+  TasksCompanion toCompanion(bool nullToAbsent) {
+    return TasksCompanion(
+      id: Value(id),
+      ownerUserId: Value(ownerUserId),
+      title: Value(title),
+      dueDate: dueDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueDate),
+      hasTime: Value(hasTime),
+      recurrenceRule: recurrenceRule == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceRule),
+      reminder: reminder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminder),
+      completions: Value(completions),
+      isCompleted: Value(isCompleted),
+      lastCompletedAt: lastCompletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastCompletedAt),
+      revision: Value(revision),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      scheduleGeneration: Value(scheduleGeneration),
+    );
+  }
+
+  factory TaskData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TaskData(
+      id: serializer.fromJson<String>(json['id']),
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      title: serializer.fromJson<String>(json['title']),
+      dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
+      hasTime: serializer.fromJson<bool>(json['hasTime']),
+      recurrenceRule: serializer.fromJson<String?>(json['recurrenceRule']),
+      reminder: serializer.fromJson<String?>(json['reminder']),
+      completions: serializer.fromJson<String>(json['completions']),
+      isCompleted: serializer.fromJson<bool>(json['isCompleted']),
+      lastCompletedAt: serializer.fromJson<DateTime?>(json['lastCompletedAt']),
+      revision: serializer.fromJson<int>(json['revision']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      scheduleGeneration: serializer.fromJson<int>(json['scheduleGeneration']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'title': serializer.toJson<String>(title),
+      'dueDate': serializer.toJson<DateTime?>(dueDate),
+      'hasTime': serializer.toJson<bool>(hasTime),
+      'recurrenceRule': serializer.toJson<String?>(recurrenceRule),
+      'reminder': serializer.toJson<String?>(reminder),
+      'completions': serializer.toJson<String>(completions),
+      'isCompleted': serializer.toJson<bool>(isCompleted),
+      'lastCompletedAt': serializer.toJson<DateTime?>(lastCompletedAt),
+      'revision': serializer.toJson<int>(revision),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'scheduleGeneration': serializer.toJson<int>(scheduleGeneration),
+    };
+  }
+
+  TaskData copyWith({
+    String? id,
+    String? ownerUserId,
+    String? title,
+    Value<DateTime?> dueDate = const Value.absent(),
+    bool? hasTime,
+    Value<String?> recurrenceRule = const Value.absent(),
+    Value<String?> reminder = const Value.absent(),
+    String? completions,
+    bool? isCompleted,
+    Value<DateTime?> lastCompletedAt = const Value.absent(),
+    int? revision,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    int? scheduleGeneration,
+  }) => TaskData(
+    id: id ?? this.id,
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    title: title ?? this.title,
+    dueDate: dueDate.present ? dueDate.value : this.dueDate,
+    hasTime: hasTime ?? this.hasTime,
+    recurrenceRule: recurrenceRule.present
+        ? recurrenceRule.value
+        : this.recurrenceRule,
+    reminder: reminder.present ? reminder.value : this.reminder,
+    completions: completions ?? this.completions,
+    isCompleted: isCompleted ?? this.isCompleted,
+    lastCompletedAt: lastCompletedAt.present
+        ? lastCompletedAt.value
+        : this.lastCompletedAt,
+    revision: revision ?? this.revision,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    scheduleGeneration: scheduleGeneration ?? this.scheduleGeneration,
+  );
+  TaskData copyWithCompanion(TasksCompanion data) {
+    return TaskData(
+      id: data.id.present ? data.id.value : this.id,
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      title: data.title.present ? data.title.value : this.title,
+      dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
+      hasTime: data.hasTime.present ? data.hasTime.value : this.hasTime,
+      recurrenceRule: data.recurrenceRule.present
+          ? data.recurrenceRule.value
+          : this.recurrenceRule,
+      reminder: data.reminder.present ? data.reminder.value : this.reminder,
+      completions: data.completions.present
+          ? data.completions.value
+          : this.completions,
+      isCompleted: data.isCompleted.present
+          ? data.isCompleted.value
+          : this.isCompleted,
+      lastCompletedAt: data.lastCompletedAt.present
+          ? data.lastCompletedAt.value
+          : this.lastCompletedAt,
+      revision: data.revision.present ? data.revision.value : this.revision,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      scheduleGeneration: data.scheduleGeneration.present
+          ? data.scheduleGeneration.value
+          : this.scheduleGeneration,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TaskData(')
+          ..write('id: $id, ')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('title: $title, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('hasTime: $hasTime, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('reminder: $reminder, ')
+          ..write('completions: $completions, ')
+          ..write('isCompleted: $isCompleted, ')
+          ..write('lastCompletedAt: $lastCompletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('scheduleGeneration: $scheduleGeneration')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    ownerUserId,
+    title,
+    dueDate,
+    hasTime,
+    recurrenceRule,
+    reminder,
+    completions,
+    isCompleted,
+    lastCompletedAt,
+    revision,
+    createdAt,
+    updatedAt,
+    deletedAt,
+    scheduleGeneration,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TaskData &&
+          other.id == this.id &&
+          other.ownerUserId == this.ownerUserId &&
+          other.title == this.title &&
+          other.dueDate == this.dueDate &&
+          other.hasTime == this.hasTime &&
+          other.recurrenceRule == this.recurrenceRule &&
+          other.reminder == this.reminder &&
+          other.completions == this.completions &&
+          other.isCompleted == this.isCompleted &&
+          other.lastCompletedAt == this.lastCompletedAt &&
+          other.revision == this.revision &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.scheduleGeneration == this.scheduleGeneration);
+}
+
+class TasksCompanion extends UpdateCompanion<TaskData> {
+  final Value<String> id;
+  final Value<String> ownerUserId;
+  final Value<String> title;
+  final Value<DateTime?> dueDate;
+  final Value<bool> hasTime;
+  final Value<String?> recurrenceRule;
+  final Value<String?> reminder;
+  final Value<String> completions;
+  final Value<bool> isCompleted;
+  final Value<DateTime?> lastCompletedAt;
+  final Value<int> revision;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> scheduleGeneration;
+  final Value<int> rowid;
+  const TasksCompanion({
+    this.id = const Value.absent(),
+    this.ownerUserId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.hasTime = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.reminder = const Value.absent(),
+    this.completions = const Value.absent(),
+    this.isCompleted = const Value.absent(),
+    this.lastCompletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.scheduleGeneration = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TasksCompanion.insert({
+    required String id,
+    required String ownerUserId,
+    required String title,
+    this.dueDate = const Value.absent(),
+    this.hasTime = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.reminder = const Value.absent(),
+    this.completions = const Value.absent(),
+    this.isCompleted = const Value.absent(),
+    this.lastCompletedAt = const Value.absent(),
+    this.revision = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.scheduleGeneration = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       ownerUserId = Value(ownerUserId),
+       title = Value(title),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<TaskData> custom({
+    Expression<String>? id,
+    Expression<String>? ownerUserId,
+    Expression<String>? title,
+    Expression<DateTime>? dueDate,
+    Expression<bool>? hasTime,
+    Expression<String>? recurrenceRule,
+    Expression<String>? reminder,
+    Expression<String>? completions,
+    Expression<bool>? isCompleted,
+    Expression<DateTime>? lastCompletedAt,
+    Expression<int>? revision,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? scheduleGeneration,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (title != null) 'title': title,
+      if (dueDate != null) 'due_date': dueDate,
+      if (hasTime != null) 'has_time': hasTime,
+      if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+      if (reminder != null) 'reminder': reminder,
+      if (completions != null) 'completions': completions,
+      if (isCompleted != null) 'is_completed': isCompleted,
+      if (lastCompletedAt != null) 'last_completed_at': lastCompletedAt,
+      if (revision != null) 'revision': revision,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (scheduleGeneration != null) 'schedule_generation': scheduleGeneration,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TasksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? ownerUserId,
+    Value<String>? title,
+    Value<DateTime?>? dueDate,
+    Value<bool>? hasTime,
+    Value<String?>? recurrenceRule,
+    Value<String?>? reminder,
+    Value<String>? completions,
+    Value<bool>? isCompleted,
+    Value<DateTime?>? lastCompletedAt,
+    Value<int>? revision,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? scheduleGeneration,
+    Value<int>? rowid,
+  }) {
+    return TasksCompanion(
+      id: id ?? this.id,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      title: title ?? this.title,
+      dueDate: dueDate ?? this.dueDate,
+      hasTime: hasTime ?? this.hasTime,
+      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
+      reminder: reminder ?? this.reminder,
+      completions: completions ?? this.completions,
+      isCompleted: isCompleted ?? this.isCompleted,
+      lastCompletedAt: lastCompletedAt ?? this.lastCompletedAt,
+      revision: revision ?? this.revision,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      scheduleGeneration: scheduleGeneration ?? this.scheduleGeneration,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (dueDate.present) {
+      map['due_date'] = Variable<DateTime>(dueDate.value);
+    }
+    if (hasTime.present) {
+      map['has_time'] = Variable<bool>(hasTime.value);
+    }
+    if (recurrenceRule.present) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule.value);
+    }
+    if (reminder.present) {
+      map['reminder'] = Variable<String>(reminder.value);
+    }
+    if (completions.present) {
+      map['completions'] = Variable<String>(completions.value);
+    }
+    if (isCompleted.present) {
+      map['is_completed'] = Variable<bool>(isCompleted.value);
+    }
+    if (lastCompletedAt.present) {
+      map['last_completed_at'] = Variable<DateTime>(lastCompletedAt.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (scheduleGeneration.present) {
+      map['schedule_generation'] = Variable<int>(scheduleGeneration.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TasksCompanion(')
+          ..write('id: $id, ')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('title: $title, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('hasTime: $hasTime, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('reminder: $reminder, ')
+          ..write('completions: $completions, ')
+          ..write('isCompleted: $isCompleted, ')
+          ..write('lastCompletedAt: $lastCompletedAt, ')
+          ..write('revision: $revision, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('scheduleGeneration: $scheduleGeneration, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PendingTaskOperationsTable extends PendingTaskOperations
+    with TableInfo<$PendingTaskOperationsTable, PendingTaskOperationData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingTaskOperationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _operationIdMeta = const VerificationMeta(
+    'operationId',
+  );
+  @override
+  late final GeneratedColumn<String> operationId = GeneratedColumn<String>(
+    'operation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _taskIdMeta = const VerificationMeta('taskId');
+  @override
+  late final GeneratedColumn<String> taskId = GeneratedColumn<String>(
+    'task_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ownerUserIdMeta = const VerificationMeta(
+    'ownerUserId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerUserId = GeneratedColumn<String>(
+    'owner_user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _observedRevisionMeta = const VerificationMeta(
+    'observedRevision',
+  );
+  @override
+  late final GeneratedColumn<int> observedRevision = GeneratedColumn<int>(
+    'observed_revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _scheduleGenerationMeta =
+      const VerificationMeta('scheduleGeneration');
+  @override
+  late final GeneratedColumn<int> scheduleGeneration = GeneratedColumn<int>(
+    'schedule_generation',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ordinalMeta = const VerificationMeta(
+    'ordinal',
+  );
+  @override
+  late final GeneratedColumn<int> ordinal = GeneratedColumn<int>(
+    'ordinal',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadHashMeta = const VerificationMeta(
+    'payloadHash',
+  );
+  @override
+  late final GeneratedColumn<String> payloadHash = GeneratedColumn<String>(
+    'payload_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastAttemptAtMeta = const VerificationMeta(
+    'lastAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastAttemptAt =
+      GeneratedColumn<DateTime>(
+        'last_attempt_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _attemptCountMeta = const VerificationMeta(
+    'attemptCount',
+  );
+  @override
+  late final GeneratedColumn<int> attemptCount = GeneratedColumn<int>(
+    'attempt_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    operationId,
+    taskId,
+    ownerUserId,
+    observedRevision,
+    scheduleGeneration,
+    ordinal,
+    kind,
+    payloadJson,
+    payloadHash,
+    createdAt,
+    lastAttemptAt,
+    attemptCount,
+    status,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_task_operations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingTaskOperationData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('operation_id')) {
+      context.handle(
+        _operationIdMeta,
+        operationId.isAcceptableOrUnknown(
+          data['operation_id']!,
+          _operationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_operationIdMeta);
+    }
+    if (data.containsKey('task_id')) {
+      context.handle(
+        _taskIdMeta,
+        taskId.isAcceptableOrUnknown(data['task_id']!, _taskIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_taskIdMeta);
+    }
+    if (data.containsKey('owner_user_id')) {
+      context.handle(
+        _ownerUserIdMeta,
+        ownerUserId.isAcceptableOrUnknown(
+          data['owner_user_id']!,
+          _ownerUserIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerUserIdMeta);
+    }
+    if (data.containsKey('observed_revision')) {
+      context.handle(
+        _observedRevisionMeta,
+        observedRevision.isAcceptableOrUnknown(
+          data['observed_revision']!,
+          _observedRevisionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_observedRevisionMeta);
+    }
+    if (data.containsKey('schedule_generation')) {
+      context.handle(
+        _scheduleGenerationMeta,
+        scheduleGeneration.isAcceptableOrUnknown(
+          data['schedule_generation']!,
+          _scheduleGenerationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduleGenerationMeta);
+    }
+    if (data.containsKey('ordinal')) {
+      context.handle(
+        _ordinalMeta,
+        ordinal.isAcceptableOrUnknown(data['ordinal']!, _ordinalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ordinalMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('payload_hash')) {
+      context.handle(
+        _payloadHashMeta,
+        payloadHash.isAcceptableOrUnknown(
+          data['payload_hash']!,
+          _payloadHashMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadHashMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('last_attempt_at')) {
+      context.handle(
+        _lastAttemptAtMeta,
+        lastAttemptAt.isAcceptableOrUnknown(
+          data['last_attempt_at']!,
+          _lastAttemptAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('attempt_count')) {
+      context.handle(
+        _attemptCountMeta,
+        attemptCount.isAcceptableOrUnknown(
+          data['attempt_count']!,
+          _attemptCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {operationId};
+  @override
+  PendingTaskOperationData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingTaskOperationData(
+      operationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operation_id'],
+      )!,
+      taskId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}task_id'],
+      )!,
+      ownerUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_user_id'],
+      )!,
+      observedRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}observed_revision'],
+      )!,
+      scheduleGeneration: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}schedule_generation'],
+      )!,
+      ordinal: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ordinal'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      payloadHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_hash'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      lastAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_attempt_at'],
+      ),
+      attemptCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempt_count'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingTaskOperationsTable createAlias(String alias) {
+    return $PendingTaskOperationsTable(attachedDatabase, alias);
+  }
+}
+
+class PendingTaskOperationData extends DataClass
+    implements Insertable<PendingTaskOperationData> {
+  final String operationId;
+  final String taskId;
+  final String ownerUserId;
+  final int observedRevision;
+  final int scheduleGeneration;
+  final int ordinal;
+  final String kind;
+  final String payloadJson;
+  final String payloadHash;
+  final DateTime createdAt;
+  final DateTime? lastAttemptAt;
+  final int attemptCount;
+  final String status;
+  const PendingTaskOperationData({
+    required this.operationId,
+    required this.taskId,
+    required this.ownerUserId,
+    required this.observedRevision,
+    required this.scheduleGeneration,
+    required this.ordinal,
+    required this.kind,
+    required this.payloadJson,
+    required this.payloadHash,
+    required this.createdAt,
+    this.lastAttemptAt,
+    required this.attemptCount,
+    required this.status,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['operation_id'] = Variable<String>(operationId);
+    map['task_id'] = Variable<String>(taskId);
+    map['owner_user_id'] = Variable<String>(ownerUserId);
+    map['observed_revision'] = Variable<int>(observedRevision);
+    map['schedule_generation'] = Variable<int>(scheduleGeneration);
+    map['ordinal'] = Variable<int>(ordinal);
+    map['kind'] = Variable<String>(kind);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['payload_hash'] = Variable<String>(payloadHash);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastAttemptAt != null) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt);
+    }
+    map['attempt_count'] = Variable<int>(attemptCount);
+    map['status'] = Variable<String>(status);
+    return map;
+  }
+
+  PendingTaskOperationsCompanion toCompanion(bool nullToAbsent) {
+    return PendingTaskOperationsCompanion(
+      operationId: Value(operationId),
+      taskId: Value(taskId),
+      ownerUserId: Value(ownerUserId),
+      observedRevision: Value(observedRevision),
+      scheduleGeneration: Value(scheduleGeneration),
+      ordinal: Value(ordinal),
+      kind: Value(kind),
+      payloadJson: Value(payloadJson),
+      payloadHash: Value(payloadHash),
+      createdAt: Value(createdAt),
+      lastAttemptAt: lastAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAttemptAt),
+      attemptCount: Value(attemptCount),
+      status: Value(status),
+    );
+  }
+
+  factory PendingTaskOperationData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingTaskOperationData(
+      operationId: serializer.fromJson<String>(json['operationId']),
+      taskId: serializer.fromJson<String>(json['taskId']),
+      ownerUserId: serializer.fromJson<String>(json['ownerUserId']),
+      observedRevision: serializer.fromJson<int>(json['observedRevision']),
+      scheduleGeneration: serializer.fromJson<int>(json['scheduleGeneration']),
+      ordinal: serializer.fromJson<int>(json['ordinal']),
+      kind: serializer.fromJson<String>(json['kind']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      payloadHash: serializer.fromJson<String>(json['payloadHash']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
+      attemptCount: serializer.fromJson<int>(json['attemptCount']),
+      status: serializer.fromJson<String>(json['status']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'operationId': serializer.toJson<String>(operationId),
+      'taskId': serializer.toJson<String>(taskId),
+      'ownerUserId': serializer.toJson<String>(ownerUserId),
+      'observedRevision': serializer.toJson<int>(observedRevision),
+      'scheduleGeneration': serializer.toJson<int>(scheduleGeneration),
+      'ordinal': serializer.toJson<int>(ordinal),
+      'kind': serializer.toJson<String>(kind),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'payloadHash': serializer.toJson<String>(payloadHash),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
+      'attemptCount': serializer.toJson<int>(attemptCount),
+      'status': serializer.toJson<String>(status),
+    };
+  }
+
+  PendingTaskOperationData copyWith({
+    String? operationId,
+    String? taskId,
+    String? ownerUserId,
+    int? observedRevision,
+    int? scheduleGeneration,
+    int? ordinal,
+    String? kind,
+    String? payloadJson,
+    String? payloadHash,
+    DateTime? createdAt,
+    Value<DateTime?> lastAttemptAt = const Value.absent(),
+    int? attemptCount,
+    String? status,
+  }) => PendingTaskOperationData(
+    operationId: operationId ?? this.operationId,
+    taskId: taskId ?? this.taskId,
+    ownerUserId: ownerUserId ?? this.ownerUserId,
+    observedRevision: observedRevision ?? this.observedRevision,
+    scheduleGeneration: scheduleGeneration ?? this.scheduleGeneration,
+    ordinal: ordinal ?? this.ordinal,
+    kind: kind ?? this.kind,
+    payloadJson: payloadJson ?? this.payloadJson,
+    payloadHash: payloadHash ?? this.payloadHash,
+    createdAt: createdAt ?? this.createdAt,
+    lastAttemptAt: lastAttemptAt.present
+        ? lastAttemptAt.value
+        : this.lastAttemptAt,
+    attemptCount: attemptCount ?? this.attemptCount,
+    status: status ?? this.status,
+  );
+  PendingTaskOperationData copyWithCompanion(
+    PendingTaskOperationsCompanion data,
+  ) {
+    return PendingTaskOperationData(
+      operationId: data.operationId.present
+          ? data.operationId.value
+          : this.operationId,
+      taskId: data.taskId.present ? data.taskId.value : this.taskId,
+      ownerUserId: data.ownerUserId.present
+          ? data.ownerUserId.value
+          : this.ownerUserId,
+      observedRevision: data.observedRevision.present
+          ? data.observedRevision.value
+          : this.observedRevision,
+      scheduleGeneration: data.scheduleGeneration.present
+          ? data.scheduleGeneration.value
+          : this.scheduleGeneration,
+      ordinal: data.ordinal.present ? data.ordinal.value : this.ordinal,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      payloadHash: data.payloadHash.present
+          ? data.payloadHash.value
+          : this.payloadHash,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastAttemptAt: data.lastAttemptAt.present
+          ? data.lastAttemptAt.value
+          : this.lastAttemptAt,
+      attemptCount: data.attemptCount.present
+          ? data.attemptCount.value
+          : this.attemptCount,
+      status: data.status.present ? data.status.value : this.status,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingTaskOperationData(')
+          ..write('operationId: $operationId, ')
+          ..write('taskId: $taskId, ')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('observedRevision: $observedRevision, ')
+          ..write('scheduleGeneration: $scheduleGeneration, ')
+          ..write('ordinal: $ordinal, ')
+          ..write('kind: $kind, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('payloadHash: $payloadHash, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('attemptCount: $attemptCount, ')
+          ..write('status: $status')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    operationId,
+    taskId,
+    ownerUserId,
+    observedRevision,
+    scheduleGeneration,
+    ordinal,
+    kind,
+    payloadJson,
+    payloadHash,
+    createdAt,
+    lastAttemptAt,
+    attemptCount,
+    status,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingTaskOperationData &&
+          other.operationId == this.operationId &&
+          other.taskId == this.taskId &&
+          other.ownerUserId == this.ownerUserId &&
+          other.observedRevision == this.observedRevision &&
+          other.scheduleGeneration == this.scheduleGeneration &&
+          other.ordinal == this.ordinal &&
+          other.kind == this.kind &&
+          other.payloadJson == this.payloadJson &&
+          other.payloadHash == this.payloadHash &&
+          other.createdAt == this.createdAt &&
+          other.lastAttemptAt == this.lastAttemptAt &&
+          other.attemptCount == this.attemptCount &&
+          other.status == this.status);
+}
+
+class PendingTaskOperationsCompanion
+    extends UpdateCompanion<PendingTaskOperationData> {
+  final Value<String> operationId;
+  final Value<String> taskId;
+  final Value<String> ownerUserId;
+  final Value<int> observedRevision;
+  final Value<int> scheduleGeneration;
+  final Value<int> ordinal;
+  final Value<String> kind;
+  final Value<String> payloadJson;
+  final Value<String> payloadHash;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> lastAttemptAt;
+  final Value<int> attemptCount;
+  final Value<String> status;
+  final Value<int> rowid;
+  const PendingTaskOperationsCompanion({
+    this.operationId = const Value.absent(),
+    this.taskId = const Value.absent(),
+    this.ownerUserId = const Value.absent(),
+    this.observedRevision = const Value.absent(),
+    this.scheduleGeneration = const Value.absent(),
+    this.ordinal = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.payloadHash = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
+    this.attemptCount = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingTaskOperationsCompanion.insert({
+    required String operationId,
+    required String taskId,
+    required String ownerUserId,
+    required int observedRevision,
+    required int scheduleGeneration,
+    required int ordinal,
+    required String kind,
+    required String payloadJson,
+    required String payloadHash,
+    required DateTime createdAt,
+    this.lastAttemptAt = const Value.absent(),
+    this.attemptCount = const Value.absent(),
+    this.status = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : operationId = Value(operationId),
+       taskId = Value(taskId),
+       ownerUserId = Value(ownerUserId),
+       observedRevision = Value(observedRevision),
+       scheduleGeneration = Value(scheduleGeneration),
+       ordinal = Value(ordinal),
+       kind = Value(kind),
+       payloadJson = Value(payloadJson),
+       payloadHash = Value(payloadHash),
+       createdAt = Value(createdAt);
+  static Insertable<PendingTaskOperationData> custom({
+    Expression<String>? operationId,
+    Expression<String>? taskId,
+    Expression<String>? ownerUserId,
+    Expression<int>? observedRevision,
+    Expression<int>? scheduleGeneration,
+    Expression<int>? ordinal,
+    Expression<String>? kind,
+    Expression<String>? payloadJson,
+    Expression<String>? payloadHash,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastAttemptAt,
+    Expression<int>? attemptCount,
+    Expression<String>? status,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (operationId != null) 'operation_id': operationId,
+      if (taskId != null) 'task_id': taskId,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
+      if (observedRevision != null) 'observed_revision': observedRevision,
+      if (scheduleGeneration != null) 'schedule_generation': scheduleGeneration,
+      if (ordinal != null) 'ordinal': ordinal,
+      if (kind != null) 'kind': kind,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (payloadHash != null) 'payload_hash': payloadHash,
+      if (createdAt != null) 'created_at': createdAt,
+      if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
+      if (attemptCount != null) 'attempt_count': attemptCount,
+      if (status != null) 'status': status,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingTaskOperationsCompanion copyWith({
+    Value<String>? operationId,
+    Value<String>? taskId,
+    Value<String>? ownerUserId,
+    Value<int>? observedRevision,
+    Value<int>? scheduleGeneration,
+    Value<int>? ordinal,
+    Value<String>? kind,
+    Value<String>? payloadJson,
+    Value<String>? payloadHash,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? lastAttemptAt,
+    Value<int>? attemptCount,
+    Value<String>? status,
+    Value<int>? rowid,
+  }) {
+    return PendingTaskOperationsCompanion(
+      operationId: operationId ?? this.operationId,
+      taskId: taskId ?? this.taskId,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
+      observedRevision: observedRevision ?? this.observedRevision,
+      scheduleGeneration: scheduleGeneration ?? this.scheduleGeneration,
+      ordinal: ordinal ?? this.ordinal,
+      kind: kind ?? this.kind,
+      payloadJson: payloadJson ?? this.payloadJson,
+      payloadHash: payloadHash ?? this.payloadHash,
+      createdAt: createdAt ?? this.createdAt,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      attemptCount: attemptCount ?? this.attemptCount,
+      status: status ?? this.status,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (operationId.present) {
+      map['operation_id'] = Variable<String>(operationId.value);
+    }
+    if (taskId.present) {
+      map['task_id'] = Variable<String>(taskId.value);
+    }
+    if (ownerUserId.present) {
+      map['owner_user_id'] = Variable<String>(ownerUserId.value);
+    }
+    if (observedRevision.present) {
+      map['observed_revision'] = Variable<int>(observedRevision.value);
+    }
+    if (scheduleGeneration.present) {
+      map['schedule_generation'] = Variable<int>(scheduleGeneration.value);
+    }
+    if (ordinal.present) {
+      map['ordinal'] = Variable<int>(ordinal.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (payloadHash.present) {
+      map['payload_hash'] = Variable<String>(payloadHash.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (lastAttemptAt.present) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt.value);
+    }
+    if (attemptCount.present) {
+      map['attempt_count'] = Variable<int>(attemptCount.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingTaskOperationsCompanion(')
+          ..write('operationId: $operationId, ')
+          ..write('taskId: $taskId, ')
+          ..write('ownerUserId: $ownerUserId, ')
+          ..write('observedRevision: $observedRevision, ')
+          ..write('scheduleGeneration: $scheduleGeneration, ')
+          ..write('ordinal: $ordinal, ')
+          ..write('kind: $kind, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('payloadHash: $payloadHash, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('attemptCount: $attemptCount, ')
+          ..write('status: $status, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5524,9 +7203,28 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $SyncInboxTable syncInbox = $SyncInboxTable(this);
+  late final $TasksTable tasks = $TasksTable(this);
+  late final $PendingTaskOperationsTable pendingTaskOperations =
+      $PendingTaskOperationsTable(this);
   late final Index idxSyncInboxPending = Index(
     'idx_sync_inbox_pending',
     'CREATE INDEX idx_sync_inbox_pending ON sync_inbox (user_id, applied_at, sequence)',
+  );
+  late final Index idxTasksOwnerAgenda = Index(
+    'idx_tasks_owner_agenda',
+    'CREATE INDEX idx_tasks_owner_agenda ON tasks (owner_user_id, deleted_at, due_date)',
+  );
+  late final Index idxTasksOwnerUpdated = Index(
+    'idx_tasks_owner_updated',
+    'CREATE INDEX idx_tasks_owner_updated ON tasks (owner_user_id, updated_at)',
+  );
+  late final Index idxPendingTaskOperationsTaskOrder = Index(
+    'idx_pending_task_operations_task_order',
+    'CREATE INDEX idx_pending_task_operations_task_order ON pending_task_operations (task_id, ordinal)',
+  );
+  late final Index idxPendingTaskOperationsOwnerStatus = Index(
+    'idx_pending_task_operations_owner_status',
+    'CREATE INDEX idx_pending_task_operations_owner_status ON pending_task_operations (owner_user_id, status, created_at)',
   );
   late final NotesDao notesDao = NotesDao(this as AppDatabase);
   late final NoteLinksDao noteLinksDao = NoteLinksDao(this as AppDatabase);
@@ -5538,6 +7236,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final NoteOperationsDao noteOperationsDao = NoteOperationsDao(
     this as AppDatabase,
   );
+  late final TasksDao tasksDao = TasksDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5553,7 +7252,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncSessions,
     syncFeedCursors,
     syncInbox,
+    tasks,
+    pendingTaskOperations,
     idxSyncInboxPending,
+    idxTasksOwnerAgenda,
+    idxTasksOwnerUpdated,
+    idxPendingTaskOperationsTaskOrder,
+    idxPendingTaskOperationsOwnerStatus,
   ];
 }
 
@@ -8517,6 +10222,788 @@ typedef $$SyncInboxTableProcessedTableManager =
       SyncInboxData,
       PrefetchHooks Function()
     >;
+typedef $$TasksTableCreateCompanionBuilder =
+    TasksCompanion Function({
+      required String id,
+      required String ownerUserId,
+      required String title,
+      Value<DateTime?> dueDate,
+      Value<bool> hasTime,
+      Value<String?> recurrenceRule,
+      Value<String?> reminder,
+      Value<String> completions,
+      Value<bool> isCompleted,
+      Value<DateTime?> lastCompletedAt,
+      Value<int> revision,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> scheduleGeneration,
+      Value<int> rowid,
+    });
+typedef $$TasksTableUpdateCompanionBuilder =
+    TasksCompanion Function({
+      Value<String> id,
+      Value<String> ownerUserId,
+      Value<String> title,
+      Value<DateTime?> dueDate,
+      Value<bool> hasTime,
+      Value<String?> recurrenceRule,
+      Value<String?> reminder,
+      Value<String> completions,
+      Value<bool> isCompleted,
+      Value<DateTime?> lastCompletedAt,
+      Value<int> revision,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> scheduleGeneration,
+      Value<int> rowid,
+    });
+
+class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
+  $$TasksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasTime => $composableBuilder(
+    column: $table.hasTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recurrenceRule => $composableBuilder(
+    column: $table.recurrenceRule,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reminder => $composableBuilder(
+    column: $table.reminder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get completions => $composableBuilder(
+    column: $table.completions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastCompletedAt => $composableBuilder(
+    column: $table.lastCompletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get scheduleGeneration => $composableBuilder(
+    column: $table.scheduleGeneration,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TasksTableOrderingComposer
+    extends Composer<_$AppDatabase, $TasksTable> {
+  $$TasksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasTime => $composableBuilder(
+    column: $table.hasTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recurrenceRule => $composableBuilder(
+    column: $table.recurrenceRule,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reminder => $composableBuilder(
+    column: $table.reminder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get completions => $composableBuilder(
+    column: $table.completions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastCompletedAt => $composableBuilder(
+    column: $table.lastCompletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get scheduleGeneration => $composableBuilder(
+    column: $table.scheduleGeneration,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TasksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TasksTable> {
+  $$TasksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dueDate =>
+      $composableBuilder(column: $table.dueDate, builder: (column) => column);
+
+  GeneratedColumn<bool> get hasTime =>
+      $composableBuilder(column: $table.hasTime, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrenceRule => $composableBuilder(
+    column: $table.recurrenceRule,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reminder =>
+      $composableBuilder(column: $table.reminder, builder: (column) => column);
+
+  GeneratedColumn<String> get completions => $composableBuilder(
+    column: $table.completions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastCompletedAt => $composableBuilder(
+    column: $table.lastCompletedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get scheduleGeneration => $composableBuilder(
+    column: $table.scheduleGeneration,
+    builder: (column) => column,
+  );
+}
+
+class $$TasksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TasksTable,
+          TaskData,
+          $$TasksTableFilterComposer,
+          $$TasksTableOrderingComposer,
+          $$TasksTableAnnotationComposer,
+          $$TasksTableCreateCompanionBuilder,
+          $$TasksTableUpdateCompanionBuilder,
+          (TaskData, BaseReferences<_$AppDatabase, $TasksTable, TaskData>),
+          TaskData,
+          PrefetchHooks Function()
+        > {
+  $$TasksTableTableManager(_$AppDatabase db, $TasksTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TasksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TasksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TasksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> ownerUserId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
+                Value<bool> hasTime = const Value.absent(),
+                Value<String?> recurrenceRule = const Value.absent(),
+                Value<String?> reminder = const Value.absent(),
+                Value<String> completions = const Value.absent(),
+                Value<bool> isCompleted = const Value.absent(),
+                Value<DateTime?> lastCompletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> scheduleGeneration = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TasksCompanion(
+                id: id,
+                ownerUserId: ownerUserId,
+                title: title,
+                dueDate: dueDate,
+                hasTime: hasTime,
+                recurrenceRule: recurrenceRule,
+                reminder: reminder,
+                completions: completions,
+                isCompleted: isCompleted,
+                lastCompletedAt: lastCompletedAt,
+                revision: revision,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                scheduleGeneration: scheduleGeneration,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String ownerUserId,
+                required String title,
+                Value<DateTime?> dueDate = const Value.absent(),
+                Value<bool> hasTime = const Value.absent(),
+                Value<String?> recurrenceRule = const Value.absent(),
+                Value<String?> reminder = const Value.absent(),
+                Value<String> completions = const Value.absent(),
+                Value<bool> isCompleted = const Value.absent(),
+                Value<DateTime?> lastCompletedAt = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> scheduleGeneration = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TasksCompanion.insert(
+                id: id,
+                ownerUserId: ownerUserId,
+                title: title,
+                dueDate: dueDate,
+                hasTime: hasTime,
+                recurrenceRule: recurrenceRule,
+                reminder: reminder,
+                completions: completions,
+                isCompleted: isCompleted,
+                lastCompletedAt: lastCompletedAt,
+                revision: revision,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                scheduleGeneration: scheduleGeneration,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TasksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TasksTable,
+      TaskData,
+      $$TasksTableFilterComposer,
+      $$TasksTableOrderingComposer,
+      $$TasksTableAnnotationComposer,
+      $$TasksTableCreateCompanionBuilder,
+      $$TasksTableUpdateCompanionBuilder,
+      (TaskData, BaseReferences<_$AppDatabase, $TasksTable, TaskData>),
+      TaskData,
+      PrefetchHooks Function()
+    >;
+typedef $$PendingTaskOperationsTableCreateCompanionBuilder =
+    PendingTaskOperationsCompanion Function({
+      required String operationId,
+      required String taskId,
+      required String ownerUserId,
+      required int observedRevision,
+      required int scheduleGeneration,
+      required int ordinal,
+      required String kind,
+      required String payloadJson,
+      required String payloadHash,
+      required DateTime createdAt,
+      Value<DateTime?> lastAttemptAt,
+      Value<int> attemptCount,
+      Value<String> status,
+      Value<int> rowid,
+    });
+typedef $$PendingTaskOperationsTableUpdateCompanionBuilder =
+    PendingTaskOperationsCompanion Function({
+      Value<String> operationId,
+      Value<String> taskId,
+      Value<String> ownerUserId,
+      Value<int> observedRevision,
+      Value<int> scheduleGeneration,
+      Value<int> ordinal,
+      Value<String> kind,
+      Value<String> payloadJson,
+      Value<String> payloadHash,
+      Value<DateTime> createdAt,
+      Value<DateTime?> lastAttemptAt,
+      Value<int> attemptCount,
+      Value<String> status,
+      Value<int> rowid,
+    });
+
+class $$PendingTaskOperationsTableFilterComposer
+    extends Composer<_$AppDatabase, $PendingTaskOperationsTable> {
+  $$PendingTaskOperationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get taskId => $composableBuilder(
+    column: $table.taskId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get observedRevision => $composableBuilder(
+    column: $table.observedRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get scheduleGeneration => $composableBuilder(
+    column: $table.scheduleGeneration,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ordinal => $composableBuilder(
+    column: $table.ordinal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadHash => $composableBuilder(
+    column: $table.payloadHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingTaskOperationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PendingTaskOperationsTable> {
+  $$PendingTaskOperationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get taskId => $composableBuilder(
+    column: $table.taskId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get observedRevision => $composableBuilder(
+    column: $table.observedRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get scheduleGeneration => $composableBuilder(
+    column: $table.scheduleGeneration,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ordinal => $composableBuilder(
+    column: $table.ordinal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadHash => $composableBuilder(
+    column: $table.payloadHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingTaskOperationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PendingTaskOperationsTable> {
+  $$PendingTaskOperationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get operationId => $composableBuilder(
+    column: $table.operationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get taskId =>
+      $composableBuilder(column: $table.taskId, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerUserId => $composableBuilder(
+    column: $table.ownerUserId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get observedRevision => $composableBuilder(
+    column: $table.observedRevision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get scheduleGeneration => $composableBuilder(
+    column: $table.scheduleGeneration,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get ordinal =>
+      $composableBuilder(column: $table.ordinal, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get payloadHash => $composableBuilder(
+    column: $table.payloadHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastAttemptAt => $composableBuilder(
+    column: $table.lastAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attemptCount => $composableBuilder(
+    column: $table.attemptCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+}
+
+class $$PendingTaskOperationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingTaskOperationsTable,
+          PendingTaskOperationData,
+          $$PendingTaskOperationsTableFilterComposer,
+          $$PendingTaskOperationsTableOrderingComposer,
+          $$PendingTaskOperationsTableAnnotationComposer,
+          $$PendingTaskOperationsTableCreateCompanionBuilder,
+          $$PendingTaskOperationsTableUpdateCompanionBuilder,
+          (
+            PendingTaskOperationData,
+            BaseReferences<
+              _$AppDatabase,
+              $PendingTaskOperationsTable,
+              PendingTaskOperationData
+            >,
+          ),
+          PendingTaskOperationData,
+          PrefetchHooks Function()
+        > {
+  $$PendingTaskOperationsTableTableManager(
+    _$AppDatabase db,
+    $PendingTaskOperationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingTaskOperationsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$PendingTaskOperationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PendingTaskOperationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> operationId = const Value.absent(),
+                Value<String> taskId = const Value.absent(),
+                Value<String> ownerUserId = const Value.absent(),
+                Value<int> observedRevision = const Value.absent(),
+                Value<int> scheduleGeneration = const Value.absent(),
+                Value<int> ordinal = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<String> payloadHash = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
+                Value<int> attemptCount = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingTaskOperationsCompanion(
+                operationId: operationId,
+                taskId: taskId,
+                ownerUserId: ownerUserId,
+                observedRevision: observedRevision,
+                scheduleGeneration: scheduleGeneration,
+                ordinal: ordinal,
+                kind: kind,
+                payloadJson: payloadJson,
+                payloadHash: payloadHash,
+                createdAt: createdAt,
+                lastAttemptAt: lastAttemptAt,
+                attemptCount: attemptCount,
+                status: status,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String operationId,
+                required String taskId,
+                required String ownerUserId,
+                required int observedRevision,
+                required int scheduleGeneration,
+                required int ordinal,
+                required String kind,
+                required String payloadJson,
+                required String payloadHash,
+                required DateTime createdAt,
+                Value<DateTime?> lastAttemptAt = const Value.absent(),
+                Value<int> attemptCount = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingTaskOperationsCompanion.insert(
+                operationId: operationId,
+                taskId: taskId,
+                ownerUserId: ownerUserId,
+                observedRevision: observedRevision,
+                scheduleGeneration: scheduleGeneration,
+                ordinal: ordinal,
+                kind: kind,
+                payloadJson: payloadJson,
+                payloadHash: payloadHash,
+                createdAt: createdAt,
+                lastAttemptAt: lastAttemptAt,
+                attemptCount: attemptCount,
+                status: status,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingTaskOperationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingTaskOperationsTable,
+      PendingTaskOperationData,
+      $$PendingTaskOperationsTableFilterComposer,
+      $$PendingTaskOperationsTableOrderingComposer,
+      $$PendingTaskOperationsTableAnnotationComposer,
+      $$PendingTaskOperationsTableCreateCompanionBuilder,
+      $$PendingTaskOperationsTableUpdateCompanionBuilder,
+      (
+        PendingTaskOperationData,
+        BaseReferences<
+          _$AppDatabase,
+          $PendingTaskOperationsTable,
+          PendingTaskOperationData
+        >,
+      ),
+      PendingTaskOperationData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8541,4 +11028,8 @@ class $AppDatabaseManager {
       $$SyncFeedCursorsTableTableManager(_db, _db.syncFeedCursors);
   $$SyncInboxTableTableManager get syncInbox =>
       $$SyncInboxTableTableManager(_db, _db.syncInbox);
+  $$TasksTableTableManager get tasks =>
+      $$TasksTableTableManager(_db, _db.tasks);
+  $$PendingTaskOperationsTableTableManager get pendingTaskOperations =>
+      $$PendingTaskOperationsTableTableManager(_db, _db.pendingTaskOperations);
 }

@@ -12,6 +12,7 @@ import 'package:supanotes/core/database/daos/note_lifecycle_dao.dart';
 import 'package:supanotes/core/database/daos/note_links_dao.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
+import 'package:supanotes/core/database/daos/tasks_dao.dart';
 import 'package:supanotes/core/database/daos/user_note_preferences_dao.dart';
 import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/core/database/tables/attachments.dart';
@@ -23,6 +24,7 @@ import 'package:supanotes/core/database/tables/pending_note_operations.dart';
 import 'package:supanotes/core/database/tables/sync_feed_cursors.dart';
 import 'package:supanotes/core/database/tables/sync_inbox.dart';
 import 'package:supanotes/core/database/tables/sync_sessions.dart';
+import 'package:supanotes/core/database/tables/tasks.dart';
 import 'package:supanotes/core/database/tables/user_note_preferences.dart';
 
 part 'database.g.dart';
@@ -108,6 +110,8 @@ Future<void> migratePerUserCollapse(
     SyncSessions,
     SyncFeedCursors,
     SyncInbox,
+    Tasks,
+    PendingTaskOperations,
   ],
   daos: [
     NotesDao,
@@ -115,6 +119,7 @@ Future<void> migratePerUserCollapse(
     AttachmentsDao,
     UserNotePreferencesDao,
     NoteOperationsDao,
+    TasksDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -122,6 +127,30 @@ class AppDatabase extends _$AppDatabase {
 
   AppDatabase.test({QueryExecutor? executor})
     : super(executor ?? NativeDatabase.memory());
+
+  TaskStorageDiagnostic _taskStorageDiagnostic =
+      const TaskStorageDiagnostic();
+
+  /// Independent-task migration status, kept separate from note sync errors.
+  TaskStorageDiagnostic get taskStorageDiagnostic => _taskStorageDiagnostic;
+
+  /// Re-reads quarantine rows after reopening an existing database. The
+  /// physical quarantine names are the durable source of truth.
+  Future<TaskStorageDiagnostic> readTaskStorageDiagnostic() async {
+    final rows = <String, int>{};
+    for (final table in _taskQuarantineNames.values) {
+      if (await _tableExists(table)) {
+        rows[table] = await _countRows(table);
+      }
+    }
+    _taskStorageDiagnostic = TaskStorageDiagnostic(
+      availability: rows.values.any((count) => count > 0)
+          ? TaskStorageAvailability.blocked
+          : TaskStorageAvailability.available,
+      quarantinedRows: Map.unmodifiable(rows),
+    );
+    return _taskStorageDiagnostic;
+  }
 
   late final noteLifecycleDao = NoteLifecycleDao(this);
 
@@ -226,7 +255,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 32;
+  int get schemaVersion => 33;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -246,6 +275,7 @@ class AppDatabase extends _$AppDatabase {
     await _migrateEffectiveDocuments(m, from);
     await migratePerUserCollapse(this, m, from);
     await _migrateSyncInbox(m, from);
+    await _migrateTasks(m, from, to);
   }
 
   Future<void> _migrateSyncInbox(Migrator m, int from) async {
@@ -273,6 +303,45 @@ class AppDatabase extends _$AppDatabase {
         syncInbox.taskId,
       );
     }
+  }
+
+  static const _taskQuarantineNames = <String, String>{
+    'tasks': 'tasks_legacy_quarantine_v32',
+    'task_completions': 'task_completions_legacy_quarantine_v32',
+    'local_task_completions':
+        'local_task_completions_legacy_quarantine_v32',
+  };
+
+  Future<void> _migrateTasks(Migrator m, int from, int to) async {
+    // Task 4 owns the feed-only 31 -> 32 upgrade. When Drift upgrades a v31
+    // database directly to v33, this method still represents the one logical
+    // v32 -> 33 task step after the feed columns are in place.
+    if (to < 33 || from >= 33) return;
+
+    final quarantinedRows = <String, int>{};
+    for (final entry in _taskQuarantineNames.entries) {
+      final source = entry.key;
+      if (!await _tableExists(source)) continue;
+      final rowCount = await _countRows(source);
+      var target = entry.value;
+      var suffix = 1;
+      while (await _tableExists(target)) {
+        target = '${entry.value}_$suffix';
+        suffix++;
+      }
+      await customStatement('ALTER TABLE $source RENAME TO $target');
+      quarantinedRows[target] = rowCount;
+    }
+
+    await m.createTable(tasks);
+    await m.createTable(pendingTaskOperations);
+
+    _taskStorageDiagnostic = TaskStorageDiagnostic(
+      availability: quarantinedRows.values.any((count) => count > 0)
+          ? TaskStorageAvailability.blocked
+          : TaskStorageAvailability.available,
+      quarantinedRows: Map.unmodifiable(quarantinedRows),
+    );
   }
 
   Future<void> _rebuildSyncFeedCursors(Migrator m) async {
@@ -346,6 +415,13 @@ class AppDatabase extends _$AppDatabase {
       variables: [Variable.withString('table'), Variable.withString(tableName)],
     ).get();
     return rows.isNotEmpty;
+  }
+
+  Future<int> _countRows(String tableName) async {
+    final result = await customSelect(
+      'SELECT COUNT(*) AS row_count FROM $tableName',
+    ).getSingle();
+    return (result.data['row_count'] as num).toInt();
   }
 
   Future<void> _migrateEffectiveDocuments(Migrator m, int from) async {
