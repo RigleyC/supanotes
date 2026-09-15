@@ -63,12 +63,12 @@ void main() {
   test('canonicalizes equivalent completion representations', () {
     final first = fixtureRecurringTask(
       completions: {
-        '2026-09-15T09:00:00.000-03:00': '2026-09-14T09:00:00-03:00',
+        '2026-09-15T09:00': '2026-09-14T09:00:00.000Z',
       },
     );
     final second = fixtureRecurringTask(
       completions: {
-        '2026-09-15T12:00:00.000Z': '2026-09-14T12:00:00Z',
+        '2026-09-15T09:00:00.000': '2026-09-14T09:00:00Z',
       },
     );
     expect(first.completions, second.completions);
@@ -113,5 +113,26 @@ void main() {
     final changed = task.withSchedule(dueDate: null, recurrenceRule: null);
     expect(changed.dueDate, isNull);
     expect(changed.recurrenceRule, isNull);
+  });
+
+  test('rejects scheduled offsets instead of shifting wall-clock identity', () {
+    final json = fixtureRecurringTask().toJson();
+    json['due_date'] = '2026-09-15T09:00:00-03:00';
+    expect(() => Task.fromJson(json), throwsFormatException);
+  });
+
+  test('validates generation and instant wire formats strictly', () {
+    final decimal = fixtureRecurringTask().toJson()
+      ..['schedule_generation'] = 1.5;
+    expect(() => Task.fromJson(decimal), throwsFormatException);
+    final negative = fixtureRecurringTask().toJson()
+      ..['schedule_generation'] = -1;
+    expect(() => Task.fromJson(negative), throwsFormatException);
+    final string = fixtureRecurringTask().toJson()
+      ..['schedule_generation'] = '1';
+    expect(() => Task.fromJson(string), throwsFormatException);
+    final localInstant = fixtureRecurringTask().toJson()
+      ..['created_at'] = '2026-09-01T00:00:00.000';
+    expect(() => Task.fromJson(localInstant), throwsFormatException);
   });
 }

@@ -39,7 +39,7 @@ class Task {
     ownerUserId:
         json['owner_user_id'] as String? ?? json['ownerUserId'] as String,
     title: json['title'] as String,
-    dueDate: _parseDate(json['due_date'] ?? json['dueDate']),
+    dueDate: _parseScheduledDate(json['due_date'] ?? json['dueDate']),
     hasTime: json['has_time'] as bool? ?? json['hasTime'] as bool? ?? false,
     recurrenceRule:
         json['recurrence_rule'] as String? ?? json['recurrenceRule'] as String?,
@@ -48,19 +48,16 @@ class Task {
         (json['completions'] as Map?)?.cast<String, Object?>() ?? const {},
     isCompleted:
         json['is_completed'] as bool? ?? json['isCompleted'] as bool? ?? false,
-    lastCompletedAt: _parseDate(
+    lastCompletedAt: _parseInstant(
       json['last_completed_at'] ?? json['lastCompletedAt'],
     ),
     revision: (json['revision'] as num?)?.toInt() ?? 0,
-    createdAt: _requiredDate(json['created_at'] ?? json['createdAt']),
-    updatedAt: _requiredDate(json['updated_at'] ?? json['updatedAt']),
-    deletedAt: _parseDate(json['deleted_at'] ?? json['deletedAt']),
-    scheduleGeneration:
-        (json['schedule_generation'] ?? json['scheduleGeneration'] as num?)
-            is num
-        ? ((json['schedule_generation'] ?? json['scheduleGeneration']) as num)
-              .toInt()
-        : 0,
+    createdAt: _requiredInstant(json['created_at'] ?? json['createdAt']),
+    updatedAt: _requiredInstant(json['updated_at'] ?? json['updatedAt']),
+    deletedAt: _parseInstant(json['deleted_at'] ?? json['deletedAt']),
+    scheduleGeneration: _parseGeneration(
+      json['schedule_generation'] ?? json['scheduleGeneration'],
+    ),
   );
 
   final String id;
@@ -202,7 +199,7 @@ Map<String, String> _normalizeCompletions(
 
 String _canonicalScheduledKey(String value, {required bool hasTime}) {
   try {
-    final parsed = DateTime.parse(value);
+    final parsed = _parseScheduledLexically(value);
     return scheduledAtKey(parsed, hasTime: hasTime);
   } on FormatException {
     throw const FormatException('invalid scheduledAt key');
@@ -211,7 +208,7 @@ String _canonicalScheduledKey(String value, {required bool hasTime}) {
 
 String _canonicalInstant(Object? value) {
   try {
-    final parsed = value is DateTime ? value : DateTime.parse(value as String);
+    final parsed = value is DateTime ? value : _parseInstant(value as String)!;
     return parsed.toUtc().toIso8601String();
   } on FormatException {
     throw const FormatException('invalid completion timestamp');
@@ -220,9 +217,60 @@ String _canonicalInstant(Object? value) {
   }
 }
 
-DateTime? _parseDate(Object? value) =>
-    value == null ? null : DateTime.parse(value as String);
-DateTime _requiredDate(Object? value) => _parseDate(value)!;
+DateTime _parseScheduledLexically(String value) {
+  final match = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?$',
+  ).firstMatch(value);
+  if (match == null) {
+    throw const FormatException(
+      'scheduledAt must not contain a timezone offset',
+    );
+  }
+  final fraction = (match.group(7) ?? '').padRight(6, '0');
+  return DateTime(
+    int.parse(match.group(1)!),
+    int.parse(match.group(2)!),
+    int.parse(match.group(3)!),
+    int.parse(match.group(4)!),
+    int.parse(match.group(5)!),
+    int.parse(match.group(6) ?? '0'),
+    int.parse(fraction.substring(0, 3)),
+    int.parse(fraction.substring(3)),
+  );
+}
+
+DateTime? _parseScheduledDate(Object? value) =>
+    value == null ? null : _parseScheduledLexically(value as String);
+
+DateTime? _parseInstant(Object? value) =>
+    value == null ? null : _parseInstantString(value as String);
+
+DateTime _parseInstantString(String value) {
+  if (!RegExp(r'(?:Z|[+-]\d{2}:\d{2})$').hasMatch(value)) {
+    throw const FormatException('instant must include an explicit offset');
+  }
+  try {
+    return DateTime.parse(value).toUtc();
+  } on FormatException {
+    throw const FormatException('invalid instant');
+  }
+}
+
+DateTime _requiredInstant(Object? value) {
+  final parsed = _parseInstant(value);
+  if (parsed == null) throw const FormatException('instant is required');
+  return parsed;
+}
+
+int _parseGeneration(Object? value) {
+  if (value == null) return 0;
+  if (value is! int || value < 0) {
+    throw const FormatException(
+      'scheduleGeneration must be a non-negative integer',
+    );
+  }
+  return value;
+}
 
 bool _mapsEqual(Map<String, dynamic> a, Map<String, dynamic> b) =>
     a.toString() == b.toString();

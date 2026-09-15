@@ -39,4 +39,24 @@ void main() {
     expect(operation.payload['nested']['value'], 1);
     expect(operation.payloadHash, isNotEmpty);
   });
+
+  test(
+    'normalizes occurrence operations with the requested schedule identity',
+    () {
+      final allDay = TaskOperation.completeOccurrence(
+        taskId: 'task-1',
+        scheduledAt: '2026-09-15T09:00:00',
+        hasTime: false,
+        scheduleGeneration: 0,
+      );
+      final timed = TaskOperation.reopenOccurrence(
+        taskId: 'task-1',
+        scheduledAt: '2026-09-15T09:00:00',
+        hasTime: true,
+        scheduleGeneration: 0,
+      );
+      expect(allDay.payload['scheduledAt'], '2026-09-15T00:00:00.000');
+      expect(timed.payload['scheduledAt'], '2026-09-15T09:00:00.000');
+    },
+  );
 }

@@ -73,3 +73,30 @@ dart analyze lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_
 A primeira execução combinada foi encerrada por falta de memória do
 `flutter_tester`; os mesmos testes foram então executados serialmente com
 `--concurrency=1` e passaram.
+
+## Fix round 3
+
+Arquivos alterados:
+
+- `lib/features/tasks/domain/task.dart`: parsing lexical de `dueDate` e chaves `scheduledAt` rejeita offsets e preserva wall-clock; `scheduleGeneration` exige inteiro não-negativo; instantes JSON exigem offset/Z explícito e são normalizados para UTC.
+- `lib/features/tasks/domain/task_operation.dart`: operações de ocorrência recebem `hasTime` obrigatório e usam a identidade de agenda correspondente, inclusive all-day.
+- `test/features/tasks/domain/task_test.dart` e `task_operation_test.dart`: regressões para offsets, formatos de instante, geração inválida e ocorrência all-day/timed.
+
+Comandos e saída:
+
+```text
+dart format lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_operation.dart test/features/tasks/domain/task_test.dart test/features/tasks/domain/task_operation_test.dart
+# Formatted successfully
+
+flutter test --concurrency=1 test/features/tasks/domain/task_test.dart
+# All tests passed! (12 tests)
+
+flutter test --concurrency=1 test/features/tasks/domain/task_operation_test.dart
+# All tests passed! (4 tests)
+
+dart analyze lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_operation.dart lib/features/tasks/domain/task_list_item.dart lib/features/tasks/domain/task_history_entry.dart
+# No analyzer errors (only existing documentation/style infos)
+```
+
+Artefatos alterados pelo `flutter test` (`pubspec.lock` e arquivos gerados do
+Windows) foram restaurados antes do commit.

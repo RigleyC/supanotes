@@ -59,6 +59,7 @@ class TaskOperation {
   factory TaskOperation.completeOccurrence({
     required String taskId,
     required String scheduledAt,
+    required bool hasTime,
     int observedRevision = 0,
     required int scheduleGeneration,
     String? operationId,
@@ -68,11 +69,14 @@ class TaskOperation {
     taskId: taskId,
     observedRevision: observedRevision,
     scheduleGeneration: scheduleGeneration,
-    payload: {'scheduledAt': _canonicalScheduledAt(scheduledAt)},
+    payload: {
+      'scheduledAt': _canonicalScheduledAt(scheduledAt, hasTime: hasTime),
+    },
   );
   factory TaskOperation.reopenOccurrence({
     required String taskId,
     required String scheduledAt,
+    required bool hasTime,
     int observedRevision = 0,
     required int scheduleGeneration,
     String? operationId,
@@ -82,7 +86,9 @@ class TaskOperation {
     taskId: taskId,
     observedRevision: observedRevision,
     scheduleGeneration: scheduleGeneration,
-    payload: {'scheduledAt': _canonicalScheduledAt(scheduledAt)},
+    payload: {
+      'scheduledAt': _canonicalScheduledAt(scheduledAt, hasTime: hasTime),
+    },
   );
   factory TaskOperation.delete({
     required String taskId,
@@ -142,9 +148,24 @@ Object? _freezeValue(Object? value) => value is Map
     ? List.unmodifiable(value.map(_freezeValue))
     : value;
 
-String _canonicalScheduledAt(String value) {
+String _canonicalScheduledAt(String value, {required bool hasTime}) {
   try {
-    return scheduledAtKey(DateTime.parse(value), hasTime: true);
+    final match = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?$',
+    ).firstMatch(value);
+    if (match == null) throw const FormatException();
+    final fraction = (match.group(7) ?? '').padRight(6, '0');
+    final parsed = DateTime(
+      int.parse(match.group(1)!),
+      int.parse(match.group(2)!),
+      int.parse(match.group(3)!),
+      int.parse(match.group(4)!),
+      int.parse(match.group(5)!),
+      int.parse(match.group(6) ?? '0'),
+      int.parse(fraction.substring(0, 3)),
+      int.parse(fraction.substring(3)),
+    );
+    return scheduledAtKey(parsed, hasTime: hasTime);
   } on FormatException {
     throw const FormatException('invalid scheduledAt');
   }
