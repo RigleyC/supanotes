@@ -12,7 +12,9 @@ CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL CHECK (length(btrim(title)) > 0),
-    due_date DATE,
+    -- A task's dueDate is a wall-clock value; has_time distinguishes a
+    -- calendar day from a timed value. Do not coerce it to a DATE.
+    due_date TIMESTAMP WITHOUT TIME ZONE,
     has_time BOOLEAN NOT NULL DEFAULT FALSE,
     recurrence_rule TEXT,
     reminder TEXT,

@@ -20,6 +20,16 @@
   - Uses the existing `SUPANOTES_SYNC_TEST_DATABASE_URL` integration-test
     convention and skips with an explicit reason when PostgreSQL is absent.
 
+## Round 1 fixes
+
+- `applyMigrations` now treats `migrate.ErrNoChange` as success, matching the
+  shared backend migration helper.
+- `due_date` is `TIMESTAMP WITHOUT TIME ZONE`, preserving the task's wall-clock
+  `dueDate` components alongside `has_time`.
+- Added an isolated-database contract covering legacy-row preservation without
+  promotion, successful empty down migration restoration, and atomic down
+  guards for task rows, operation rows and task feed events.
+
 ## Validation
 
 Command (from `backend`):
@@ -28,13 +38,14 @@ Command (from `backend`):
 go test ./internal/tasks -run TestTaskMigration -v
 ```
 
-Result: PASS with the test skipped because
-`SUPANOTES_SYNC_TEST_DATABASE_URL` is not configured. No PostgreSQL instance
-was available in this environment, so the SQL was not executed against a live
-database. `git diff --check` also completed without whitespace errors.
+Result: PASS with both migration tests skipped because
+`SUPANOTES_SYNC_TEST_DATABASE_URL` and
+`SUPANOTES_TASK_MIGRATION_TEST_DATABASE_URL` are not configured. No PostgreSQL
+instance was available in this environment, so the SQL and rollback guards
+were not executed against a live database. `git diff --check` also completed
+without whitespace errors.
 
 ## Limitations
 
-The empty-schema contract is covered by the integration test. Live verification
-of non-empty legacy-row preservation and the guarded down migration requires an
-isolated PostgreSQL database; no production database was accessed or changed.
+Live verification of empty and non-empty migration paths requires the isolated
+PostgreSQL URL above; no production database was accessed or changed.
