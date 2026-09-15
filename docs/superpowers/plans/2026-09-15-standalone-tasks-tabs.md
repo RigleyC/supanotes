@@ -33,35 +33,36 @@
 
 ### Flutter — contratos, banco e sync
 
-- Create `lib/features/tasks/domain/standalone_task.dart`: modelo canônico independente e codec JSON.
-- Create `lib/features/tasks/domain/standalone_task_operation.dart`: tipos e payloads idempotentes.
+- Create `lib/features/tasks/domain/task.dart`: modelo canônico independente e codec JSON (`Task`).
+- Create `lib/features/tasks/domain/task_operation.dart`: tipos e payloads idempotentes (`TaskOperation`).
 - Create `lib/features/tasks/domain/task_list_item.dart`: DTO de apresentação discriminado por origem.
 - Create `lib/features/tasks/domain/task_history_entry.dart`: DTO de histórico.
-- Create `lib/core/database/tables/standalone_tasks.dart`: tabelas Drift `StandaloneTasks` e `PendingTaskOperations`.
-- Create `lib/core/database/daos/standalone_tasks_dao.dart`: queries transacionais e streams por usuário.
-- Create `lib/features/tasks/data/standalone_task_api.dart`: contrato HTTP com `/tasks` e `/tasks/:id/mutations`.
-- Create `lib/features/tasks/data/standalone_task_repository.dart`: mutações locais, outbox e leitura.
-- Create `lib/features/tasks/data/standalone_task_sync_service.dart`: envio serializado e confirmação por `operationId`.
-- Create `lib/core/sync/standalone_task_outbox_worker.dart`: retry e backoff por task.
+- Create `lib/core/database/tables/tasks.dart`: tabelas Drift `Tasks` e `PendingTaskOperations`.
+- Create `lib/core/database/daos/tasks_dao.dart`: queries transacionais e streams por usuário.
+- Create `lib/features/tasks/data/task_api.dart`: contrato HTTP com `/tasks` e `/tasks/:id/mutations`.
+- Create `lib/features/tasks/data/task_repository.dart`: mutações locais, outbox e leitura.
+- Create `lib/features/tasks/data/task_sync_service.dart`: envio serializado e confirmação por `operationId`.
+- Create `lib/core/sync/task_outbox_worker.dart`: retry e backoff por task.
 - Modify `lib/core/database/database.dart`, `lib/core/sync/sync_inbox_store.dart`, `lib/core/database/tables/sync_inbox.dart`, `lib/core/database/tables/sync_feed_cursors.dart`, `lib/core/sync/sync_feed_client.dart` and `lib/core/sync/note_remote_sync_coordinator.dart` for schema, events and bootstrap.
 - Modify `lib/core/di/providers.dart` and `lib/core/sync/note_remote_sync_runtime.dart` for authenticated-session lifecycle.
 
 ### Flutter — agregação, notificações e UI
 
 - Create `lib/features/tasks/domain/note_task_list_reader.dart`: task reader for lists, separate from notification reader.
+- `note_task_list_reader.dart` defines the read-only `NoteTask` adapter with `noteId` and `blockId`.
 - Create `lib/features/tasks/application/task_list_providers.dart`: streams, filter, temporal clock and history.
-- Create `lib/features/tasks/application/standalone_task_controller.dart`: create, edit, complete, reopen and delete.
+- Create `lib/features/tasks/application/task_controller.dart`: create, edit, complete, reopen and delete.
 - Create `lib/features/tasks/presentation/tasks_screen.dart`: main list and note-task toggle.
 - Create `lib/features/tasks/presentation/completed_tasks_screen.dart`: history.
-- Create `lib/features/tasks/presentation/standalone_task_editor_screen.dart`: standalone edit-only screen.
-- Create `lib/features/tasks/presentation/widgets/task_list_tile.dart`, `task_source_label.dart`, `completed_tasks_tile.dart` and `standalone_task_form.dart`.
+- Create `lib/features/tasks/presentation/task_editor_screen.dart`: independent-task edit-only screen.
+- Create `lib/features/tasks/presentation/widgets/task_list_tile.dart`, `task_source_label.dart`, `completed_tasks_tile.dart` and `task_form.dart`.
 - Create `lib/shared/widgets/app_navigation_shell.dart`: public shell for Tasks and Notas.
 - Modify `lib/core/router/app_routes.dart`, `lib/core/router/app_router.dart` and `lib/features/notes/editor/presentation/note_editor_screen.dart` for tabs, routes and `blockId`.
 - Modify `lib/features/tasks/domain/task_notification_id.dart`, `task_notification_scheduler.dart` and `note_task_notification_source.dart` for both sources and collision-free IDs.
 
 ### Go — schema, API and feed
 
-- Create `backend/db/migrations/000055_standalone_tasks.up.sql` and `.down.sql`: legacy quarantine, independent tables and feed columns.
+- Create `backend/db/migrations/000055_tasks_v2.up.sql` and `.down.sql`: legacy quarantine, independent tables and feed columns.
 - Create `backend/db/queries/tasks.sql`: bootstrap, reads, operation log and transactional persistence.
 - Create `backend/internal/tasks/contract.go`, `repository.go`, `service.go`, `handler.go` and focused tests.
 - Modify `backend/internal/syncfeed/repository.go`, `handler.go`, tests and generated `backend/internal/db/sqlcgen/*` for `scope` and `taskId`.
@@ -78,17 +79,17 @@
 ### Task 1: Congelar os contratos de domínio e o protocolo de operações
 
 **Files:**
-- Create: `lib/features/tasks/domain/standalone_task.dart`
-- Create: `lib/features/tasks/domain/standalone_task_operation.dart`
+- Create: `lib/features/tasks/domain/task.dart`
+- Create: `lib/features/tasks/domain/task_operation.dart`
 - Create: `lib/features/tasks/domain/task_list_item.dart`
 - Create: `lib/features/tasks/domain/task_history_entry.dart`
-- Test: `test/features/tasks/domain/standalone_task_test.dart`
-- Test: `test/features/tasks/domain/standalone_task_operation_test.dart`
+- Test: `test/features/tasks/domain/task_test.dart`
+- Test: `test/features/tasks/domain/task_operation_test.dart`
 
 **Interfaces:**
-- Produces `StandaloneTask`, `StandaloneTask.fromJson`, `StandaloneTask.toJson`, `StandaloneTask.copyWith`, `StandaloneTask.scheduleGeneration`.
-- Produces `StandaloneTaskOperation.create`, `.upsert`, `.completeOccurrence`, `.reopenOccurrence`, `.delete`, with `operationId`, `taskId`, `observedRevision`, `scheduleGeneration`, `payload` and `payloadHash`.
-- Produces `TaskListItem.standalone`, `TaskListItem.note` and `TaskHistoryEntry`.
+- Produces `Task`, `Task.fromJson`, `Task.toJson`, `Task.copyWith`, `Task.scheduleGeneration`.
+- Produces `TaskOperation.create`, `.upsert`, `.completeOccurrence`, `.reopenOccurrence`, `.delete`, with `operationId`, `taskId`, `observedRevision`, `scheduleGeneration`, `payload` and `payloadHash`.
+- Produces `TaskListItem.task`, `TaskListItem.note`, `NoteTask` and `TaskHistoryEntry`.
 
 - [ ] **Step 1: Write failing canonical JSON and generation tests.**
 
@@ -97,7 +98,7 @@ test('round trips a standalone task without losing completions', () {
   final task = fixtureRecurringTask(
     completions: {'2026-09-15T09:00:00.000': '2026-09-14T12:00:00.000Z'},
   );
-  expect(StandaloneTask.fromJson(task.toJson()), task);
+  expect(Task.fromJson(task.toJson()), task);
 });
 
 test('schedule metadata changes clear history and increment generation', () {
@@ -114,9 +115,9 @@ test('schedule metadata changes clear history and increment generation', () {
 });
 ```
 
-Run: `flutter test test/features/tasks/domain/standalone_task_test.dart test/features/tasks/domain/standalone_task_operation_test.dart`
+Run: `flutter test test/features/tasks/domain/task_test.dart test/features/tasks/domain/task_operation_test.dart`
 
-Expected: FAIL with unresolved `StandaloneTask` and `StandaloneTaskOperation` symbols.
+Expected: FAIL with unresolved `Task` and `TaskOperation` symbols.
 
 - [ ] **Step 2: Implement immutable contracts and deterministic payload hashes.**
 
@@ -124,7 +125,7 @@ Use UTC ISO-8601 for instants, wall-clock canonical keys for `scheduledAt`, sort
 
 - [ ] **Step 3: Run the focused tests and add idempotency edge cases.**
 
-Run: `flutter test test/features/tasks/domain/standalone_task_test.dart test/features/tasks/domain/standalone_task_operation_test.dart`
+Run: `flutter test test/features/tasks/domain/task_test.dart test/features/tasks/domain/task_operation_test.dart`
 
 Expected: PASS for round trips, generation changes, same-payload same-hash and changed-payload different-hash.
 
@@ -138,8 +139,8 @@ git commit -m "feat(tasks): define standalone task contracts"
 ### Task 2: Criar a migração PostgreSQL e a quarentena do schema legado
 
 **Files:**
-- Create: `backend/db/migrations/000055_standalone_tasks.up.sql`
-- Create: `backend/db/migrations/000055_standalone_tasks.down.sql`
+- Create: `backend/db/migrations/000055_tasks_v2.up.sql`
+- Create: `backend/db/migrations/000055_tasks_v2.down.sql`
 - Test: `backend/internal/tasks/migration_test.go`
 
 **Interfaces:**
@@ -150,7 +151,7 @@ git commit -m "feat(tasks): define standalone task contracts"
 
 Create the old schema with zero rows, apply all migrations, assert new columns `owner_user_id`, `completions`, `schedule_generation` and `deleted_at`, then assert `task_operations` has `operation_id`, `payload_hash` and `response_json`.
 
-Run: `go test ./internal/tasks -run TestStandaloneTaskMigration -v`
+Run: `go test ./internal/tasks -run TestTaskMigration -v`
 
 Expected: FAIL because migration `000055` and the package do not exist.
 
@@ -164,7 +165,7 @@ Allow rollback only while new `tasks` and `task_operations` are empty. Drop the 
 
 - [ ] **Step 4: Run empty and non-empty legacy migration tests.**
 
-Run: `go test ./internal/tasks -run TestStandaloneTaskMigration -v`
+Run: `go test ./internal/tasks -run TestTaskMigration -v`
 
 Expected: PASS for empty legacy tables, preservation of legacy rows in quarantine, and a guarded-down failure after inserting a new task.
 
@@ -297,25 +298,25 @@ git commit -m "feat(sync): add compatible task feed scope"
 ### Task 5: Adicionar Drift, quarentena local e repositório offline-first
 
 **Files:**
-- Create: `lib/core/database/tables/standalone_tasks.dart`
-- Create: `lib/core/database/daos/standalone_tasks_dao.dart`
-- Create: `lib/features/tasks/data/standalone_task_repository.dart`
+- Create: `lib/core/database/tables/tasks.dart`
+- Create: `lib/core/database/daos/tasks_dao.dart`
+- Create: `lib/features/tasks/data/task_repository.dart`
 - Modify: `lib/core/database/database.dart`
 - Modify: `lib/core/di/providers.dart`
-- Test: `test/core/database/daos/standalone_tasks_dao_test.dart`
-- Test: `test/features/tasks/data/standalone_task_repository_test.dart`
+- Test: `test/core/database/daos/tasks_dao_test.dart`
+- Test: `test/features/tasks/data/task_repository_test.dart`
 
 **Interfaces:**
-- `StandaloneTasksDao.watchTasks(String userId) -> Stream<List<StandaloneTaskData>>`.
-- `StandaloneTasksDao.watchTask(String userId, String taskId) -> Stream<StandaloneTaskData?>`.
-- `StandaloneTasksDao.enqueueMutation(PendingTaskOperationsCompanion operation) -> Future<void>`.
-- `StandaloneTaskRepository.create`, `.update`, `.completeOccurrence`, `.reopenOccurrence`, `.delete` update local task and outbox in one transaction.
+- `TasksDao.watchTasks(String userId) -> Stream<List<TaskData>>`.
+- `TasksDao.watchTask(String userId, String taskId) -> Stream<TaskData?>`.
+- `TasksDao.enqueueMutation(PendingTaskOperationsCompanion operation) -> Future<void>`.
+- `TaskRepository.create`, `.update`, `.completeOccurrence`, `.reopenOccurrence`, `.delete` update local task and outbox in one transaction.
 
 - [ ] **Step 1: Write DAO and transaction tests.**
 
 Test that a local create emits immediately, inserts exactly one pending operation, and a deletion leaves a tombstone. Test that `watchTasks` filters by owner and `deletedAt IS NULL`.
 
-Run: `flutter test test/core/database/daos/standalone_tasks_dao_test.dart test/features/tasks/data/standalone_task_repository_test.dart`
+Run: `flutter test test/core/database/daos/tasks_dao_test.dart test/features/tasks/data/task_repository_test.dart`
 
 Expected: FAIL because the Drift tables and DAO are not registered.
 
@@ -333,7 +334,7 @@ Generate operation IDs and payload hashes at the repository boundary; update loc
 
 - [ ] **Step 5: Run Drift generation and focused tests.**
 
-Run: `dart run build_runner build --delete-conflicting-outputs`; `flutter test test/core/database/daos/standalone_tasks_dao_test.dart test/features/tasks/data/standalone_task_repository_test.dart`.
+Run: `dart run build_runner build --delete-conflicting-outputs`; `flutter test test/core/database/daos/tasks_dao_test.dart test/features/tasks/data/task_repository_test.dart`.
 
 Expected: PASS with schema 32 and no visual assertions.
 
@@ -341,33 +342,33 @@ Expected: PASS with schema 32 and no visual assertions.
 
 ```powershell
 git add lib/core/database lib/features/tasks/data lib/core/di test/core/database test/features/tasks/data
-git commit -m "feat(tasks): persist standalone tasks offline"
+git commit -m "feat(tasks): persist tasks offline"
 ```
 
 ### Task 6: Implementar API Dart, outbox worker e confirmação idempotente
 
 **Files:**
-- Create: `lib/features/tasks/data/standalone_task_api.dart`
-- Create: `lib/features/tasks/data/standalone_task_sync_service.dart`
-- Create: `lib/core/sync/standalone_task_outbox_worker.dart`
+- Create: `lib/features/tasks/data/task_api.dart`
+- Create: `lib/features/tasks/data/task_sync_service.dart`
+- Create: `lib/core/sync/task_outbox_worker.dart`
 - Modify: `lib/core/di/providers.dart`
 - Modify: `lib/core/sync/note_remote_sync_runtime.dart`
-- Test: `test/features/tasks/data/standalone_task_api_test.dart`
-- Test: `test/features/tasks/data/standalone_task_sync_service_test.dart`
-- Test: `test/core/sync/standalone_task_outbox_worker_test.dart`
+- Test: `test/features/tasks/data/task_api_test.dart`
+- Test: `test/features/tasks/data/task_sync_service_test.dart`
+- Test: `test/core/sync/task_outbox_worker_test.dart`
 
 **Interfaces:**
-- `StandaloneTaskApi.bootstrap() -> Future<TaskBootstrapResponse>`.
-- `StandaloneTaskApi.fetch(String taskId) -> Future<StandaloneTask>`.
-- `StandaloneTaskApi.mutate(StandaloneTaskOperation operation) -> Future<TaskMutationResponse>`.
-- `StandaloneTaskSyncService.syncTask(String taskId) -> Future<void>`.
-- `StandaloneTaskOutboxWorker.drain() -> Future<void>` and `.wake({bool resetBackoff = true})`.
+- `TaskApi.bootstrap() -> Future<TaskBootstrapResponse>`.
+- `TaskApi.fetch(String taskId) -> Future<Task>`.
+- `TaskApi.mutate(TaskOperation operation) -> Future<TaskMutationResponse>`.
+- `TaskSyncService.syncTask(String taskId) -> Future<void>`.
+- `TaskOutboxWorker.drain() -> Future<void>` and `.wake({bool resetBackoff = true})`.
 
 - [ ] **Step 1: Write API parsing tests.**
 
 Cover bootstrap watermark, mutation response, `409 SCHEDULE_CHANGED`, `410 TASK_DELETED`, malformed payload and network failure mapping to the existing API exception convention.
 
-Run: `flutter test test/features/tasks/data/standalone_task_api_test.dart`
+Run: `flutter test test/features/tasks/data/task_api_test.dart`
 
 Expected: FAIL because the API and response classes do not exist.
 
@@ -389,7 +390,7 @@ Wake on connectivity, foreground safety interval and local task mutation. Run th
 
 - [ ] **Step 6: Run focused tests and commit.**
 
-Run: `flutter test test/features/tasks/data test/core/sync/standalone_task_outbox_worker_test.dart`
+Run: `flutter test test/features/tasks/data test/core/sync/task_outbox_worker_test.dart`
 
 Expected: PASS for network retry, exact confirmation, ordering and blocked protocol errors.
 
@@ -408,7 +409,7 @@ git commit -m "feat(tasks): sync standalone task outbox"
 - Test: `test/features/tasks/application/task_list_providers_test.dart`
 
 **Interfaces:**
-- `NoteTaskListReader.read({required String noteId, required String noteTitle, required String documentJson, required bool hideCompleted}) -> List<TaskListItem>`.
+- `NoteTaskListReader.read({required String noteId, required String noteTitle, required String documentJson, required bool hideCompleted}) -> List<NoteTask>`.
 - `taskListProvider({required bool includeNoteTasks}) -> StreamProvider<List<TaskListItem>>`.
 - `completedTaskHistoryProvider({required bool includeNoteTasks}) -> StreamProvider<List<TaskHistoryEntry>>`.
 - `taskNotesVisibilityProvider -> StreamProvider<List<VisibleNoteDocument>>`.
@@ -451,16 +452,16 @@ git commit -m "feat(tasks): aggregate standalone and note task lists"
 ### Task 8: Unificar notificações das duas fontes
 
 **Files:**
-- Create: `lib/features/tasks/domain/standalone_task_notification_source.dart`
+- Create: `lib/features/tasks/domain/task_notification_source.dart`
 - Modify: `lib/features/tasks/domain/task_notification_id.dart`
 - Modify: `lib/features/tasks/domain/task_notification_scheduler.dart`
 - Modify: `lib/features/tasks/domain/note_task_notification_source.dart`
-- Test: `test/features/tasks/domain/standalone_task_notification_source_test.dart`
+- Test: `test/features/tasks/domain/task_notification_source_test.dart`
 - Test: `test/features/tasks/domain/task_notification_id_test.dart`
 
 **Interfaces:**
-- `StandaloneTaskNotificationSource.readOpenTasks(String userId) -> Future<List<TaskNotificationEntry>>`.
-- `TaskNotificationId.forStandalone({required String userId, required String taskId, required DateTime scheduledAt})`.
+- `TaskNotificationSource.readOpenTasks(String userId) -> Future<List<TaskNotificationEntry>>`.
+- `TaskNotificationId.forTask({required String userId, required String taskId, required DateTime scheduledAt})`.
 - `TaskNotificationId.forNote({required String userId, required String noteId, required String blockId, required DateTime scheduledAt})`.
 
 - [ ] **Step 1: Write collision and rescheduling tests.**
@@ -477,7 +478,7 @@ Include user ID and full source identity in the notification ID, reconcile stand
 
 - [ ] **Step 4: Run focused notification tests and commit.**
 
-Run: `flutter test test/features/tasks/domain/standalone_task_notification_source_test.dart test/features/tasks/domain/task_notification_id_test.dart test/features/tasks/domain/note_task_reader_test.dart`
+Run: `flutter test test/features/tasks/domain/task_notification_source_test.dart test/features/tasks/domain/task_notification_id_test.dart test/features/tasks/domain/note_task_reader_test.dart`
 
 Expected: PASS with no layout tests.
 
@@ -535,27 +536,27 @@ git commit -m "feat(navigation): add tasks and notes tabs"
 **Files:**
 - Create: `lib/features/tasks/presentation/tasks_screen.dart`
 - Create: `lib/features/tasks/presentation/completed_tasks_screen.dart`
-- Create: `lib/features/tasks/presentation/standalone_task_editor_screen.dart`
+- Create: `lib/features/tasks/presentation/task_editor_screen.dart`
 - Create: `lib/features/tasks/presentation/widgets/task_list_tile.dart`
 - Create: `lib/features/tasks/presentation/widgets/task_source_label.dart`
 - Create: `lib/features/tasks/presentation/widgets/completed_tasks_tile.dart`
-- Create: `lib/features/tasks/presentation/widgets/standalone_task_form.dart`
-- Create: `lib/features/tasks/application/standalone_task_controller.dart`
+- Create: `lib/features/tasks/presentation/widgets/task_form.dart`
+- Create: `lib/features/tasks/application/task_controller.dart`
 - Modify: `lib/core/router/app_router.dart`
 - Test: `test/features/tasks/presentation/tasks_screen_test.dart`
 - Test: `test/features/tasks/presentation/completed_tasks_screen_test.dart`
-- Test: `test/features/tasks/application/standalone_task_controller_test.dart`
+- Test: `test/features/tasks/application/task_controller_test.dart`
 
 **Interfaces:**
 - `TasksScreen` reads `taskListProvider(includeNoteTasks: ...)` and uses `AsyncValue.when`.
-- `StandaloneTaskController.create/update/complete/reopen/delete` delegates to `StandaloneTaskRepository` and returns `Future<void>`.
+- `TaskController.create/update/complete/reopen/delete` delegates to `TaskRepository` and returns `Future<void>`.
 - `TaskListTile` receives `TaskListItem` and callbacks; it never reads a repository directly.
 
 - [ ] **Step 1: Write behavioral tests.**
 
 Test that the screen exposes the completed destination, toggling the note-task preference changes the provider input, tapping a standalone item navigates to its editor, tapping a note item navigates with `noteId`/`blockId`, and the controller delegates completion to the correct repository operation.
 
-Run: `flutter test test/features/tasks/presentation/tasks_screen_test.dart test/features/tasks/presentation/completed_tasks_screen_test.dart test/features/tasks/application/standalone_task_controller_test.dart`
+Run: `flutter test test/features/tasks/presentation/tasks_screen_test.dart test/features/tasks/presentation/completed_tasks_screen_test.dart test/features/tasks/application/task_controller_test.dart`
 
 Expected: FAIL because screens, controller and routes do not exist.
 
@@ -573,7 +574,7 @@ Render `TaskHistoryEntry` descending by completion. A note entry pushes the note
 
 - [ ] **Step 5: Run focused behavioral tests and commit.**
 
-Run: `flutter test test/features/tasks/presentation test/features/tasks/application/standalone_task_controller_test.dart`
+Run: `flutter test test/features/tasks/presentation test/features/tasks/application/task_controller_test.dart`
 
 Expected: PASS without size, color, pixel-position or geometry assertions.
 
@@ -628,7 +629,7 @@ git commit -m "docs(tasks): align task ownership and migration rules"
 
 - [ ] **Step 1: Run focused Flutter domain/data/sync tests.**
 
-Run: `flutter test test/features/tasks/domain test/features/tasks/data test/features/tasks/application test/core/sync test/core/database/daos/standalone_tasks_dao_test.dart`.
+Run: `flutter test test/features/tasks/domain test/features/tasks/data test/features/tasks/application test/core/sync test/core/database/daos/tasks_dao_test.dart`.
 
 Expected: PASS with no visual-only tests added.
 

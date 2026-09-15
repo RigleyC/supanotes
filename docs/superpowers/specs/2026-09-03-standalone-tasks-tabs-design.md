@@ -61,6 +61,22 @@ de uma nota. A tabela local `tasks` desta especificação pertence exclusivament
 às tasks independentes; ela não é uma projeção de `TaskNode` e não recebe
 escritas de operações do editor.
 
+## Nomenclatura de código
+
+Como a task independente é o recurso principal da aba e da API, seu modelo de
+domínio será chamado simplesmente `Task`, em `task.dart`. A operação de sync
+será `TaskOperation`, o repositório será `TaskRepository` e os componentes de
+persistência usarão `tasks.dart`/`tasks_dao.dart`.
+
+Um bloco de task dentro de uma nota será representado somente na borda de
+leitura por `NoteTask`, em `note_task_list_reader.dart`. `NoteTask` não é uma
+entidade persistida nem uma cópia sincronizável; ele carrega `noteId` e
+`blockId` para a lista, histórico e navegação de volta ao documento.
+
+`TaskListItem` continua sendo a união de apresentação entre `Task` e
+`NoteTask`. O código não usará `StandaloneTask`, `TaskNote` ou
+`NoteTaskEntity`.
+
 ## Navegação
 
 Um shell autenticado contém duas abas persistentes:
