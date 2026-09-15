@@ -2,7 +2,6 @@ package tasks
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -63,13 +62,13 @@ func formatTimestamp(v pgtype.Timestamptz) *string {
 	if !v.Valid {
 		return nil
 	}
-	s := v.Time.UTC().Format(time.RFC3339Nano)
+	s := formatUTCInstant(v.Time)
 	return &s
 }
 func formatDate(v pgtype.Timestamp) *string {
 	if !v.Valid {
 		return nil
 	}
-	s := v.Time.Format("2006-01-02T15:04:05.999999999")
+	s := formatWallClock(v.Time)
 	return &s
 }

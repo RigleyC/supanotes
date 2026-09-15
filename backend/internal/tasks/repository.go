@@ -11,11 +11,12 @@ import (
 
 type Repository interface {
 	WithTx(context.Context, func(Repository) error) error
+	WithReadTx(context.Context, func(Repository) error) error
 	WithQuerier(sqlcgen.Querier) Repository
 	ListTasks(context.Context, pgtype.UUID) ([]sqlcgen.Task, error)
 	GetTask(context.Context, pgtype.UUID, pgtype.UUID) (sqlcgen.Task, error)
 	LockTask(context.Context, pgtype.UUID, pgtype.UUID) (sqlcgen.Task, error)
-	GetOperation(context.Context, pgtype.UUID) (sqlcgen.TaskOperation, error)
+	GetOperation(context.Context, pgtype.UUID, pgtype.UUID) (sqlcgen.TaskOperation, error)
 	InsertTask(context.Context, sqlcgen.InsertTaskParams) (sqlcgen.Task, error)
 	UpdateTask(context.Context, sqlcgen.UpdateTaskParams) (sqlcgen.Task, error)
 	InsertOperation(context.Context, sqlcgen.InsertTaskOperationParams) error
@@ -32,7 +33,18 @@ func NewRepository(q sqlcgen.Querier, pool *pgxpool.Pool) Repository {
 	return &repository{q: q, pool: pool}
 }
 func (r *repository) WithTx(ctx context.Context, fn func(Repository) error) error {
-	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	return r.withTx(ctx, pgx.TxOptions{}, fn)
+}
+
+func (r *repository) WithReadTx(ctx context.Context, fn func(Repository) error) error {
+	return r.withTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.RepeatableRead,
+		AccessMode: pgx.ReadOnly,
+	}, fn)
+}
+
+func (r *repository) withTx(ctx context.Context, options pgx.TxOptions, fn func(Repository) error) error {
+	tx, err := r.pool.BeginTx(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -54,8 +66,8 @@ func (r *repository) GetTask(c context.Context, id, user pgtype.UUID) (sqlcgen.T
 func (r *repository) LockTask(c context.Context, id, user pgtype.UUID) (sqlcgen.Task, error) {
 	return r.q.LockTaskForOwner(c, sqlcgen.LockTaskForOwnerParams{ID: id, OwnerUserID: user})
 }
-func (r *repository) GetOperation(c context.Context, id pgtype.UUID) (sqlcgen.TaskOperation, error) {
-	return r.q.GetTaskOperation(c, id)
+func (r *repository) GetOperation(c context.Context, taskID, operationID pgtype.UUID) (sqlcgen.TaskOperation, error) {
+	return r.q.GetTaskOperation(c, sqlcgen.GetTaskOperationParams{TaskID: taskID, OperationID: operationID})
 }
 func (r *repository) InsertTask(c context.Context, a sqlcgen.InsertTaskParams) (sqlcgen.Task, error) {
 	return r.q.InsertTask(c, a)
@@ -71,8 +83,4 @@ func (r *repository) InsertChange(c context.Context, a sqlcgen.InsertTaskSyncCha
 }
 func (r *repository) Watermark(c context.Context, id pgtype.UUID) (int64, error) {
 	return r.q.GetTaskWatermark(c, id)
-}
-
-func (r *repository) Begin(c context.Context) (pgx.Tx, error) {
-	return r.pool.BeginTx(c, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 }

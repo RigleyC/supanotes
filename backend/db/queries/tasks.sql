@@ -24,7 +24,7 @@ FOR UPDATE;
 -- name: GetTaskOperation :one
 SELECT task_id, operation_id, payload_hash, response_json, created_at
 FROM task_operations
-WHERE operation_id = $1;
+WHERE task_id = $1 AND operation_id = $2;
 
 -- name: InsertTask :one
 INSERT INTO tasks (id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,

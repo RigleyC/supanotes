@@ -50,11 +50,16 @@ func (q *Queries) GetTaskForOwner(ctx context.Context, arg GetTaskForOwnerParams
 const getTaskOperation = `-- name: GetTaskOperation :one
 SELECT task_id, operation_id, payload_hash, response_json, created_at
 FROM task_operations
-WHERE operation_id = $1
+WHERE task_id = $1 AND operation_id = $2
 `
 
-func (q *Queries) GetTaskOperation(ctx context.Context, operationID pgtype.UUID) (TaskOperation, error) {
-	row := q.db.QueryRow(ctx, getTaskOperation, operationID)
+type GetTaskOperationParams struct {
+	TaskID      pgtype.UUID `json:"task_id"`
+	OperationID pgtype.UUID `json:"operation_id"`
+}
+
+func (q *Queries) GetTaskOperation(ctx context.Context, arg GetTaskOperationParams) (TaskOperation, error) {
+	row := q.db.QueryRow(ctx, getTaskOperation, arg.TaskID, arg.OperationID)
 	var i TaskOperation
 	err := row.Scan(
 		&i.TaskID,

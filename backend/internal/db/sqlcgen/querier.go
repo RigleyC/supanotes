@@ -45,7 +45,7 @@ type Querier interface {
 	GetRefreshTokenRecord(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetSharedLinkIngestion(ctx context.Context, arg GetSharedLinkIngestionParams) (SharedLinkIngestion, error)
 	GetTaskForOwner(ctx context.Context, arg GetTaskForOwnerParams) (Task, error)
-	GetTaskOperation(ctx context.Context, operationID pgtype.UUID) (TaskOperation, error)
+	GetTaskOperation(ctx context.Context, arg GetTaskOperationParams) (TaskOperation, error)
 	GetTaskWatermark(ctx context.Context, targetUserID pgtype.UUID) (int64, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)

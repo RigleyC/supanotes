@@ -2,16 +2,16 @@
 
 ## Evidências
 
-- Added typed SQL in `backend/db/queries/tasks.sql` for owner-scoped bootstrap/get/row locking, operation replay, task writes, feed emission and owner watermark.
-- Added `internal/tasks` contract, transactional repository, service and protected Echo handlers for bootstrap, owner reads and mutations.
-- Mutation writes run under one PostgreSQL transaction: operation lookup/hash validation, owner row lock, task update/create/delete, operation response persistence and `sync_changes` emission are committed together.
-- Retries return the stored canonical response; payload hash mismatches are rejected. Stale revision/schedule generation and tombstones map to `SCHEDULE_CHANGED`/`TASK_DELETED`.
-- Routes are registered below the existing JWT-protected group.
-- sqlc regenerated with sqlc v1.31.1 (`go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate`).
-- Focused tests passed: `go test ./internal/tasks -run 'TestApplyMutation|TestHandler' -v` and existing `go test ./internal/syncfeed -v` (database integration tests skipped because their database environment variables are not configured).
+- Round 1 fixed idempotent replay to lock the authenticated owner task first and query operations by `(task_id, operation_id)`; the global operation-id index was removed so the contract is task-scoped. Payload hashes are canonicalized across JSON key order.
+- Create/upsert/update now persist title, `dueDate`, `hasTime`, recurrence, reminder and completion metadata in one write. A create returns revision 1; schedule changes increment `scheduleGeneration` and clear prior completions.
+- Exact mutation kinds are enforced: `create`, `upsert`, `update`, `complete_occurrence`, `reopen_occurrence` and `delete`. Occurrence payloads validate canonical wall-clock/UTC timestamps, respect `hasTime`, merge or remove one completion key, update completion state/timestamp, and reject stale generations or no-ops.
+- Bootstrap now uses a read-only `REPEATABLE READ` transaction for the task snapshot and owner watermark.
+- The sync feed keeps `scope=notes` as the default and excludes task events for old clients; `scope=all` explicitly returns `task_changed`/`task_deleted` with `taskId`. Invalid scopes return 400.
+- Typed SQL, contracts, repository, service and protected Echo handlers remain under the existing JWT group. sqlc was regenerated with v1.31.1 (`go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate`).
+- Focused tests passed: `go test ./internal/tasks ./internal/syncfeed -v`; task and feed PostgreSQL integration tests were discovered but skipped without their configured database URLs.
 
 ## Limitações
 
-- PostgreSQL-backed migration/integration tests were not exercised: `SUPANOTES_SYNC_TEST_DATABASE_URL` and `SUPANOTES_TASK_MIGRATION_TEST_DATABASE_URL` are unavailable in this environment.
-- `go vet ./...` completed successfully in the local backend checkout.
-- Existing unrelated Flutter changes (`pubspec.lock` and Windows generated plugin files) were preserved and are not part of this task.
+- PostgreSQL-backed migration/feed integration tests were not exercised: `SUPANOTES_SYNC_TEST_DATABASE_URL` and `SUPANOTES_TASK_MIGRATION_TEST_DATABASE_URL` are unavailable in this environment. The migration and feed SQL still require PostgreSQL validation before rollout.
+- `make -C backend sqlc` is unavailable because `make` is not installed on this Windows host; the equivalent pinned sqlc command completed successfully.
+- Existing unrelated Flutter changes (`pubspec.lock`, Windows generated plugin files and pre-existing sqlc output changes) were preserved and are not part of this task.

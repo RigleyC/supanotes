@@ -34,8 +34,15 @@ func (h *Handler) ListChanges(c echo.Context) error {
 	if limit64 > 500 {
 		limit64 = 500
 	}
+	scope := ScopeNotes
+	if rawScope := c.QueryParam("scope"); rawScope != "" {
+		scope = Scope(rawScope)
+		if scope != ScopeNotes && scope != ScopeAll {
+			return web.JSONError(c, http.StatusBadRequest, "invalid scope")
+		}
+	}
 
-	page, err := h.reader.ListChanges(c.Request().Context(), userID, after, int(limit64))
+	page, err := h.reader.ListChanges(c.Request().Context(), userID, after, int(limit64), scope)
 	if err != nil {
 		c.Logger().Error(err)
 		return web.JSONError(c, http.StatusInternalServerError, "INTERNAL_ERROR")

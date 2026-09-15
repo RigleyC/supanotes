@@ -38,6 +38,7 @@ func TestChangeFeedTriggersAndCursorWithPostgres(t *testing.T) {
 	ownerID := uuid.NewString()
 	collaboratorID := uuid.NewString()
 	noteID := uuid.NewString()
+	taskID := uuid.NewString()
 	defer func() {
 		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", ownerID)
 		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", collaboratorID)
@@ -81,6 +82,15 @@ func TestChangeFeedTriggersAndCursorWithPostgres(t *testing.T) {
 	require.NoError(t, err)
 	_, err = pool.Exec(ctx, `UPDATE notes SET deleted_at = NOW() WHERE id = $1`, noteID)
 	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `
+		INSERT INTO tasks(id, owner_user_id, title) VALUES ($1, $2, 'standalone')
+		`, taskID, ownerID)
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `
+		INSERT INTO sync_changes(target_user_id, kind, task_id, revision)
+		VALUES ($1, 'task_changed', $2, 1)
+		`, ownerID, taskID)
+	require.NoError(t, err)
 
 	ownerKinds := loadKinds(t, ctx, pool, ownerID, noteID)
 	require.Subset(t, ownerKinds, []string{"note_changed", "note_deleted"})
@@ -108,11 +118,31 @@ func TestChangeFeedTriggersAndCursorWithPostgres(t *testing.T) {
 
 	collaboratorUUID, err := uid.UUIDFromString(collaboratorID)
 	require.NoError(t, err)
-	page, err := NewRepository(pool).ListChanges(ctx, collaboratorUUID, 0, 2)
+	page, err := NewRepository(pool).ListChanges(ctx, collaboratorUUID, 0, 2, ScopeNotes)
 	require.NoError(t, err)
 	require.Len(t, page.Changes, 2)
 	require.True(t, page.HasMore)
 	require.GreaterOrEqual(t, page.Watermark, page.Cursor)
+
+	ownerUUID, err := uid.UUIDFromString(ownerID)
+	require.NoError(t, err)
+	notesOnly, err := NewRepository(pool).ListChanges(ctx, ownerUUID, 0, 100, ScopeNotes)
+	require.NoError(t, err)
+	for _, change := range notesOnly.Changes {
+		require.NotEqual(t, "task_changed", change.Type)
+		require.Empty(t, change.TaskID)
+	}
+	all, err := NewRepository(pool).ListChanges(ctx, ownerUUID, 0, 100, ScopeAll)
+	require.NoError(t, err)
+	var foundTask bool
+	for _, change := range all.Changes {
+		if change.Type == "task_changed" {
+			foundTask = true
+			require.Equal(t, taskID, change.TaskID)
+			require.Empty(t, change.NoteID)
+		}
+	}
+	require.True(t, foundTask, "scope=all must include task events")
 }
 
 func loadKinds(

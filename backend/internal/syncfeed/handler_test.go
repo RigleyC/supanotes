@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,13 +19,15 @@ type fakeChangeReader struct {
 	userID pgtype.UUID
 	after  int64
 	limit  int
+	scope  Scope
 	page   Page
 }
 
-func (f *fakeChangeReader) ListChanges(_ context.Context, userID pgtype.UUID, after int64, limit int) (Page, error) {
+func (f *fakeChangeReader) ListChanges(_ context.Context, userID pgtype.UUID, after int64, limit int, scope Scope) (Page, error) {
 	f.userID = userID
 	f.after = after
 	f.limit = limit
+	f.scope = scope
 	return f.page, nil
 }
 
@@ -34,10 +37,10 @@ func TestListChangesUsesAuthenticatedActorAndCursor(t *testing.T) {
 		Watermark: 51,
 		HasMore:   true,
 		Changes: []Change{{
-			Sequence: 43,
-			Type: "note_changed",
-			NoteID: "00000000-0000-0000-0000-000000000010",
-			Revision: 7,
+			Sequence:  43,
+			Type:      "note_changed",
+			NoteID:    "00000000-0000-0000-0000-000000000010",
+			Revision:  7,
 			CreatedAt: time.Date(2026, 9, 1, 20, 0, 0, 0, time.UTC),
 		}},
 	}}
@@ -56,6 +59,9 @@ func TestListChangesUsesAuthenticatedActorAndCursor(t *testing.T) {
 	if reader.after != 41 || reader.limit != 50 {
 		t.Fatalf("reader args = after %d limit %d", reader.after, reader.limit)
 	}
+	if reader.scope != ScopeNotes {
+		t.Fatalf("default scope = %q, want %q", reader.scope, ScopeNotes)
+	}
 	if !reader.userID.Valid || reader.userID.Bytes[15] != 2 {
 		t.Fatalf("wrong actor: %+v", reader.userID)
 	}
@@ -71,6 +77,38 @@ func TestListChangesUsesAuthenticatedActorAndCursor(t *testing.T) {
 	}
 	if payload.Cursor != 43 || payload.Watermark != 51 || !payload.HasMore || len(payload.Changes) != 1 {
 		t.Fatalf("response = %+v", payload)
+	}
+}
+
+func TestListChangesPassesAllScopeAndTaskID(t *testing.T) {
+	reader := &fakeChangeReader{page: Page{Changes: []Change{{Type: "task_changed", TaskID: "task-1"}}}}
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/sync/changes?scope=all", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	web.SetUserID(c, "00000000-0000-0000-0000-000000000002")
+
+	if err := NewHandler(reader).ListChanges(c); err != nil {
+		t.Fatalf("list changes: %v", err)
+	}
+	if reader.scope != ScopeAll || !strings.Contains(rec.Body.String(), `"taskId":"task-1"`) {
+		t.Fatalf("scope/task response = %q", rec.Body.String())
+	}
+}
+
+func TestListChangesRejectsInvalidScope(t *testing.T) {
+	reader := &fakeChangeReader{}
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/sync/changes?scope=tasks", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	web.SetUserID(c, "00000000-0000-0000-0000-000000000002")
+
+	if err := NewHandler(reader).ListChanges(c); err != nil {
+		t.Fatalf("list changes: %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
 

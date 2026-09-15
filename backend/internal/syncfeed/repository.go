@@ -2,6 +2,7 @@ package syncfeed
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -13,9 +14,17 @@ type Change struct {
 	Sequence  int64     `json:"sequence"`
 	Type      string    `json:"type"`
 	NoteID    string    `json:"noteId,omitempty"`
+	TaskID    string    `json:"taskId,omitempty"`
 	Revision  int64     `json:"revision,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 }
+
+type Scope string
+
+const (
+	ScopeNotes Scope = "notes"
+	ScopeAll   Scope = "all"
+)
 
 type Page struct {
 	Cursor    int64    `json:"cursor"`
@@ -25,7 +34,7 @@ type Page struct {
 }
 
 type ChangeReader interface {
-	ListChanges(ctx context.Context, userID pgtype.UUID, after int64, limit int) (Page, error)
+	ListChanges(ctx context.Context, userID pgtype.UUID, after int64, limit int, scope Scope) (Page, error)
 }
 
 type Repository struct {
@@ -36,26 +45,36 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-func (r *Repository) ListChanges(ctx context.Context, userID pgtype.UUID, after int64, limit int) (Page, error) {
+func (r *Repository) ListChanges(ctx context.Context, userID pgtype.UUID, after int64, limit int, scope Scope) (Page, error) {
+	if scope != ScopeNotes && scope != ScopeAll {
+		return Page{}, fmt.Errorf("invalid sync feed scope %q", scope)
+	}
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return Page{}, err
 	}
 	defer tx.Rollback(ctx)
 
+	filter := ""
+	if scope == ScopeNotes {
+		// The default is deliberately note-only so clients predating task events
+		// never receive an unknown kind without a taskId-aware coordinator.
+		filter = " AND task_id IS NULL"
+	}
 	var watermark int64
-	if err := tx.QueryRow(ctx, `
+	watermarkQuery := `
 		SELECT GREATEST(COALESCE(MAX(sequence), 0), $2)
 		FROM sync_changes
-		WHERE target_user_id = $1
-	`, userID, after).Scan(&watermark); err != nil {
+		WHERE target_user_id = $1` + filter
+	if err := tx.QueryRow(ctx, watermarkQuery, userID, after).Scan(&watermark); err != nil {
 		return Page{}, err
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT sequence, kind, COALESCE(note_id::text, ''), COALESCE(revision, 0), created_at
+		SELECT sequence, kind, COALESCE(note_id::text, ''), COALESCE(task_id::text, ''), COALESCE(revision, 0), created_at
 		FROM sync_changes
 		WHERE target_user_id = $1
+		`+filter+`
 		  AND sequence > $2
 		  AND sequence <= $3
 		ORDER BY sequence ASC
@@ -68,7 +87,7 @@ func (r *Repository) ListChanges(ctx context.Context, userID pgtype.UUID, after 
 	changes := make([]Change, 0, limit+1)
 	for rows.Next() {
 		var change Change
-		if err := rows.Scan(&change.Sequence, &change.Type, &change.NoteID, &change.Revision, &change.CreatedAt); err != nil {
+		if err := rows.Scan(&change.Sequence, &change.Type, &change.NoteID, &change.TaskID, &change.Revision, &change.CreatedAt); err != nil {
 			rows.Close()
 			return Page{}, err
 		}

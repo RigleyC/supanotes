@@ -5,7 +5,6 @@ import (
 
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 )
 
@@ -71,12 +70,12 @@ func (h *Handler) Mutate(c echo.Context) error {
 		return web.JSONError(c, 410, "TASK_DELETED")
 	case errors.Is(e, ErrTaskNotFound):
 		return web.JSONError(c, 404, "task not found")
-	case errors.Is(e, ErrHashMismatch) || errors.Is(e, ErrInvalidMutation):
+	case errors.Is(e, ErrTaskExists):
+		return web.JSONError(c, 409, "task already exists")
+	case errors.Is(e, ErrHashMismatch) || errors.Is(e, ErrInvalidMutation) || errors.Is(e, ErrNoopMutation):
 		return web.JSONError(c, 400, e.Error())
 	default:
 		c.Logger().Error(e)
 		return web.JSONError(c, 500, "failed to apply task mutation")
 	}
 }
-
-var _ = pgtype.UUID{}

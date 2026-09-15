@@ -48,9 +48,6 @@ CREATE TABLE task_operations (
     PRIMARY KEY (task_id, operation_id)
 );
 
-CREATE UNIQUE INDEX task_operations_operation_id_uq
-  ON task_operations(operation_id);
-
 ALTER TABLE sync_changes
   ADD COLUMN task_id UUID;
 
