@@ -2,11 +2,14 @@
 
 ## Tasks independentes e navegação Tasks/Notas
 
-Status: design escrito; aguardando revisão antes do plano detalhado e da
-implementação.
+Status: design revisado após parecer do Astra; plano detalhado escrito,
+aguardando escolha de execução.
 
 Design:
 `docs/superpowers/specs/2026-09-03-standalone-tasks-tabs-design.md`.
+
+Plano detalhado:
+`docs/superpowers/plans/2026-09-15-standalone-tasks-tabs.md`.
 
 Escopo aprovado em conversa: duas abas principais com Tasks primeiro; tasks
 independentes local-first sincronizadas entre dispositivos do proprietário;
@@ -17,6 +20,11 @@ O design também exige verificação atual, backup e encerramento explícito da
 retenção antes de remover as tabelas relacionais legadas. Com inventário vazio,
 o nome `tasks` será reutilizado para o novo contrato independente; dados antigos
 nunca serão convertidos automaticamente.
+
+O design revisado também cobre rollout compatível do feed (`scope=notes` por
+default e `scope=all` opt-in), bootstrap versionado, confirmação idempotente,
+conflitos por `scheduleGeneration`, quarentena SQLite, visibilidade de notas,
+identidade de notificações e invalidação temporal da lista.
 
 ## Per-note preference synchronization
 
