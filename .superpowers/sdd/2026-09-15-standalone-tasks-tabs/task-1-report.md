@@ -46,3 +46,30 @@ flutter test test/features/tasks/domain/task_test.dart test/features/tasks/domai
 dart analyze lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_operation.dart lib/features/tasks/domain/task_list_item.dart lib/features/tasks/domain/task_history_entry.dart
 # No analyzer errors (only existing documentation/style infos)
 ```
+
+## Fix round 2
+
+Arquivos alterados:
+
+- `lib/features/tasks/domain/task.dart`: completions agora usam `hasTime` ao canonicalizar chaves; `withSchedule` distingue parâmetros omitidos de `null` explícito usando sentinel.
+- `test/features/tasks/domain/task_test.dart`: regressões para chave all-day sem hora, atualização parcial preservando data/recorrência e limpeza explícita.
+
+Comandos e saída:
+
+```text
+flutter test --concurrency=1 test/features/tasks/domain/task_test.dart
+# All tests passed! (10 tests)
+
+flutter test --concurrency=1 test/features/tasks/domain/task_operation_test.dart
+# All tests passed! (3 tests)
+
+flutter test --concurrency=1 test/features/tasks/domain/task_list_item_test.dart
+# All tests passed! (1 test)
+
+dart analyze lib/features/tasks/domain/task.dart lib/features/tasks/domain/task_operation.dart lib/features/tasks/domain/task_list_item.dart lib/features/tasks/domain/task_history_entry.dart
+# No analyzer errors (only existing documentation/style infos)
+```
+
+A primeira execução combinada foi encerrada por falta de memória do
+`flutter_tester`; os mesmos testes foram então executados serialmente com
+`--concurrency=1` e passaram.

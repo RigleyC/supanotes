@@ -82,4 +82,36 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('canonicalizes all-day completion keys without retaining a time', () {
+    final task = Task(
+      id: 'task-1',
+      ownerUserId: 'user-1',
+      title: 'All day',
+      hasTime: false,
+      completions: {
+        '2026-09-15T09:00:00': '2026-09-14T12:00:00Z',
+      },
+      createdAt: DateTime.utc(2026, 9, 1),
+      updatedAt: DateTime.utc(2026, 9, 14),
+    );
+    expect(task.completions.keys, contains('2026-09-15T00:00:00.000'));
+  });
+
+  test('withSchedule preserves omitted nullable fields', () {
+    final task = fixtureRecurringTask();
+    final changed = task.withSchedule(hasTime: false);
+    expect(changed.dueDate, isNotNull);
+    expect(changed.dueDate!.year, task.dueDate!.year);
+    expect(changed.dueDate!.month, task.dueDate!.month);
+    expect(changed.dueDate!.day, task.dueDate!.day);
+    expect(changed.recurrenceRule, task.recurrenceRule);
+  });
+
+  test('withSchedule supports explicit nullable field clearing', () {
+    final task = fixtureRecurringTask();
+    final changed = task.withSchedule(dueDate: null, recurrenceRule: null);
+    expect(changed.dueDate, isNull);
+    expect(changed.recurrenceRule, isNull);
+  });
 }

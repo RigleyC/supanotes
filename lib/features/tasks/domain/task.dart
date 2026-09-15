@@ -26,7 +26,9 @@ class Task {
        dueDate = dueDate == null
            ? null
            : canonicalScheduledAt(dueDate, hasTime: hasTime),
-       completions = UnmodifiableMapView(_normalizeCompletions(completions)) {
+       completions = UnmodifiableMapView(
+         _normalizeCompletions(completions, hasTime: hasTime),
+       ) {
     _requireGeneration(scheduleGeneration);
     if (revision < 0)
       throw const FormatException('revision must not be negative');
@@ -138,22 +140,32 @@ class Task {
   );
 
   Task withSchedule({
-    DateTime? dueDate,
+    Object? dueDate = _unset,
     bool? hasTime,
-    String? recurrenceRule,
+    Object? recurrenceRule = _unset,
   }) {
     final nextHasTime = hasTime ?? this.hasTime;
+    final nextDueDate = identical(dueDate, _unset)
+        ? this.dueDate
+        : dueDate as DateTime?;
+    final nextRecurrenceRule = identical(recurrenceRule, _unset)
+        ? this.recurrenceRule
+        : recurrenceRule as String?;
     final changed =
-        (this.dueDate == null) != (dueDate == null) ||
+        (this.dueDate == null) != (nextDueDate == null) ||
         (this.dueDate != null &&
-            dueDate != null &&
-            !sameScheduledAt(this.dueDate!, dueDate, hasTime: nextHasTime)) ||
+            nextDueDate != null &&
+            !sameScheduledAt(
+              this.dueDate!,
+              nextDueDate,
+              hasTime: nextHasTime,
+            )) ||
         nextHasTime != this.hasTime ||
-        recurrenceRule != this.recurrenceRule;
+        nextRecurrenceRule != this.recurrenceRule;
     return copyWith(
-      dueDate: dueDate,
+      dueDate: nextDueDate,
       hasTime: hasTime,
-      recurrenceRule: recurrenceRule,
+      recurrenceRule: nextRecurrenceRule,
       completions: changed ? const {} : completions,
       scheduleGeneration: changed ? scheduleGeneration + 1 : scheduleGeneration,
     );
@@ -178,15 +190,20 @@ void _requireGeneration(int value) {
     throw const FormatException('scheduleGeneration must not be negative');
 }
 
-Map<String, String> _normalizeCompletions(Map<String, Object?> values) => {
+Map<String, String> _normalizeCompletions(
+  Map<String, Object?> values, {
+  required bool hasTime,
+}) => {
   for (final entry in values.entries)
-    _canonicalScheduledKey(entry.key): _canonicalInstant(entry.value),
+    _canonicalScheduledKey(entry.key, hasTime: hasTime): _canonicalInstant(
+      entry.value,
+    ),
 };
 
-String _canonicalScheduledKey(String value) {
+String _canonicalScheduledKey(String value, {required bool hasTime}) {
   try {
     final parsed = DateTime.parse(value);
-    return scheduledAtKey(parsed, hasTime: true);
+    return scheduledAtKey(parsed, hasTime: hasTime);
   } on FormatException {
     throw const FormatException('invalid scheduledAt key');
   }
