@@ -39,6 +39,26 @@ void main() {
     );
   });
 
+  test('serializes occurrence mutation kinds using the wire contract', () {
+    final complete = TaskOperation.completeOccurrence(
+      operationId: 'op-complete',
+      taskId: 'task-1',
+      scheduledAt: '2026-09-15T09:00:00',
+      hasTime: true,
+      scheduleGeneration: 2,
+    );
+    final reopen = TaskOperation.reopenOccurrence(
+      operationId: 'op-reopen',
+      taskId: 'task-1',
+      scheduledAt: '2026-09-15T09:00:00',
+      hasTime: true,
+      scheduleGeneration: 2,
+    );
+
+    expect(complete.toJson(), containsPair('kind', 'complete_occurrence'));
+    expect(reopen.toJson(), containsPair('kind', 'reopen_occurrence'));
+  });
+
   test('snapshots payloads before exposing or hashing them', () {
     final payload = <String, dynamic>{
       'nested': <String, dynamic>{'value': 1},

@@ -11,6 +11,7 @@ import 'package:supanotes/core/sync/note_remote_sync_coordinator.dart';
 import 'package:supanotes/core/sync/sync_feed_client.dart';
 import 'package:supanotes/core/sync/sync_inbox_store.dart';
 import 'package:supanotes/core/sync/sync_retry_policy.dart';
+import 'package:supanotes/core/sync/task_outbox_worker.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/data/remote_note_change_applier.dart';
 import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
@@ -154,8 +155,7 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
       .watch(noteOutboxConnectivityChangesProvider)
       .listen((results) {
         if (results.any((result) => result != ConnectivityResult.none)) {
-          taskWorker?.wake();
-          coordinator.wake();
+          unawaited(_wakeCoordinatorAfterTasks(taskWorker, coordinator));
         }
       });
   ref.onDispose(() {
@@ -189,6 +189,23 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
     await Future<void>.delayed(_remoteSyncDelay(failureAttempt));
   }
 });
+
+Future<void> _wakeCoordinatorAfterTasks(
+  TaskOutboxWorker? taskWorker,
+  NoteRemoteSyncCoordinator coordinator,
+) async {
+  taskWorker?.wake();
+  try {
+    await taskWorker?.drain();
+  } on Object catch (error, stackTrace) {
+    dev.log(
+      '[RemoteSync] Task outbox wake failed; continuing with notes',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+  coordinator.wake();
+}
 
 Duration _remoteSyncDelay(int failureAttempt) {
   if (failureAttempt == 0) return const Duration(seconds: 2);

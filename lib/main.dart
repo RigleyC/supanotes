@@ -105,16 +105,31 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.read(taskOutboxWorkerProvider)?.wake();
-      ref.read(noteOutboxWorkerProvider)?.wake();
-      ref.read(noteRemoteSyncCoordinatorProvider)?.wake();
-      final coordinator = ref.read(shareIntakeCoordinatorProvider);
-      final notes = ref.read(activeNotesProvider).asData?.value;
-      if (notes != null && notes.isNotEmpty) {
-        unawaited(coordinator.publishNotesIndex(notes));
-      }
-      unawaited(_processPendingShare());
+      unawaited(_handleAppResumed());
     }
+  }
+
+  Future<void> _handleAppResumed() async {
+    final taskWorker = ref.read(taskOutboxWorkerProvider);
+    taskWorker?.wake();
+    try {
+      // Task snapshots must reach the server before the note feed can apply
+      // remote changes that may include the same task.
+      await taskWorker?.drain();
+    } on Object catch (error, stackTrace) {
+      // A transient local/transport failure must not keep note sync paused.
+      debugPrint('Task outbox foreground drain failed: $error\n$stackTrace');
+    }
+    if (!mounted) return;
+
+    ref.read(noteOutboxWorkerProvider)?.wake();
+    ref.read(noteRemoteSyncCoordinatorProvider)?.wake();
+    final coordinator = ref.read(shareIntakeCoordinatorProvider);
+    final notes = ref.read(activeNotesProvider).asData?.value;
+    if (notes != null && notes.isNotEmpty) {
+      unawaited(coordinator.publishNotesIndex(notes));
+    }
+    unawaited(_processPendingShare());
   }
 
   Future<void> _processPendingShare() async {

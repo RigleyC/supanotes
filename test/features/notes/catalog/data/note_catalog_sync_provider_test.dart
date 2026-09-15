@@ -29,9 +29,18 @@ void main() {
     final database = AppDatabase.test();
     final client = _MockNoteSyncClient();
     final lifecycle = <String>[];
+    final connectivity = StreamController<List<ConnectivityResult>>.broadcast();
+    final resumedFeed = Completer<void>();
+    var holdNextTaskDrain = false;
+    Completer<void>? releaseTaskDrain;
     final taskWorker = TaskOutboxWorker(
       loadPendingTaskIds: () async {
         lifecycle.add('task-drain');
+        if (holdNextTaskDrain) {
+          holdNextTaskDrain = false;
+          final release = releaseTaskDrain;
+          if (release != null) await release.future;
+        }
         return const [];
       },
       syncTask: (_) async {},
@@ -45,7 +54,7 @@ void main() {
         taskSyncServiceProvider.overrideWithValue(null),
         authControllerProvider.overrideWith(_StubAuthController.new),
         noteOutboxConnectivityChangesProvider.overrideWithValue(
-          const Stream<List<ConnectivityResult>>.empty(),
+          connectivity.stream,
         ),
         syncChangesFetcherProvider.overrideWithValue(({
           required int after,
@@ -54,6 +63,9 @@ void main() {
         }) async {
           lifecycle.add('feed');
           feedCalls.add(after);
+          if (feedCalls.length > 2 && !resumedFeed.isCompleted) {
+            resumedFeed.complete();
+          }
           return SyncChangePage(
             cursor: after,
             watermark: 0,
@@ -71,6 +83,7 @@ void main() {
     addTearDown(() async {
       container.dispose();
       await taskWorker.dispose();
+      await connectivity.close();
       await database.close();
     });
 
@@ -97,7 +110,10 @@ void main() {
       ),
     );
 
-    final subscription = container.listen(noteRemoteSyncRuntimeProvider, (_, next) {
+    final subscription = container.listen(noteRemoteSyncRuntimeProvider, (
+      _,
+      next,
+    ) {
       if (next.hasError && !completed.isCompleted) {
         completed.completeError(
           next.error!,
@@ -126,5 +142,19 @@ void main() {
     );
     verify(client.listNotes).called(1);
     verify(() => client.getDocument('remote-note')).called(1);
+
+    lifecycle.clear();
+    releaseTaskDrain = Completer<void>();
+    holdNextTaskDrain = true;
+    connectivity.add([ConnectivityResult.wifi]);
+    await pumpEventQueue();
+    expect(resumedFeed.isCompleted, isFalse);
+
+    releaseTaskDrain?.complete();
+    await resumedFeed.future.timeout(const Duration(seconds: 2));
+    expect(
+      lifecycle.indexOf('task-drain'),
+      lessThan(lifecycle.indexOf('feed')),
+    );
   });
 }
