@@ -13,8 +13,9 @@
   `local_task_completions` são renomeados para quarentena versionada e nunca
   são descartados. Linhas não vazias deixam o diagnóstico em estado
   `blocked`, sem impedir o banco de notas de abrir.
-- Snapshots remotos não removem operações locais pendentes; a confirmação por
-  `operationId` ficará a cargo do worker da Task 6.
+- Snapshots remotos são aplicados mantendo o outbox e rebasing as operações
+  locais pendentes sobre o snapshot; a confirmação por `operationId` ficará a
+  cargo do worker da Task 6.
 
 ## Verificação
 
@@ -25,7 +26,7 @@ flutter test --no-pub --concurrency=1 \
   test/features/tasks/data/task_repository_test.dart
 ```
 
-O build do Drift e os 6 testes focados passaram. O teste de migração cobre
+O build do Drift e os 7 testes focados passaram. O teste de migração cobre
 quarentena não vazia, preservação do novo schema e diagnóstico bloqueado.
 
 ## Limitações conhecidas

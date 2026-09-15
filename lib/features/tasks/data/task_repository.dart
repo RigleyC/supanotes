@@ -5,6 +5,7 @@ import 'package:supanotes/core/database/daos/tasks_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_operation.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 /// Local-first repository for independent tasks.
 ///
@@ -35,7 +36,17 @@ class TaskRepository {
   Future<void> applyRemoteTask(Task task) async {
     _assertOwner(task);
     await _dao.runInTransaction(
-      () => _dao.applyRemoteTask(_toCompanion(task)),
+      () async {
+        var rebased = task;
+        final pending = await _dao.getPendingOperations(
+          _ownerUserId,
+          task.id,
+        );
+        for (final operation in pending) {
+          rebased = _reapplyPendingOperation(rebased, operation);
+        }
+        await _dao.applyRemoteTask(_toCompanion(rebased));
+      },
     );
   }
 
@@ -221,6 +232,134 @@ class TaskRepository {
     deletedAt: Value(task.deletedAt),
     scheduleGeneration: Value(task.scheduleGeneration),
   );
+
+  static Task _reapplyPendingOperation(
+    Task current,
+    PendingTaskOperationData operation,
+  ) {
+    final payload = jsonDecode(operation.payloadJson);
+    if (payload is! Map) {
+      throw const FormatException('Pending task payload must be a JSON object');
+    }
+    final fields = payload.cast<String, dynamic>();
+    switch (operation.kind) {
+      case 'create':
+      case 'upsert':
+        return _reapplyPatch(current, fields, operation);
+      case 'complete_occurrence':
+      case 'completeOccurrence':
+        return _reapplyCompletion(current, fields, operation, complete: true);
+      case 'reopen_occurrence':
+      case 'reopenOccurrence':
+        return _reapplyCompletion(current, fields, operation, complete: false);
+      case 'delete':
+        return current.copyWith(
+          deletedAt: operation.createdAt,
+          updatedAt: operation.createdAt,
+        );
+      default:
+        throw FormatException('Unknown pending task operation: ${operation.kind}');
+    }
+  }
+
+  static Task _reapplyPatch(
+    Task current,
+    Map<String, dynamic> fields,
+    PendingTaskOperationData operation,
+  ) {
+    final hasTime = fields['hasTime'] as bool? ?? current.hasTime;
+    final dueDate = _parseWallClock(fields['dueDate'], hasTime: hasTime);
+    final recurrence = fields.containsKey('recurrenceRule')
+        ? fields['recurrenceRule'] as String?
+        : current.recurrenceRule;
+    final scheduleChanged =
+        !sameScheduledAtOrNull(current.dueDate, dueDate, hasTime: hasTime) ||
+        current.hasTime != hasTime ||
+        current.recurrenceRule != recurrence;
+    final decodedCompletions = fields['completions'];
+    final completions = scheduleChanged
+        ? const <String, Object?>{}
+        : decodedCompletions is Map
+        ? decodedCompletions.cast<String, Object?>()
+        : current.completions;
+    return current.copyWith(
+      title: fields['title'] as String? ?? current.title,
+      dueDate: dueDate,
+      hasTime: hasTime,
+      recurrenceRule: recurrence,
+      reminder: fields.containsKey('reminder')
+          ? fields['reminder'] as String?
+          : current.reminder,
+      completions: completions,
+      isCompleted: fields['isCompleted'] as bool? ?? current.isCompleted,
+      lastCompletedAt: fields.containsKey('lastCompletedAt')
+          ? _parseInstant(fields['lastCompletedAt'])
+          : current.lastCompletedAt,
+      updatedAt: operation.createdAt,
+      scheduleGeneration: scheduleChanged
+          ? operation.scheduleGeneration
+          : current.scheduleGeneration,
+    );
+  }
+
+  static Task _reapplyCompletion(
+    Task current,
+    Map<String, dynamic> fields,
+    PendingTaskOperationData operation, {
+    required bool complete,
+  }) {
+    final scheduledAt = fields['scheduledAt'] as String?;
+    if (scheduledAt == null || scheduledAt.isEmpty) {
+      throw const FormatException('Occurrence operation needs scheduledAt');
+    }
+    if (current.recurrenceRule == null) {
+      return current.copyWith(
+        isCompleted: complete,
+        lastCompletedAt: complete ? operation.createdAt.toUtc() : null,
+        updatedAt: operation.createdAt,
+      );
+    }
+    final completions = {...current.completions};
+    if (complete) {
+      completions[scheduledAt] = operation.createdAt.toUtc().toIso8601String();
+    } else {
+      completions.remove(scheduledAt);
+    }
+    return current.copyWith(
+      isCompleted: false,
+      completions: completions,
+      updatedAt: operation.createdAt,
+    );
+  }
+
+  static DateTime? _parseWallClock(Object? value, {required bool hasTime}) {
+    if (value == null) return null;
+    if (value is! String) throw const FormatException('Invalid task dueDate');
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) throw const FormatException('Invalid task dueDate');
+    return canonicalScheduledAt(parsed, hasTime: hasTime);
+  }
+
+  static DateTime? _parseInstant(Object? value) {
+    if (value == null) return null;
+    if (value is! String) {
+      throw const FormatException('Invalid task completion instant');
+    }
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      throw const FormatException('Invalid task completion instant');
+    }
+    return parsed.toUtc();
+  }
+
+  static bool sameScheduledAtOrNull(
+    DateTime? left,
+    DateTime? right, {
+    required bool hasTime,
+  }) {
+    if (left == null || right == null) return left == right;
+    return sameScheduledAt(left, right, hasTime: hasTime);
+  }
 
   static Task _fromRow(TaskData row) {
     final decoded = jsonDecode(row.completions);

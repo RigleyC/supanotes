@@ -77,4 +77,28 @@ void main() {
       'complete_occurrence',
     );
   });
+
+  test('remote snapshots are rebased over pending local operations', () async {
+    final db = AppDatabase.test();
+    addTearDown(db.close);
+    final repository = TaskRepository(db.tasksDao, 'user-a');
+    await repository.create(_task());
+    final local = await repository.update(_task().copyWith(title: 'Local'));
+
+    await repository.applyRemoteTask(
+      _task().copyWith(
+        title: 'Remote',
+        revision: 1,
+        updatedAt: DateTime.utc(2026, 9, 15, 12),
+      ),
+    );
+
+    final stored = await db.tasksDao.getTask('user-a', 'task-1');
+    expect(stored!.title, local.title);
+    expect(stored.revision, 1);
+    expect(
+      await db.tasksDao.getPendingOperations('user-a', 'task-1'),
+      hasLength(2),
+    );
+  });
 }
