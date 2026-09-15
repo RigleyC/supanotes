@@ -134,6 +134,9 @@ func apply(c context.Context, r Repository, u, id pgtype.UUID, m Mutation) (Muta
 		if patch.dueDate.Valid && !patch.hasTime && !isMidnight(patch.dueDate.Time) {
 			return MutationResult{}, ErrInvalidMutation
 		}
+		if err := validateCompletionsForTask(patch.completions, patch.hasTime, patch.recurrenceRule); err != nil {
+			return MutationResult{}, err
+		}
 		row, err = r.InsertTask(c, sqlcgen.InsertTaskParams{
 			ID: id, OwnerUserID: u, Title: patch.title,
 			DueDate: patch.dueDate, HasTime: patch.hasTime,
@@ -142,10 +145,22 @@ func apply(c context.Context, r Repository, u, id pgtype.UUID, m Mutation) (Muta
 			IsCompleted: patch.isCompleted, LastCompletedAt: patch.lastCompleted,
 			ScheduleGeneration: m.ScheduleGeneration,
 		})
+		if err == nil {
+			return persistMutation(c, r, u, id, m, operationID, hash, row, "task_changed")
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return MutationResult{}, err
+		}
+		// An owner may have created this id concurrently. InsertTask uses
+		// ON CONFLICT DO NOTHING, so the transaction remains usable and the
+		// owner row can be locked and replayed/applied below.
+		row, err = r.LockTask(c, id, u)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return MutationResult{}, ErrTaskNotFound
+		}
 		if err != nil {
 			return MutationResult{}, err
 		}
-		return persistMutation(c, r, u, id, m, operationID, hash, row, "task_changed")
 	}
 	if err != nil {
 		return MutationResult{}, err
@@ -244,13 +259,20 @@ func apply(c context.Context, r Repository, u, id pgtype.UUID, m Mutation) (Muta
 		return MutationResult{}, ErrInvalidMutation
 	}
 
-	scheduleChanged := !sameTimestamp(dueDate, row.DueDate) || hasTime != row.HasTime || !sameText(recurrence, row.RecurrenceRule) || !sameText(reminder, row.Reminder)
+	if patch.hasCompletions {
+		if err := validateCompletionsForTask(patch.completions, hasTime, recurrence); err != nil {
+			return MutationResult{}, err
+		}
+	}
+	scheduleChanged := !sameTimestamp(dueDate, row.DueDate) || hasTime != row.HasTime || !sameText(recurrence, row.RecurrenceRule)
 	generation := row.ScheduleGeneration
 	if scheduleChanged {
 		generation++
 		completions = map[string]string{}
+	} else if err := validateCompletionsForTask(completions, hasTime, recurrence); err != nil {
+		return MutationResult{}, err
 	}
-	if !scheduleChanged && title == row.Title && sameCompletions(completions, originalCompletions) && isCompleted == row.IsCompleted && sameTimestamptz(lastCompleted, row.LastCompletedAt) {
+	if !scheduleChanged && title == row.Title && sameText(reminder, row.Reminder) && sameCompletions(completions, originalCompletions) && isCompleted == row.IsCompleted && sameTimestamptz(lastCompleted, row.LastCompletedAt) {
 		return MutationResult{}, ErrNoopMutation
 	}
 
@@ -570,6 +592,24 @@ func encodeCompletions(values map[string]string) []byte {
 func validateCompletions(values map[string]string) error {
 	for scheduledAt, completedAt := range values {
 		if _, err := parseWallClock(scheduledAt, false); err != nil {
+			return ErrInvalidMutation
+		}
+		if _, err := parseUTCInstant(completedAt); err != nil {
+			return ErrInvalidMutation
+		}
+	}
+	return nil
+}
+
+func validateCompletionsForTask(values map[string]string, hasTime bool, recurrence pgtype.Text) error {
+	if len(values) == 0 {
+		return nil
+	}
+	if !recurrence.Valid {
+		return ErrInvalidMutation
+	}
+	for scheduledAt, completedAt := range values {
+		if _, err := parseWallClock(scheduledAt, !hasTime); err != nil {
 			return ErrInvalidMutation
 		}
 		if _, err := parseUTCInstant(completedAt); err != nil {

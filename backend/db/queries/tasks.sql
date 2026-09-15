@@ -30,6 +30,7 @@ WHERE task_id = $1 AND operation_id = $2;
 INSERT INTO tasks (id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,
                    completions, is_completed, last_completed_at, revision, schedule_generation)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11)
+ON CONFLICT (id) DO NOTHING
 RETURNING id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,
           completions, is_completed, last_completed_at, revision, schedule_generation,
           created_at, updated_at, deleted_at;
