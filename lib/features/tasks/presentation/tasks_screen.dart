@@ -53,14 +53,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         setState(() => _includeNoteTasks = value),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                AppTile(
-                  title: 'Concluídas',
-                  subtitle: 'Histórico de tasks concluídas',
-                  leading: const Icon(Icons.task_alt_rounded),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.push(AppRoutes.completedTasks),
-                ),
               ]),
             ),
           ),
@@ -116,6 +108,26 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 ),
               );
             },
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.lg,
+            ),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                AppTile(
+                  key: const ValueKey('completed-tasks-entry'),
+                  title: 'Concluídas',
+                  subtitle: 'Histórico de tasks concluídas',
+                  leading: const Icon(Icons.task_alt_rounded),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push(AppRoutes.completedTasks),
+                ),
+              ]),
+            ),
           ),
         ],
       ),

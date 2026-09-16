@@ -7,6 +7,7 @@ import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/presentation/tasks_screen.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_list_tile.dart';
+import 'package:supanotes/shared/widgets/app_tile.dart';
 
 Task _task(String id) {
   final now = DateTime.utc(2026, 9, 15, 10);
@@ -93,6 +94,11 @@ void main() {
 
     expect(find.text('Concluídas'), findsOneWidget);
     expect(find.text('note task'), findsNothing);
+    final tileTitles = tester
+        .widgetList<AppTile>(find.byType(AppTile))
+        .map((tile) => tile.title)
+        .toList();
+    expect(tileTitles.last, 'Concluídas');
     await tester.tap(find.byKey(const ValueKey('show-note-tasks-toggle')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
