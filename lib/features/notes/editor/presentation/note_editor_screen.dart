@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
@@ -21,17 +20,25 @@ import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:super_editor/super_editor.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
-
   const NoteEditorScreen({
-    required this.noteId, super.key,
+    required this.noteId,
+    super.key,
     this.attachmentDelivery,
+    this.blockId,
   });
   final String noteId;
   final AttachmentDelivery? attachmentDelivery;
+
+  /// Optional task block requested by a Tasks deep link.
+  ///
+  /// It stays in the route query when the block no longer exists, allowing a
+  /// later retry after the note has synchronized instead of losing context.
+  final String? blockId;
 
   @override
   ConsumerState<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -47,6 +54,36 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   AsyncValue<NoteEditorSession> _readSession() =>
       ref.read(noteEditorSessionProvider(widget.noteId));
+
+  Widget _editorContent({
+    required AttachmentDelivery? attachmentDelivery,
+    required AsyncValue<NoteModel?> noteAsync,
+    required AsyncValue<NoteEditorSession> sessionAsync,
+  }) {
+    return noteAsync.when(
+      data: (note) {
+        if (note == null) {
+          return const Center(child: Text(NoteStrings.errorNotFound));
+        }
+        return sessionAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) =>
+              const AppErrorView(title: NoteStrings.editorErrorTitle),
+          data: (session) => _NoteEditorWithSession(
+            noteId: widget.noteId,
+            blockId: widget.blockId,
+            note: note,
+            attachmentDelivery: attachmentDelivery,
+            session: session,
+            taskForMetadata: _taskForMetadata,
+            readSession: _readSession,
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const AppErrorView(title: NoteStrings.editorErrorTitle),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,13 +109,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           screenIsReadOnly: screenIsReadOnly,
           sessionAsync: sessionAsync,
         ),
-        body: _NoteEditorBody(
-          noteId: widget.noteId,
+        body: _editorContent(
           attachmentDelivery: widget.attachmentDelivery,
           noteAsync: noteAsync,
           sessionAsync: sessionAsync,
-          taskForMetadata: _taskForMetadata,
-          readSession: _readSession,
         ),
       ),
     );
@@ -285,112 +319,10 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
   }
 }
 
-class _NoteEditorBody extends StatelessWidget {
-  const _NoteEditorBody({
-    required this.noteId,
-    required this.attachmentDelivery,
-    required this.noteAsync,
-    required this.sessionAsync,
-    required this.taskForMetadata,
-    required this.readSession,
-  });
-
-  final String noteId;
-  final AttachmentDelivery? attachmentDelivery;
-  final AsyncValue<NoteModel?> noteAsync;
-  final AsyncValue<NoteEditorSession> sessionAsync;
-  final TaskMetadataDraft? Function(String taskId) taskForMetadata;
-  final AsyncValue<NoteEditorSession> Function() readSession;
-
-  @override
-  Widget build(BuildContext context) {
-    return _NoteEditorDocument(
-      noteId: noteId,
-      attachmentDelivery: attachmentDelivery,
-      noteAsync: noteAsync,
-      sessionAsync: sessionAsync,
-      taskForMetadata: taskForMetadata,
-      readSession: readSession,
-    );
-  }
-}
-
-class _NoteEditorDocument extends StatelessWidget {
-  const _NoteEditorDocument({
-    required this.noteId,
-    required this.attachmentDelivery,
-    required this.noteAsync,
-    required this.sessionAsync,
-    required this.taskForMetadata,
-    required this.readSession,
-  });
-
-  final String noteId;
-  final AttachmentDelivery? attachmentDelivery;
-  final AsyncValue<NoteModel?> noteAsync;
-  final AsyncValue<NoteEditorSession> sessionAsync;
-  final TaskMetadataDraft? Function(String taskId) taskForMetadata;
-  final AsyncValue<NoteEditorSession> Function() readSession;
-
-  @override
-  Widget build(BuildContext context) {
-    return noteAsync.when(
-      data: (note) {
-        if (note == null) {
-          return const Center(child: Text(NoteStrings.errorNotFound));
-        }
-        return _NoteEditorSessionContent(
-          noteId: noteId,
-          note: note,
-          attachmentDelivery: attachmentDelivery,
-          sessionAsync: sessionAsync,
-          taskForMetadata: taskForMetadata,
-          readSession: readSession,
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const AppErrorView(title: NoteStrings.editorErrorTitle),
-    );
-  }
-}
-
-class _NoteEditorSessionContent extends StatelessWidget {
-  const _NoteEditorSessionContent({
-    required this.noteId,
-    required this.note,
-    required this.attachmentDelivery,
-    required this.sessionAsync,
-    required this.taskForMetadata,
-    required this.readSession,
-  });
-
-  final String noteId;
-  final NoteModel note;
-  final AttachmentDelivery? attachmentDelivery;
-  final AsyncValue<NoteEditorSession> sessionAsync;
-  final TaskMetadataDraft? Function(String taskId) taskForMetadata;
-  final AsyncValue<NoteEditorSession> Function() readSession;
-
-  @override
-  Widget build(BuildContext context) {
-    return sessionAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const AppErrorView(title: NoteStrings.editorErrorTitle),
-      data: (session) => _NoteEditorWithSession(
-        noteId: noteId,
-        note: note,
-        attachmentDelivery: attachmentDelivery,
-        session: session,
-        taskForMetadata: taskForMetadata,
-        readSession: readSession,
-      ),
-    );
-  }
-}
-
-class _NoteEditorWithSession extends ConsumerWidget {
+class _NoteEditorWithSession extends ConsumerStatefulWidget {
   const _NoteEditorWithSession({
     required this.noteId,
+    required this.blockId,
     required this.note,
     required this.attachmentDelivery,
     required this.session,
@@ -399,6 +331,7 @@ class _NoteEditorWithSession extends ConsumerWidget {
   });
 
   final String noteId;
+  final String? blockId;
   final NoteModel note;
   final AttachmentDelivery? attachmentDelivery;
   final NoteEditorSession session;
@@ -406,23 +339,98 @@ class _NoteEditorWithSession extends ConsumerWidget {
   final AsyncValue<NoteEditorSession> Function() readSession;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_NoteEditorWithSession> createState() =>
+      _NoteEditorWithSessionState();
+}
+
+class _NoteEditorWithSessionState
+    extends ConsumerState<_NoteEditorWithSession> {
+  bool _targetMissing = false;
+  bool _targetSelected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveBlockTarget();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NoteEditorWithSession oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.blockId != widget.blockId ||
+        oldWidget.session != widget.session) {
+      _targetMissing = false;
+      _targetSelected = false;
+      _resolveBlockTarget();
+    }
+  }
+
+  void _resolveBlockTarget() {
+    final blockId = widget.blockId;
+    if (blockId == null || blockId.isEmpty) return;
+
+    final controller = widget.session.controller;
+    final node = controller.document.getNodeById(blockId);
+    if (node is! TaskNode) {
+      _targetMissing = true;
+      return;
+    }
+
+    controller.composer.setSelectionWithReason(
+      DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: blockId,
+          nodePosition: const TextNodePosition(offset: 0),
+        ),
+      ),
+    );
+    _targetSelected = true;
+  }
+
+  void _retryBlockTarget() {
+    _targetMissing = false;
+    _targetSelected = false;
+    _resolveBlockTarget();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final taskDelegate = _NoteEditorTaskDelegate(
       context: context,
       ref: ref,
-      note: note,
-      taskForMetadata: taskForMetadata,
-      readSession: readSession,
-      isReadOnly: !session.captureLocalOperations,
+      note: widget.note,
+      taskForMetadata: widget.taskForMetadata,
+      readSession: widget.readSession,
+      isReadOnly: !widget.session.captureLocalOperations,
     );
-    return NoteEditor(
-      noteId: noteId,
-      session: session,
-      requestInitialFocus: note.shouldAutofocus,
-      hideCompleted: note.hideCompleted,
-      collapseImages: note.collapseImages,
-      attachmentDelivery: attachmentDelivery,
+    final editor = NoteEditor(
+      noteId: widget.noteId,
+      session: widget.session,
+      requestInitialFocus: widget.note.shouldAutofocus || _targetSelected,
+      hideCompleted: widget.note.hideCompleted,
+      collapseImages: widget.note.collapseImages,
+      attachmentDelivery: widget.attachmentDelivery,
       delegate: taskDelegate.create(),
+    );
+    if (!_targetMissing) return editor;
+
+    return Column(
+      children: [
+        MaterialBanner(
+          key: ValueKey('missing-block:${widget.blockId}'),
+          content: const Text('Esta tarefa não está disponível nesta nota.'),
+          actions: [
+            AppButton(
+              text: 'Tentar novamente',
+              variant: AppButtonVariant.text,
+              width: 160,
+              onPressed: _retryBlockTarget,
+            ),
+          ],
+        ),
+        Expanded(child: editor),
+      ],
     );
   }
 }

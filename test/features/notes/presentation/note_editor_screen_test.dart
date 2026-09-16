@@ -44,7 +44,17 @@ void main() {
   late NoteEditorSession session;
 
   setUp(() {
-    controller = NoteEditorController(userId: 'user-1', noteId: 'note-1');
+    controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      nodes: [
+        TaskNode(
+          id: 'task-1',
+          text: AttributedText('Target task'),
+          isComplete: false,
+        ),
+      ],
+    );
     session = NoteEditorSession(
       noteId: 'note-1',
       controller: controller,
@@ -56,7 +66,7 @@ void main() {
     controller.dispose();
   });
 
-  Future<void> pumpScreen(WidgetTester tester) async {
+  Future<void> pumpScreen(WidgetTester tester, {String? blockId}) async {
     final note = NoteModel(
       id: 'note-1',
       userId: 'user-1',
@@ -81,7 +91,9 @@ void main() {
             'note-1',
           ).overrideWith((ref) => Stream.value(true)),
         ],
-        child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
+        child: MaterialApp(
+          home: NoteEditorScreen(noteId: 'note-1', blockId: blockId),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -110,4 +122,27 @@ void main() {
     final keyboardEditorTop = tester.getTopLeft(find.byType(SuperEditor)).dy;
     expect(keyboardEditorTop, greaterThanOrEqualTo(keyboardAppBarBottom));
   });
+
+  testWidgets('selects an existing task block from the route state', (
+    tester,
+  ) async {
+    await pumpScreen(tester, blockId: 'task-1');
+
+    expect(controller.composer.selection?.extent.nodeId, 'task-1');
+  });
+
+  testWidgets(
+    'keeps a missing task target recoverable without hiding the note',
+    (
+      tester,
+    ) async {
+      await pumpScreen(tester, blockId: 'missing-task');
+
+      expect(
+        find.byKey(const ValueKey('missing-block:missing-task')),
+        findsOneWidget,
+      );
+      expect(find.byType(SuperEditor), findsOneWidget);
+    },
+  );
 }

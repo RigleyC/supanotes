@@ -12,6 +12,7 @@ import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/shared/theme/app_theme.dart';
 
 class _MockAuthLocalStorage extends Mock implements AuthLocalStorage {}
@@ -55,6 +56,7 @@ Future<ProviderContainer> _makeContainer(
       authLocalStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWithValue(repository),
       authControllerProvider.overrideWith(() => _StubAuthController(stub)),
+      activeNotesProvider.overrideWith((ref) => Stream.value([])),
     ],
   );
   addTearDown(container.dispose);
@@ -75,6 +77,7 @@ Future<ProviderContainer> _makeLoadingContainer({
       authLocalStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWithValue(repository),
       authControllerProvider.overrideWith(_LoadingAuthController.new),
+      activeNotesProvider.overrideWith((ref) => Stream.value([])),
     ],
   );
   addTearDown(container.dispose);
@@ -99,8 +102,12 @@ Widget _wrapRouter(ProviderContainer container) {
 }
 
 void main() {
-  test('note route keeps transient editor options out of the URL', () {
+  test('note route carries an optional task block in the URL', () {
     expect(AppRoutes.note('note-1'), '/notes/note-1');
+    expect(
+      AppRoutes.note('note-1', blockId: 'task 1'),
+      '/notes/note-1?blockId=task+1',
+    );
   });
 
   Future<void> settleRedirect(WidgetTester tester) async {
@@ -137,7 +144,7 @@ void main() {
     );
   });
 
-  testWidgets('starting on /splash with auth redirects to /home', (
+  testWidgets('starting on /splash with auth redirects to Tasks', (
     tester,
   ) async {
     final container = await _makeContainer(
@@ -150,7 +157,7 @@ void main() {
     final router = container.read(goRouterProvider);
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      AppRoutes.home,
+      AppRoutes.tasks,
     );
   });
 
@@ -169,7 +176,7 @@ void main() {
     );
   });
 
-  testWidgets('starting on /login with auth redirects to /home', (
+  testWidgets('starting on /login with auth redirects to Tasks', (
     tester,
   ) async {
     final container = await _makeContainer(
@@ -182,7 +189,7 @@ void main() {
     final router = container.read(goRouterProvider);
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      AppRoutes.home,
+      AppRoutes.tasks,
     );
   });
 
@@ -222,7 +229,7 @@ void main() {
     );
   });
 
-  testWidgets('authenticated user on /login is redirected to /home', (
+  testWidgets('authenticated user on /login is redirected to Tasks', (
     tester,
   ) async {
     final container = await _makeContainer(
@@ -238,11 +245,11 @@ void main() {
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      AppRoutes.home,
+      AppRoutes.tasks,
     );
   });
 
-  testWidgets('authenticated user on /register is redirected to /home', (
+  testWidgets('authenticated user on /register is redirected to Tasks', (
     tester,
   ) async {
     final container = await _makeContainer(
@@ -258,11 +265,11 @@ void main() {
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      AppRoutes.home,
+      AppRoutes.tasks,
     );
   });
 
-  testWidgets('authenticated user on /home stays at /home', (tester) async {
+  testWidgets('authenticated user on /home redirects to Tasks', (tester) async {
     final container = await _makeContainer(
       const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
     );
@@ -276,7 +283,76 @@ void main() {
 
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),
-      AppRoutes.home,
+      AppRoutes.tasks,
+    );
+  });
+
+  testWidgets('completed tasks is a child route of the Tasks branch', (
+    tester,
+  ) async {
+    final container = await _makeContainer(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    router.go(AppRoutes.completedTasks);
+    await settleRedirect(tester);
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      AppRoutes.completedTasks,
+    );
+  });
+
+  testWidgets('switching tabs preserves each branch location', (tester) async {
+    final container = await _makeContainer(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    router.go(AppRoutes.completedTasks);
+    await settleRedirect(tester);
+    router.go(AppRoutes.notes);
+    await settleRedirect(tester);
+
+    await tester.tap(find.text('Tasks'));
+    await settleRedirect(tester);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      AppRoutes.completedTasks,
+    );
+
+    await tester.tap(find.text('Notas'));
+    await settleRedirect(tester);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      AppRoutes.notes,
+    );
+  });
+
+  testWidgets('note route preserves a task block query parameter', (
+    tester,
+  ) async {
+    final container = await _makeContainer(
+      const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+    );
+
+    await tester.pumpWidget(_wrapRouter(container));
+    await settleRedirect(tester);
+
+    final router = container.read(goRouterProvider);
+    router.go(AppRoutes.note('note-1', blockId: 'task-1'));
+    await settleRedirect(tester);
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      AppRoutes.note('note-1', blockId: 'task-1'),
     );
   });
 }
