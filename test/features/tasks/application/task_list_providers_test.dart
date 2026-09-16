@@ -68,9 +68,10 @@ VisibleNoteDocument _noteDocument({
 );
 
 class _ManualTimer implements Timer {
-  _ManualTimer(this.callback);
+  _ManualTimer(this.callback, {required this.delay});
 
   final void Function() callback;
+  final Duration delay;
   bool _isActive = true;
   int _tick = 0;
 
@@ -290,7 +291,7 @@ void main() {
           TaskListClock(
             () => now,
             (duration, callback) {
-              final timer = _ManualTimer(callback);
+              final timer = _ManualTimer(callback, delay: duration);
               timers.add(timer);
               return timer;
             },
@@ -319,6 +320,60 @@ void main() {
     expect(values, hasLength(2));
     expect(values.last.single.task!.id, 'tomorrow');
   });
+
+  test(
+    'schedules the next civil midnight across a local DST transition',
+    () async {
+      final database = AppDatabase.test();
+      final now = DateTime(2018, 11, 3, 23, 30);
+      final expectedBoundary = DateTime(now.year, now.month, now.day + 1);
+      final timers = <_ManualTimer>[];
+      await database.tasksDao.insertOrUpdateTask(
+        TasksCompanion.insert(
+          id: 'dst-boundary',
+          ownerUserId: 'user-1',
+          title: 'Transição DST',
+          dueDate: Value(DateTime(2018, 11, 5)),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      final provider = taskListProvider(includeNoteTasks: false);
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          currentUserIdProvider.overrideWithValue('user-1'),
+          taskListClockProvider.overrideWithValue(
+            TaskListClock(
+              () => now,
+              (duration, callback) {
+                final timer = _ManualTimer(callback, delay: duration);
+                timers.add(timer);
+                return timer;
+              },
+            ),
+          ),
+        ],
+      );
+      final subscription = container.listen(provider, (_, _) {});
+      addTearDown(() {
+        subscription.close();
+        container.dispose();
+      });
+      addTearDown(database.close);
+
+      await container.read(provider.future);
+
+      expect(timers, hasLength(1));
+      expect(expectedBoundary.year, now.year);
+      expect(expectedBoundary.month, now.month);
+      expect(expectedBoundary.day, now.day + 1);
+      expect(expectedBoundary.hour, 1);
+      expect(expectedBoundary.timeZoneOffset, const Duration(hours: -2));
+      expect(timers.single.delay, expectedBoundary.difference(now));
+    expect(timers.single.delay, const Duration(minutes: 30));
+    },
+  );
 
   test(
     'surfaces malformed effective note documents as a provider error',
