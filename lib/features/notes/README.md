@@ -2,7 +2,9 @@
 
 Uma nota é um documento rico, não um texto com campos independentes. Seu
 snapshot REST/OT contém blocos de parágrafo, lista, tarefa, imagem, anexo e
-link. O módulo foi dividido pelos fluxos que mudam juntos.
+link. O bloco de tarefa é um `TaskNode`: ele pertence ao documento da nota e
+não é a entidade independente `Task` da feature de tarefas. O módulo foi
+dividido pelos fluxos que mudam juntos.
 
 | Pasta | Responsabilidade | Quando entrar nela |
 | --- | --- | --- |
@@ -19,13 +21,16 @@ migração dos importadores. Novos arquivos devem ficar no submódulo correto.
 
 1. [catalog](catalog/README.md): como uma nota passa a existir localmente.
 2. [editor](editor/README.md): como a edição vira operação REST/OT.
-3. [tasks](../tasks/README.md): como tarefas vivem no documento e alimentam
-   notificações locais.
+3. [tasks](../tasks/README.md): como `TaskNode`s e `Task`s independentes são
+   lidos na visão global e alimentam notificações locais.
 4. [backend noteoperations](../../../backend/internal/noteoperations/README.md): como o servidor confirma uma operação.
 
 Para a referência arquivo por arquivo, consulte [Notes: file reference](../../../docs/architecture/notes-file-reference.md).
 
 ## Regra de ouro
 
-Para mudar texto ou metadados de uma tarefa, altere o documento através da
-sessão do editor. Não existe DAO relacional de tarefas.
+Para mudar texto ou metadados de um `TaskNode`, altere o documento através da
+sessão do editor. Essa regra é específica para tarefas dentro de notas: ela
+não deve ser generalizada para a `Task` independente. Para a `Task`, use o
+`TaskRepository` e a API de tarefas; a tabela local `tasks` é sua cópia
+local-first e não uma projeção do documento da nota.

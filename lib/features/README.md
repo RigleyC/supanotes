@@ -8,11 +8,26 @@ sem um contrato claro.
 | --- | --- | --- |
 | `auth` | sessão, login, cadastro e renovação de token | [auth](auth/README.md) |
 | `notes` | catálogo, documento, editor, compartilhamento e anexos | [notes](notes/README.md) |
-| `tasks` | recorrência, metadados e lembretes derivados do documento | [tasks](tasks/README.md) |
+| `tasks` | visão global das tarefas, recurso independente `Task` e adaptador de leitura de `TaskNode` | [tasks](tasks/README.md) |
 | `settings` | preferências da conta e configuração MCP | [settings](settings/README.md) |
 
 Uma feature normalmente separa `data` (adapta banco/API), `domain` (modelo e
 regras puras), `application` ou `controllers` (coordenação de estado) e
 `presentation` (widgets/telas). Notes usa submódulos nomeados porque é grande.
+
+## Duas fontes de tarefas
+
+`TaskNode` é a tarefa que existe dentro de uma nota. A feature `notes` é dona
+do seu documento REST/OT e o editor altera seu texto e metadados por operações
+de documento.
+
+`Task` é a tarefa independente. A feature `tasks` é dona do
+`TaskRepository`/API, do outbox e da tabela local `tasks` (com a tabela
+PostgreSQL `tasks` como autoridade do servidor). Essa tabela armazena somente
+`Task`s independentes; não é uma projeção de `TaskNode`.
+
+A tela global pode misturar os dois adaptadores para facilitar a consulta, mas
+não persiste uma terceira entidade e não copia tarefas entre uma nota e o
+recurso independente.
 
 Para a relação arquivo/classe/método das outras features, consulte [features-file-reference](../../docs/architecture/features-file-reference.md).

@@ -22,18 +22,31 @@ An empty regular note is determined from block content, tasks, attachments, not 
 - One REST/OT document snapshot per note, stored in `notes.document` (JSONB) with a `revision` counter.
 - Blocks are stored in the `blocks` array, each with an immutable UUID `id`,
   `type`, delta text, and optional metadata.
-- Tasks are blocks with type `task`. Their canonical metadata lives in the
-  document: `isCompleted`, `dueDate`, `hasTime`, `recurrenceRule`, `reminder`,
-  and recurring `completions`.
-- `dueDate` is the recurrence anchor. Each completion stores the scheduled
-  calendar identity separately from the UTC completion instant.
-- The relational `tasks` and `task_completions` tables are legacy projections
-  retained only for the controlled migration and retention window.
-- Tasks may form a hierarchy within a note: a subtask belongs to one parent task and can be completed independently.
-- A parent task with subtasks reports partial progress, remains open while any subtask is open, and toggling its checkbox completes or reopens its subtasks.
+- A `TaskNode` is a block with type `task`. Its canonical metadata lives in
+  the note document: `isCompleted`, `dueDate`, `hasTime`, `recurrenceRule`,
+  `reminder`, and recurring `completions`.
+- `dueDate` is the recurrence anchor. Each `TaskNode` completion stores the
+  scheduled calendar identity separately from the UTC completion instant.
+- An independent `Task` is a root resource, not a document block. Its server
+  authority is the backend `tasks` table, its local-first copy is the Drift
+  `tasks` table, and its writes go through `TaskRepository` and the task API.
+- The backend and local `tasks` tables contain independent `Task`s only. They
+  are not projections of `TaskNode`, and neither source is automatically copied
+  or converted into the other.
+- The old `task_completions` relation and other legacy task rows are retained
+  only in migration quarantine/evidence; they are not current runtime sources.
+- `TaskNode`s may form a hierarchy within a note: a subtask belongs to one
+  parent `TaskNode` and can be completed independently.
+- A parent `TaskNode` with subtasks reports partial progress, remains open while
+  any subtask is open, and toggling its checkbox completes or reopens its
+  subtasks.
 
 ## Projections
 
-The application editor, task metadata UI, and notification scheduler read the
-canonical note document. They do not read or write the legacy task tables.
+The note editor, `TaskNode` metadata UI, and note-task notification reader read
+the canonical note document and mutate it through REST/OT operations. The
+independent-task UI reads the local-first `Task` resource through
+`TaskRepository`; its outbox/API syncs that resource separately. The global
+Tasks view may combine both read adapters, but it is a non-persisted view and
+does not make either source a projection of the other.
 
