@@ -19,18 +19,25 @@ class NoteTaskNotificationSource implements TaskNotificationSource {
   final DateTime Function()? clock;
 
   Stream<List<TaskNotificationEntry>> watchOpenTasks(String userId) {
-    // The materialized-document table is the effective local cache used by
-    // the note runtime. The account ID remains part of the source contract so
-    // the scheduler always includes it in the platform identity.
-    final dao = _database.noteOperationsDao;
+    // Materialized documents are shared local cache rows, so they must be
+    // intersected with the same effective note selection used by the notes
+    // list. That selection enforces ownership and current membership before a
+    // document can become a reminder for this account.
+    final notes = _database.notesDao.watchAllActiveNotes(userId);
+    final documents = _database.noteOperationsDao.watchMaterializedDocuments();
     final reader = NoteTaskReader(clock: clock);
     return Stream.multi((controller) {
+      var latestAuthorizedNoteIds = const <String>{};
       var latestDocuments = const <LocalNoteDocumentData>[];
+      var notesReady = false;
+      var documentsReady = false;
 
       void emit() {
+        if (!notesReady || !documentsReady) return;
         controller.add([
           for (final document in latestDocuments)
-            if (document.materializedDocumentJson != null)
+            if (latestAuthorizedNoteIds.contains(document.noteId) &&
+                document.materializedDocumentJson != null)
               ...reader.read(
                 document.materializedDocumentJson!,
                 noteId: document.noteId,
@@ -38,17 +45,24 @@ class NoteTaskNotificationSource implements TaskNotificationSource {
         ]);
       }
 
-      final subscription = dao.watchMaterializedDocuments().listen((
-        documents,
-      ) {
-        latestDocuments = documents;
+      final notesSubscription = notes.listen((authorizedNotes) {
+        latestAuthorizedNoteIds = {
+          for (final note in authorizedNotes) note.note.id,
+        };
+        notesReady = true;
+        emit();
+      }, onError: controller.addError);
+      final documentsSubscription = documents.listen((nextDocuments) {
+        latestDocuments = nextDocuments;
+        documentsReady = true;
         emit();
       }, onError: controller.addError);
       final timer = Timer.periodic(const Duration(minutes: 1), (_) => emit());
 
       controller.onCancel = () async {
         timer.cancel();
-        await subscription.cancel();
+        await notesSubscription.cancel();
+        await documentsSubscription.cancel();
       };
     });
   }

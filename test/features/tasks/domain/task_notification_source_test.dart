@@ -90,6 +90,86 @@ void main() {
   });
 
   test(
+    'scopes note reminders to owned and current shared-note membership',
+    () async {
+      final database = AppDatabase.test();
+      addTearDown(database.close);
+      final now = DateTime(2026, 9, 15, 10);
+
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'owned-note',
+          userId: 'user-1',
+          content: 'Owned note',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'other-account-note',
+          userId: 'user-2',
+          content: 'Other account note',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'shared-note',
+          userId: 'user-2',
+          content: 'Shared note',
+          permission: const Value('view'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await database.userNotePreferencesDao.setPreferences(
+        userId: 'user-1',
+        noteId: 'shared-note',
+        favorite: false,
+        archived: false,
+        hideCompleted: false,
+        collapseImages: false,
+      );
+
+      await _insertMaterializedTask(
+        database,
+        noteId: 'owned-note',
+        blockId: 'owned-task',
+        now: now,
+      );
+      await _insertMaterializedTask(
+        database,
+        noteId: 'other-account-note',
+        blockId: 'other-account-task',
+        now: now,
+      );
+      await _insertMaterializedTask(
+        database,
+        noteId: 'shared-note',
+        blockId: 'shared-task',
+        now: now,
+      );
+
+      final source = NoteTaskNotificationSource(database, clock: () => now);
+      expect(
+        (await source.readOpenTasks('user-1')).map((entry) => entry.id),
+        unorderedEquals(['owned-task', 'shared-task']),
+      );
+
+      await database.userNotePreferencesDao.deletePreference(
+        'user-1',
+        'shared-note',
+      );
+      expect(
+        (await source.readOpenTasks('user-1')).map((entry) => entry.id),
+        ['owned-task'],
+      );
+    },
+  );
+
+  test(
     'cancels the persisted legacy ID before scheduling the new ID',
     () async {
       final scheduledAt = DateTime.now().add(const Duration(days: 2));
@@ -133,13 +213,12 @@ void main() {
         taskNotificationSchedulerProvider.notifier,
       );
       await container.read(taskNotificationSchedulerProvider.future);
-      final entry = TaskNotificationEntry(
+      final entry = TaskNotificationEntry.standalone(
         id: 'task-1',
         title: 'Task',
         dueDate: scheduledAt,
         hasTime: true,
         reminder: 'at_time',
-        source: TaskNotificationEntrySource.standalone,
       );
       await scheduler.reconcile(tasks: [entry]);
 
@@ -171,15 +250,61 @@ TaskNotificationEntry _entry(
   String id,
   TaskNotificationEntrySource source, {
   String? noteId,
-}) => TaskNotificationEntry(
-  id: id,
-  title: id,
-  dueDate: DateTime(2026, 9, 15, 9),
-  hasTime: true,
-  reminder: 'at_time',
-  source: source,
-  noteId: noteId,
-);
+}) {
+  if (source == TaskNotificationEntrySource.note) {
+    return TaskNotificationEntry.note(
+      id: id,
+      title: id,
+      dueDate: DateTime(2026, 9, 15, 9),
+      hasTime: true,
+      reminder: 'at_time',
+      noteId: noteId!,
+    );
+  }
+  return TaskNotificationEntry.standalone(
+    id: id,
+    title: id,
+    dueDate: DateTime(2026, 9, 15, 9),
+    hasTime: true,
+    reminder: 'at_time',
+  );
+}
+
+Future<void> _insertMaterializedTask(
+  AppDatabase database, {
+  required String noteId,
+  required String blockId,
+  required DateTime now,
+}) {
+  return database.noteOperationsDao.upsertNoteDocument(
+    LocalNoteDocumentsCompanion.insert(
+      noteId: noteId,
+      revision: 1,
+      documentJson: _taskDocument(blockId),
+      updatedAt: now,
+      materializedDocumentJson: Value(_taskDocument(blockId)),
+    ),
+  );
+}
+
+String _taskDocument(String blockId) => jsonEncode({
+  'schemaVersion': 1,
+  'blocks': [
+    {
+      'id': blockId,
+      'type': 'task',
+      'delta': [
+        {'insert': blockId},
+      ],
+      'metadata': {
+        'dueDate': '2099-01-02T10:00:00.000',
+        'hasTime': true,
+        'reminder': 'at_time',
+        'isCompleted': false,
+      },
+    },
+  ],
+});
 
 class _FakeSource implements TaskNotificationSource {
   _FakeSource(this.entries);

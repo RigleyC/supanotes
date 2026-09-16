@@ -8,15 +8,53 @@ import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 enum TaskNotificationEntrySource { standalone, note }
 
 class TaskNotificationEntry {
-  const TaskNotificationEntry({
+  const TaskNotificationEntry._({
     required this.id,
     required this.title,
     required this.dueDate,
     required this.hasTime,
     required this.reminder,
-    this.source = TaskNotificationEntrySource.note,
+    required this.source,
     this.noteId,
   });
+
+  factory TaskNotificationEntry.standalone({
+    required String id,
+    required String title,
+    required DateTime dueDate,
+    required bool hasTime,
+    required String? reminder,
+  }) => TaskNotificationEntry._(
+    id: id,
+    title: title,
+    dueDate: dueDate,
+    hasTime: hasTime,
+    reminder: reminder,
+    source: TaskNotificationEntrySource.standalone,
+  );
+
+  factory TaskNotificationEntry.note({
+    required String id,
+    required String title,
+    required DateTime dueDate,
+    required bool hasTime,
+    required String? reminder,
+    required String noteId,
+  }) {
+    final normalizedNoteId = noteId.trim();
+    if (normalizedNoteId.isEmpty) {
+      throw ArgumentError.value(noteId, 'noteId', 'must not be empty');
+    }
+    return TaskNotificationEntry._(
+      id: id,
+      title: title,
+      dueDate: dueDate,
+      hasTime: hasTime,
+      reminder: reminder,
+      source: TaskNotificationEntrySource.note,
+      noteId: normalizedNoteId,
+    );
+  }
 
   final String id;
   final String title;
@@ -28,10 +66,19 @@ class TaskNotificationEntry {
   /// The owning note for a note task. It is null for standalone tasks.
   final String? noteId;
 
+  /// Returns the note identity after enforcing the source invariant.
+  String get requiredNoteId {
+    final id = noteId;
+    if (source != TaskNotificationEntrySource.note || id == null) {
+      throw StateError('A note notification entry must have a noteId');
+    }
+    return id;
+  }
+
   /// Stable cache identity for one source item, excluding its occurrence.
   /// The occurrence itself is part of [TaskNotificationId].
   String get sourceKey => source == TaskNotificationEntrySource.note
-      ? 'note:${noteId ?? ''}:$id'
+      ? 'note:$requiredNoteId:$id'
       : 'task:$id';
 
   @override

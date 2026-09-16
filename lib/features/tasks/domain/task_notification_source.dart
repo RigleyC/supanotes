@@ -64,13 +64,12 @@ class StandaloneTaskNotificationSource implements TaskNotificationSource {
       if (task.isCompleted && recurrence == null) continue;
 
       result.add(
-        TaskNotificationEntry(
+        TaskNotificationEntry.standalone(
           id: task.id,
           title: task.title,
           dueDate: occurrence.scheduledAt,
           hasTime: task.hasTime,
           reminder: task.reminder,
-          source: TaskNotificationEntrySource.standalone,
         ),
       );
     }

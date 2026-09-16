@@ -509,7 +509,7 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     return entry.source == TaskNotificationEntrySource.note
         ? TaskNotificationId.forNote(
             userId: userId,
-            noteId: entry.noteId ?? '',
+            noteId: entry.requiredNoteId,
             blockId: entry.id,
             scheduledAt: scheduledAt,
           )
