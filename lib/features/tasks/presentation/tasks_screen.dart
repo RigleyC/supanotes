@@ -1,15 +1,20 @@
+import 'dart:async';
+
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/features/tasks/application/note_task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
+import 'package:supanotes/features/tasks/presentation/task_editor_screen.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_list_tile.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_source_filter_menu.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
@@ -116,10 +121,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: TaskListTile(
                         item: item,
-                        onTap: () => _openTask(context, item),
-                        onToggle: item.isStandalone
-                            ? () => _completeTask(item)
-                            : null,
+                        onTap: () => unawaited(_openTask(context, item)),
+                        onToggle: () => unawaited(_completeTask(item)),
                       ),
                     );
                   },
@@ -152,26 +155,40 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  void _openTask(BuildContext context, TaskListItem item) {
+  Future<void> _openTask(BuildContext context, TaskListItem item) async {
     if (item.isStandalone) {
-      context.push('${AppRoutes.standaloneTask}/${item.task!.id}');
+      // Independent tasks use the standalone form in a modal from the list.
+      // The route remains available for the primary action and deep links.
+      await showAppBottomSheet<void>(
+        context: context,
+        builder: (_) => TaskEditorScreen(taskId: item.task!.id),
+      );
       return;
     }
-    context.push(
+
+    // Note tasks remain owned by the note document. Their full editor is the
+    // note route, so this preserves the existing deep-link target instead of
+    // accidentally routing the block through the standalone task repository.
+    await context.push<void>(
       AppRoutes.note(item.note!.noteId, blockId: item.note!.blockId),
     );
   }
 
   Future<void> _completeTask(TaskListItem item) async {
-    if (!item.isStandalone) return;
     try {
-      await ref
-          .read(taskControllerProvider)
-          .complete(
-            item.task!.id,
-            scheduledAt: item.scheduledAt?.toIso8601String(),
-          );
-    } catch (error) {
+      if (item.isStandalone) {
+        await ref
+            .read(taskControllerProvider)
+            .complete(
+              item.task!.id,
+              scheduledAt: item.scheduledAt?.toIso8601String(),
+            );
+      } else {
+        await ref
+            .read(noteTaskControllerProvider)
+            .complete(item.note!, scheduledAt: item.scheduledAt);
+      }
+    } on Object catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Não foi possível concluir a task: $error')),

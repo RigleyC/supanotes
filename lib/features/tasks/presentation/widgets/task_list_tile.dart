@@ -35,9 +35,10 @@ class TaskListTile extends StatelessWidget {
             key: ValueKey('task-toggle-${item.uiKey}'),
             behavior: HitTestBehavior.opaque,
             onTap: onToggle,
-            child: const Padding(
-              padding: EdgeInsets.all(AppSpacing.sm),
-              child: AppTaskCheckbox(value: false),
+            child: const SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(child: AppTaskCheckbox(value: false)),
             ),
           ),
         ),

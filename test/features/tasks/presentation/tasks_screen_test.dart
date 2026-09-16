@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/presentation/tasks_screen.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_form.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_list_tile.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
 
@@ -78,6 +80,9 @@ Widget _wrap(GoRouter router) {
       ),
       taskListProvider(includeNoteTasks: true).overrideWith(
         (ref) => Stream.value(withNotes),
+      ),
+      standaloneTaskProvider('standalone').overrideWith(
+        (ref) => Stream.value(_task('standalone')),
       ),
     ],
     child: MaterialApp.router(routerConfig: router),
@@ -178,7 +183,7 @@ void main() {
     expect(opened, isTrue);
   });
 
-  testWidgets('navigates standalone and note tasks with their route identity', (
+  testWidgets('opens standalone tasks in a modal and keeps note deep links', (
     tester,
   ) async {
     final router = _router();
@@ -188,7 +193,10 @@ void main() {
 
     await tester.tap(find.text('standalone'));
     await tester.pumpAndSettle();
-    expect(find.text('/tasks/standalone/standalone'), findsOneWidget);
+    expect(find.byType(TaskForm), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     router.go('/tasks');
     await tester.pumpAndSettle();

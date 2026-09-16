@@ -24,9 +24,10 @@ class CompletedTasksTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       spacing: AppSpacing.md,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(AppSpacing.sm),
-          child: AppTaskCheckbox(value: true),
+        const SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(child: AppTaskCheckbox(value: true)),
         ),
         Expanded(
           child: GestureDetector(
