@@ -32,6 +32,26 @@
 - [x] Apply the shared fade to the notes list and note editor.
 - [x] Validate fade geometry and existing editor layout behavior.
 
+## Standalone tasks and Tasks/Notes tabs (2026-09-15) — Task 12 rollout verification
+
+- [x] Run focused Flutter domain, data, application, sync and Tasks DAO tests:
+  171 tests passed.
+- [x] Run focused router and task presentation tests: 56 tests passed.
+- [ ] Pass the full `flutter analyze` gate. Blocked by the unrelated
+  `integration_test/full_suite_test.dart:231` reference to the removed
+  `loadPendingProjection` method; the command also reports existing
+  warnings/infos across the checkout.
+- [x] Run `go test ./...`: all backend packages passed.
+- [x] Run `go vet ./...`: passed with no findings.
+- [x] Run `git diff --check`: passed with no whitespace errors; Git only
+  reported normal LF/CRLF conversion warnings for existing dirty files.
+- [ ] Exercise PostgreSQL migration, quarantine counts and restore rehearsal
+  in an isolated database. Blocked because `make`, Docker and a disposable
+  PostgreSQL DSN are unavailable; migration tests were run and skipped
+  explicitly for the missing DSNs.
+- [x] Record commands, evidence, limitations and rollback procedure in the
+  standalone-task walkthrough.
+
 ## Editor and sync hardening (2026-09-02)
 
 - [x] Skip hidden completed tasks at visible deletion boundaries while
