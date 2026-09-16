@@ -79,7 +79,8 @@ omitidos; ele não é evidência de que a migração PostgreSQL foi aplicada.
 ## Checklist de revisão da implementação
 
 As etapas T1–T11 foram concluídas em commits separados e passaram revisão
-focada antes desta verificação final. O HEAD verificado é `4a42c03e`.
+focada antes desta verificação final. As etapas T1–T11 terminam em `4a42c03e`,
+e o walkthrough foi verificado no commit `67e7ea10`.
 
 - [x] Contratos de `Task`, operações, geração de agenda e histórico cobertos.
 - [x] Schema PostgreSQL independente, log idempotente e quarentena legada
