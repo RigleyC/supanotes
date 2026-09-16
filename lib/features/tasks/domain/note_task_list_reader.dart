@@ -18,6 +18,7 @@ class NoteTaskListReader {
     required String noteTitle,
     required String documentJson,
     required bool hideCompleted,
+    DateTime? createdAt,
   }) {
     final policy = TaskOccurrencePolicy(clock: clock);
     final result = <NoteTask>[];
@@ -46,6 +47,7 @@ class NoteTaskListReader {
           recurrenceRule: parsed.recurrence?.name,
           completions: parsed.completions,
           lastCompletedAt: parsed.lastCompletedAt,
+          createdAt: createdAt,
         ),
       );
     }
@@ -60,6 +62,7 @@ class NoteTaskListReader {
     required String noteId,
     required String noteTitle,
     required String documentJson,
+    DateTime? createdAt,
   }) {
     return [
       for (final parsed in parseNoteTaskBlocks(documentJson))
@@ -74,6 +77,7 @@ class NoteTaskListReader {
           recurrenceRule: parsed.recurrence?.name,
           completions: parsed.completions,
           lastCompletedAt: parsed.lastCompletedAt,
+          createdAt: createdAt,
         ),
     ];
   }

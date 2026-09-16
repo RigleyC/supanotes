@@ -16,11 +16,15 @@ import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 /// A clock boundary used by task list providers and easily replaced in tests.
 class TaskListClock {
-  const TaskListClock([this._read]);
+  const TaskListClock([this._read, this._timerFactory]);
 
   final DateTime Function()? _read;
+  final Timer Function(Duration, void Function())? _timerFactory;
 
   DateTime now() => _read?.call() ?? DateTime.now();
+
+  Timer schedule(Duration delay, void Function() callback) =>
+      _timerFactory?.call(delay, callback) ?? Timer(delay, callback);
 }
 
 final taskListClockProvider = Provider<TaskListClock>(
@@ -227,6 +231,7 @@ List<TaskListItem> buildTaskList({
         noteTitle: visibleNote.noteTitle,
         documentJson: visibleNote.documentJson,
         hideCompleted: visibleNote.hideCompleted,
+        createdAt: visibleNote.createdAt,
       );
       result.addAll(
         noteTasks.map(
@@ -280,6 +285,7 @@ List<TaskHistoryEntry> buildCompletedTaskHistory({
         noteId: visibleNote.noteId,
         noteTitle: visibleNote.noteTitle,
         documentJson: visibleNote.documentJson,
+        createdAt: visibleNote.createdAt,
       )) {
         if (note.isRecurring) {
           for (final entry in note.completions.entries) {
@@ -367,7 +373,7 @@ Stream<List<TaskListItem>> _watchWithTemporalInvalidation({
       final boundary = _nextTaskListBoundary(items, now);
       if (boundary == null) return;
       final delay = boundary.difference(now);
-      timer = Timer(
+      timer = clock.schedule(
         delay.isNegative || delay == Duration.zero
             ? const Duration(milliseconds: 1)
             : delay,
