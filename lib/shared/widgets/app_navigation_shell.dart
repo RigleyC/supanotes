@@ -1,3 +1,4 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,28 +13,26 @@ class AppNavigationShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Scaffold(
+    final isIos = PlatformInfo.isIOS;
+    return AdaptiveScaffold(
       body: navigationShell,
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: AdaptiveBottomNavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        backgroundColor: colorScheme.surface,
-        indicatorColor: colorScheme.primaryContainer,
-        onDestinationSelected: (index) {
+        onTap: (index) {
           navigationShell.goBranch(
             index,
             initialLocation: index == navigationShell.currentIndex,
           );
         },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.check_box_outlined),
-            selectedIcon: Icon(Icons.check_box),
+        items: [
+          AdaptiveNavigationDestination(
+            icon: isIos ? 'checkmark.circle' : Icons.check_box_outlined,
+            selectedIcon: isIos ? 'checkmark.circle.fill' : Icons.check_box,
             label: 'Tasks',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.notes_outlined),
-            selectedIcon: Icon(Icons.notes),
+          AdaptiveNavigationDestination(
+            icon: isIos ? 'note' : Icons.notes_outlined,
+            selectedIcon: isIos ? 'note.fill' : Icons.notes,
             label: 'Notas',
           ),
         ],

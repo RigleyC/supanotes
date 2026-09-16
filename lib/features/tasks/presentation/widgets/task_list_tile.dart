@@ -4,9 +4,7 @@ import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_source_label.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/app_card.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
-import 'package:supanotes/shared/widgets/app_tile.dart';
 
 class TaskListTile extends StatelessWidget {
   const TaskListTile({
@@ -26,32 +24,53 @@ class TaskListTile extends StatelessWidget {
       item.isStandalone ? item.task!.recurrenceRule : item.note!.recurrenceRule,
     );
     final reminder = item.isStandalone && item.task!.reminder != null;
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: AppTile(
-        title: item.isStandalone ? item.task!.title : item.note!.title,
-        subtitleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: AppSpacing.xs,
-          children: [
-            TaskSourceLabel(item: item),
-            TaskMetadataBadges(
-              dueDate: item.dueDate,
-              recurrence: recurrence,
-              hasReminder: reminder,
-              hasTime: item.hasTime,
-              now: DateTime.now(),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      spacing: AppSpacing.md,
+      children: [
+        Semantics(
+          button: onToggle != null,
+          enabled: onToggle != null,
+          child: GestureDetector(
+            key: ValueKey('task-toggle-${item.uiKey}'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            child: const Padding(
+              padding: EdgeInsets.all(AppSpacing.sm),
+              child: AppTaskCheckbox(value: false),
             ),
-          ],
+          ),
         ),
-        leading: GestureDetector(
-          key: ValueKey('task-toggle-${item.uiKey}'),
-          behavior: HitTestBehavior.opaque,
-          onTap: onToggle,
-          child: const AppTaskCheckbox(value: false),
+        Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: AppSpacing.xs,
+                children: [
+                  Text(
+                    item.isStandalone ? item.task!.title : item.note!.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  TaskSourceLabel(item: item),
+                  TaskMetadataBadges(
+                    dueDate: item.dueDate,
+                    recurrence: recurrence,
+                    hasReminder: reminder,
+                    hasTime: item.hasTime,
+                    now: DateTime.now(),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-        onTap: onTap,
-      ),
+      ],
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,9 +7,9 @@ import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task_history_entry.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/completed_tasks_tile.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_source_filter_menu.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
-import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
 
 class CompletedTasksScreen extends ConsumerStatefulWidget {
@@ -26,28 +28,31 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
     final historyAsync = ref.watch(
       completedTaskHistoryProvider(includeNoteTasks: _includeNoteTasks),
     );
-    return Scaffold(
+    return AdaptiveScaffold(
+      appBar: AdaptiveAppBar(
+        useNativeToolbar: false,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          actions: [
+            TaskSourceFilterMenu(
+              key: const ValueKey('task-source-filter-menu'),
+              includeNoteTasks: _includeNoteTasks,
+              onChanged: (value) => setState(() => _includeNoteTasks = value),
+            ),
+          ],
+        ),
+        cupertinoNavigationBar: CupertinoNavigationBar(
+          border: null,
+          trailing: TaskSourceFilterMenu(
+            key: const ValueKey('task-source-filter-menu'),
+            includeNoteTasks: _includeNoteTasks,
+            onChanged: (value) => setState(() => _includeNoteTasks = value),
+          ),
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar.medium(title: Text('Concluídas')),
-          SliverPadding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                AppTile(
-                  title: 'Mostrar tarefas das notas',
-                  subtitle: 'Inclui conclusões vindas das notas',
-                  leading: const Icon(Icons.notes_outlined),
-                  trailing: Switch(
-                    key: const ValueKey('show-note-tasks-history-toggle'),
-                    value: _includeNoteTasks,
-                    onChanged: (value) =>
-                        setState(() => _includeNoteTasks = value),
-                  ),
-                ),
-              ]),
-            ),
-          ),
           historyAsync.when(
             loading: () => const SliverFillRemaining(
               hasScrollBody: false,

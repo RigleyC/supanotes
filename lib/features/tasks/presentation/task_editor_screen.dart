@@ -1,3 +1,4 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -56,10 +57,10 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isNew) {
-      return Scaffold(
+      return AdaptiveScaffold(
+        appBar: const AdaptiveAppBar(useNativeToolbar: false),
         body: CustomScrollView(
           slivers: [
-            const SliverAppBar.medium(title: Text('Nova task')),
             SliverPadding(
               padding: const EdgeInsets.all(AppSpacing.md),
               sliver: SliverList(
@@ -83,10 +84,10 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
     }
 
     final taskAsync = ref.watch(standaloneTaskProvider(widget.taskId!));
-    return Scaffold(
+    return AdaptiveScaffold(
+      appBar: const AdaptiveAppBar(useNativeToolbar: false),
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar.medium(title: Text('Editar task')),
           taskAsync.when(
             loading: () => const SliverFillRemaining(
               hasScrollBody: false,

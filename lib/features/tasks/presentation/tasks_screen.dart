@@ -1,3 +1,5 @@
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_list_tile.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_source_filter_menu.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
@@ -28,30 +31,45 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       taskListProvider(includeNoteTasks: _includeNoteTasks),
     );
 
-    return Scaffold(
+    return AdaptiveScaffold(
+      appBar: AdaptiveAppBar(
+        useNativeToolbar: false,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          actions: [
+            TaskSourceFilterMenu(
+              key: const ValueKey('task-source-filter-menu'),
+              includeNoteTasks: _includeNoteTasks,
+              onChanged: (value) => setState(() => _includeNoteTasks = value),
+            ),
+          ],
+        ),
+        cupertinoNavigationBar: CupertinoNavigationBar(
+          border: null,
+          trailing: TaskSourceFilterMenu(
+            key: const ValueKey('task-source-filter-menu'),
+            includeNoteTasks: _includeNoteTasks,
+            onChanged: (value) => setState(() => _includeNoteTasks = value),
+          ),
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar.medium(title: Text('Tasks')),
           SliverPadding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 AppButton(
                   text: 'Nova task',
                   icon: const Icon(Icons.add_rounded),
                   onPressed: () => context.push(AppRoutes.standaloneTask),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                AppTile(
-                  title: 'Mostrar tarefas das notas',
-                  subtitle: 'Inclui tasks das notas visíveis nesta lista',
-                  leading: const Icon(Icons.notes_outlined),
-                  trailing: Switch(
-                    key: const ValueKey('show-note-tasks-toggle'),
-                    value: _includeNoteTasks,
-                    onChanged: (value) =>
-                        setState(() => _includeNoteTasks = value),
-                  ),
                 ),
               ]),
             ),

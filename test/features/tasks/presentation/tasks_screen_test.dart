@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -83,6 +84,18 @@ Widget _wrap(GoRouter router) {
   );
 }
 
+Future<void> _showNoteTasks(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('task-source-filter-menu')));
+  await tester.pump();
+  final option = find.ancestor(
+    of: find.text('Mostrar tarefas das notas'),
+    matching: find.byType(CupertinoActionSheetAction),
+  );
+  tester.widget<CupertinoActionSheetAction>(option.first).onPressed!();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 20));
+}
+
 void main() {
   testWidgets('exposes completed history and changes provider input', (
     tester,
@@ -99,9 +112,7 @@ void main() {
         .map((tile) => tile.title)
         .toList();
     expect(tileTitles.last, 'Concluídas');
-    await tester.tap(find.byKey(const ValueKey('show-note-tasks-toggle')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 20));
+    await _showNoteTasks(tester);
     expect(find.text('note task'), findsOneWidget);
   });
 
@@ -140,6 +151,33 @@ void main() {
     expect(noteOpened, isTrue);
   });
 
+  testWidgets('uses the checkbox region to complete a standalone task', (
+    tester,
+  ) async {
+    var toggled = false;
+    var opened = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TaskListTile(
+            item: TaskListItem.task(_task('standalone')),
+            onTap: () => opened = true,
+            onToggle: () => toggled = true,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('task-toggle-standalone:standalone')),
+    );
+    expect(toggled, isTrue);
+    expect(opened, isFalse);
+
+    await tester.tap(find.text('standalone'));
+    expect(opened, isTrue);
+  });
+
   testWidgets('navigates standalone and note tasks with their route identity', (
     tester,
   ) async {
@@ -154,9 +192,7 @@ void main() {
 
     router.go('/tasks');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('show-note-tasks-toggle')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 20));
+    await _showNoteTasks(tester);
 
     await tester.tap(find.text('note task'));
     await tester.pumpAndSettle();

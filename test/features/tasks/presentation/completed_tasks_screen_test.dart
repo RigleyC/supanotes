@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,9 +64,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
 
-    expect(find.text('Concluídas'), findsAtLeastNWidgets(1));
     expect(find.text('Concluída'), findsOneWidget);
     expect(find.textContaining('Concluída em'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('task-source-filter-menu')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('navigates standalone and note history entries', (tester) async {
@@ -120,9 +124,13 @@ void main() {
 
     router.go('/tasks/completed');
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('show-note-tasks-history-toggle')),
+    await tester.tap(find.byKey(const ValueKey('task-source-filter-menu')));
+    await tester.pump();
+    final option = find.ancestor(
+      of: find.text('Mostrar tarefas das notas'),
+      matching: find.byType(CupertinoActionSheetAction),
     );
+    tester.widget<CupertinoActionSheetAction>(option.first).onPressed!();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
     final noteFinder = find.text('Nota concluída');
