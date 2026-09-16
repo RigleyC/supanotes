@@ -18,15 +18,13 @@ GoRouter _router() => GoRouter(
     GoRoute(
       path: '/tasks/standalone/:id',
       builder: (_, state) => Scaffold(
-        body: Text(state.pathParameters['id']!),
+        body: Text(state.uri.toString()),
       ),
     ),
     GoRoute(
       path: '/notes/:id',
       builder: (_, state) => Scaffold(
-        body: Text(
-          '${state.pathParameters['id']}:${state.uri.queryParameters['blockId']}',
-        ),
+        body: Text(state.uri.toString()),
       ),
     ),
   ],
@@ -118,13 +116,7 @@ void main() {
     await tester.ensureVisible(standaloneFinder);
     await tester.tap(standaloneFinder);
     await tester.pumpAndSettle();
-    router.go('/tasks/standalone/standalone-1');
-    await tester.pumpAndSettle();
-    expect(
-      router.routeInformationProvider.value.uri.path,
-      '/tasks/standalone/standalone-1',
-    );
-    expect(find.text('standalone-1'), findsOneWidget);
+    expect(find.text('/tasks/standalone/standalone-1'), findsOneWidget);
 
     router.go('/tasks/completed');
     await tester.pumpAndSettle();
@@ -137,17 +129,10 @@ void main() {
     await tester.ensureVisible(noteFinder);
     await tester.tap(noteFinder);
     await tester.pumpAndSettle();
-    router.go('/notes/note-history?blockId=block-history');
-    await tester.pumpAndSettle();
 
     expect(
-      router.routeInformationProvider.value.uri.path,
-      '/notes/note-history',
+      find.text('/notes/note-history?blockId=block-history'),
+      findsOneWidget,
     );
-    expect(
-      router.routeInformationProvider.value.uri.queryParameters['blockId'],
-      'block-history',
-    );
-    expect(find.text('note-history:block-history'), findsOneWidget);
   });
 }
