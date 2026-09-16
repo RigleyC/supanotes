@@ -541,7 +541,7 @@ void main() {
   );
 
   test(
-    'removes a revoked shared note cache and its task projection',
+    'removes revoked membership while preserving the shared task projection',
     () async {
       final database = AppDatabase.test();
       final client = _MockNoteSyncClient();
@@ -629,7 +629,8 @@ void main() {
       await insertCachedNote(id: 'own-note', userId: 'user-b');
 
       // The current account no longer appears in the catalog for the revoked
-      // note, while its own note and an active share remain present.
+      // note, while its own note and an active share remain present. The
+      // owner still needs the shared aggregate after B loses access.
       when(client.listNotes).thenAnswer(
         (_) async => [
           {
@@ -652,7 +653,7 @@ void main() {
 
       expect(
         await database.notesDao.getNoteById('revoked-shared-note'),
-        isNull,
+        isNotNull,
       );
       expect(
         await database.userNotePreferencesDao.getPreference(
@@ -665,7 +666,7 @@ void main() {
         await (database.select(database.localNoteDocuments)
               ..where((row) => row.noteId.equals('revoked-shared-note')))
             .getSingleOrNull(),
-        isNull,
+        isNotNull,
       );
       expect(
         await database.notesDao.getNoteById('active-shared-note'),
@@ -704,6 +705,39 @@ void main() {
           taskListProvider(includeNoteTasks: true).future,
         )).where((item) => item.isNote).map((item) => item.note!.noteId),
         unorderedEquals(['active-shared-note', 'own-note']),
+      );
+
+      final ownerContainer = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          currentUserIdProvider.overrideWithValue('user-a'),
+        ],
+      );
+      addTearDown(ownerContainer.dispose);
+      final ownerNotesSubscription = ownerContainer.listen(
+        taskNotesVisibilityProvider,
+        (_, _) {},
+      );
+      final ownerTaskListSubscription = ownerContainer.listen(
+        taskListProvider(includeNoteTasks: true),
+        (_, _) {},
+      );
+      addTearDown(() {
+        ownerNotesSubscription.close();
+        ownerTaskListSubscription.close();
+      });
+
+      expect(
+        (await ownerContainer.read(
+          taskNotesVisibilityProvider.future,
+        )).map((note) => note.noteId),
+        unorderedEquals(['revoked-shared-note', 'active-shared-note']),
+      );
+      expect(
+        (await ownerContainer.read(
+          taskListProvider(includeNoteTasks: true).future,
+        )).where((item) => item.isNote).map((item) => item.note!.noteId),
+        unorderedEquals(['revoked-shared-note', 'active-shared-note']),
       );
     },
   );

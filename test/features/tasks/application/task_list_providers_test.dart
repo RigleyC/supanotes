@@ -390,6 +390,129 @@ void main() {
     },
   );
 
+  test(
+    'hides a revoked member task while keeping the owner task visible',
+    () async {
+      final database = AppDatabase.test();
+      final createdAt = DateTime.utc(2026, 9, 15);
+      final document = jsonEncode({
+        'schemaVersion': 1,
+        'blocks': [
+          {
+            'id': 'owner-task-block',
+            'type': 'task',
+            'delta': [
+              {'insert': 'Tarefa do owner'},
+            ],
+            'metadata': {'isCompleted': false},
+          },
+        ],
+      });
+      await database.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'owner-shared-note',
+          userId: 'user-a',
+          content: 'Nota compartilhada',
+          createdAt: createdAt,
+          updatedAt: createdAt,
+          hasRemoteCopy: const Value(true),
+          lifecycleState: const Value(materializedLifecycleState),
+          permission: const Value('view'),
+        ),
+      );
+      await database.noteOperationsDao.upsertNoteDocument(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: 'owner-shared-note',
+          revision: 1,
+          documentJson: document,
+          updatedAt: createdAt,
+          materializedDocumentJson: Value(document),
+          materializedUpdatedAt: Value(createdAt),
+        ),
+      );
+      await database.userNotePreferencesDao.applyRemotePreference(
+        userId: 'user-b',
+        noteId: 'owner-shared-note',
+        favorite: false,
+        archived: false,
+        hideCompleted: false,
+        collapseImages: false,
+        remoteUpdatedAt: createdAt,
+      );
+
+      // Catalog reconciliation removes this membership, not the shared note
+      // document that the owner still uses.
+      await database.userNotePreferencesDao.deletePreference(
+        'user-b',
+        'owner-shared-note',
+      );
+
+      final memberContainer = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          currentUserIdProvider.overrideWithValue('user-b'),
+        ],
+      );
+      final ownerContainer = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          currentUserIdProvider.overrideWithValue('user-a'),
+        ],
+      );
+      addTearDown(() {
+        memberContainer.dispose();
+        ownerContainer.dispose();
+      });
+      addTearDown(database.close);
+
+      final memberNotes = memberContainer.listen(
+        taskNotesVisibilityProvider,
+        (_, _) {},
+      );
+      final memberTasks = memberContainer.listen(
+        taskListProvider(includeNoteTasks: true),
+        (_, _) {},
+      );
+      final ownerNotes = ownerContainer.listen(
+        taskNotesVisibilityProvider,
+        (_, _) {},
+      );
+      final ownerTasks = ownerContainer.listen(
+        taskListProvider(includeNoteTasks: true),
+        (_, _) {},
+      );
+      addTearDown(() {
+        memberNotes.close();
+        memberTasks.close();
+        ownerNotes.close();
+        ownerTasks.close();
+      });
+
+      expect(
+        await memberContainer.read(taskNotesVisibilityProvider.future),
+        isEmpty,
+      );
+      expect(
+        (await memberContainer.read(
+          taskListProvider(includeNoteTasks: true).future,
+        )).where((item) => item.isNote),
+        isEmpty,
+      );
+      expect(
+        (await ownerContainer.read(
+          taskNotesVisibilityProvider.future,
+        )).map((note) => note.noteId),
+        ['owner-shared-note'],
+      );
+      expect(
+        (await ownerContainer.read(
+          taskListProvider(includeNoteTasks: true).future,
+        )).where((item) => item.isNote).map((item) => item.note!.noteId),
+        ['owner-shared-note'],
+      );
+    },
+  );
+
   test('re-emits the task list at an injected temporal boundary', () async {
     final database = AppDatabase.test();
     var now = DateTime.utc(2026, 9, 15, 23, 59);
@@ -493,7 +616,7 @@ void main() {
       expect(expectedBoundary.hour, 1);
       expect(expectedBoundary.timeZoneOffset, const Duration(hours: -2));
       expect(timers.single.delay, expectedBoundary.difference(now));
-    expect(timers.single.delay, const Duration(minutes: 30));
+      expect(timers.single.delay, const Duration(minutes: 30));
     },
   );
 

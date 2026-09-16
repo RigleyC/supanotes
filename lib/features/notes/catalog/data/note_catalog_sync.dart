@@ -315,7 +315,11 @@ class NoteCatalogSync {
       for (final note in localRemoteNotes) {
         if (!remoteIds.contains(note.id) &&
             !_activityTracker.isActive(note.id)) {
-          await _database.noteLifecycleDao.deleteNoteDataInTransaction(note.id);
+          await _removeMissingRemoteNote(
+            userId: userId,
+            note: note,
+            inTransaction: true,
+          );
         }
       }
     }
@@ -404,10 +408,38 @@ class NoteCatalogSync {
       }
       await _remoteNoteQueue.run(note.id, () async {
         if (_activityTracker.isActive(note.id)) return;
-        await _database.deleteNoteData(note.id);
-        dev.log('[NoteCatalogSync] Removed locally deleted note ${note.id}');
+        await _removeMissingRemoteNote(
+          userId: userId,
+          note: note,
+          inTransaction: false,
+        );
       });
     }
+  }
+
+  /// Reconciles a catalog row that disappeared for [userId]. Ownership and
+  /// sharing are separate local concerns: removing a member's preference must
+  /// not tear down the shared note aggregate that an owner or another member
+  /// may still need.
+  Future<void> _removeMissingRemoteNote({
+    required String userId,
+    required NoteData note,
+    required bool inTransaction,
+  }) async {
+    if (note.userId == userId) {
+      if (inTransaction) {
+        await _database.noteLifecycleDao.deleteNoteDataInTransaction(note.id);
+      } else {
+        await _database.deleteNoteData(note.id);
+      }
+      dev.log('[NoteCatalogSync] Removed locally deleted note ${note.id}');
+      return;
+    }
+
+    await _database.userNotePreferencesDao.deletePreference(userId, note.id);
+    dev.log(
+      '[NoteCatalogSync] Removed local membership for shared note ${note.id}',
+    );
   }
 
   /// Hydrates one note through the authenticated document endpoint.

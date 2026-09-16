@@ -24,6 +24,18 @@ class UserNotePreferencesDao extends DatabaseAccessor<AppDatabase>
         .getSingleOrNull();
   }
 
+  /// Removes the local membership/preference for a note without touching the
+  /// note aggregate. A revoked share must not delete the owner's document,
+  /// projection or other users' preferences from the shared local cache.
+  Future<void> deletePreference(String userId, String noteId) async {
+    await (delete(userNotePreferences)..where(
+          (preference) =>
+              preference.userId.equals(userId) &
+              preference.noteId.equals(noteId),
+        ))
+        .go();
+  }
+
   Future<List<UserNotePreferenceData>> getDirtyPreferences() {
     return (select(
       userNotePreferences,
