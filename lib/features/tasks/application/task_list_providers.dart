@@ -98,10 +98,12 @@ Stream<List<VisibleNoteDocument>> _watchVisibleNoteDocuments({
       };
       final visible = <VisibleNoteDocument>[];
       for (final note in catalog) {
-        // watchAllActiveNotes intentionally also exposes shared rows. The
-        // owner guard prevents stale rows from another local account from
-        // leaking into the current account's task list.
-        if (note.note.userId != userId && note.note.permission == null) {
+        // The DAO scopes rows to this account's ownership or membership. Keep
+        // this defense-in-depth check so a stale/alternate catalog stream
+        // cannot turn arbitrary permission metadata into task visibility.
+        final isAuthorizedPermission =
+            note.note.permission == 'view' || note.note.permission == 'edit';
+        if (note.note.userId != userId && !isAuthorizedPermission) {
           continue;
         }
         if (note.note.deletedAt != null ||

@@ -60,8 +60,19 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
       "AND n.lifecycle_state <> '$emptyDraftLifecycleState' "
+      // A shared row is only visible when the current account has a local
+      // membership/preference row for it. The note cache is retained across
+      // session expiry, so permission metadata by itself is not an account
+      // boundary and must not make another account's row visible.
+      '''
+      AND (
+        n.user_id = ? OR
+        (n.permission IN ('view', 'edit') AND unp.note_id IS NOT NULL)
+      )
+      '''
       'ORDER BY COALESCE(unp.favorite, 0) DESC, n.updated_at DESC, n.id DESC',
       userId,
+      extraVariables: [Variable.withString(userId)],
     );
   }
 

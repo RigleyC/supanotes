@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
@@ -267,6 +268,127 @@ void main() {
     expect(items, hasLength(1));
     expect(items.single.task!.id, 'task-1');
   });
+
+  test(
+    'scopes cached shared note tasks to the authenticated account',
+    () async {
+      final database = AppDatabase.test();
+      final createdAt = DateTime.utc(2026, 9, 15);
+      final document = jsonEncode({
+        'schemaVersion': 1,
+        'blocks': [
+          {
+            'id': 'task-block',
+            'type': 'task',
+            'delta': [
+              {'insert': 'Tarefa compartilhada'},
+            ],
+            'metadata': {'isCompleted': false},
+          },
+        ],
+      });
+
+      Future<void> insertNote({
+        required String id,
+        required String userId,
+        String? permission,
+      }) async {
+        await database.notesDao.createNote(
+          NotesCompanion.insert(
+            id: id,
+            userId: userId,
+            content: 'Nota $id',
+            createdAt: createdAt,
+            updatedAt: createdAt,
+            hasRemoteCopy: const Value(true),
+            lifecycleState: const Value(materializedLifecycleState),
+            permission: Value(permission),
+          ),
+        );
+        await database.noteOperationsDao.upsertNoteDocument(
+          LocalNoteDocumentsCompanion.insert(
+            noteId: id,
+            revision: 1,
+            documentJson: document,
+            updatedAt: createdAt,
+            materializedDocumentJson: Value(document),
+            materializedUpdatedAt: Value(createdAt),
+          ),
+        );
+      }
+
+      // These rows were cached while user-a was authenticated. Their stale
+      // view/edit metadata must not grant user-b access after expiry.
+      await insertNote(
+        id: 'cached-view-from-a',
+        userId: 'user-a',
+        permission: 'view',
+      );
+      await insertNote(
+        id: 'cached-edit-from-a',
+        userId: 'user-a',
+        permission: 'edit',
+      );
+
+      // A shared note with a current-account membership remains visible even
+      // when its cached row retains the note owner's local user id.
+      await insertNote(
+        id: 'authorized-for-b',
+        userId: 'user-a',
+        permission: 'view',
+      );
+      await database.userNotePreferencesDao.applyRemotePreference(
+        userId: 'user-b',
+        noteId: 'authorized-for-b',
+        favorite: false,
+        archived: false,
+        hideCompleted: false,
+        collapseImages: false,
+        remoteUpdatedAt: createdAt,
+      );
+      await insertNote(id: 'own-note-for-b', userId: 'user-b');
+
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          currentUserIdProvider.overrideWithValue('user-b'),
+        ],
+      );
+      addTearDown(() async {
+        container.dispose();
+        await database.close();
+      });
+
+      final visibleNotesSubscription = container.listen(
+        taskNotesVisibilityProvider,
+        (_, _) {},
+      );
+      final taskListSubscription = container.listen(
+        taskListProvider(includeNoteTasks: true),
+        (_, _) {},
+      );
+      addTearDown(() {
+        visibleNotesSubscription.close();
+        taskListSubscription.close();
+      });
+
+      final visibleNotes = await container.read(
+        taskNotesVisibilityProvider.future,
+      );
+      expect(
+        visibleNotes.map((note) => note.noteId),
+        unorderedEquals(['authorized-for-b', 'own-note-for-b']),
+      );
+
+      final items = await container.read(
+        taskListProvider(includeNoteTasks: true).future,
+      );
+      expect(
+        items.where((item) => item.isNote).map((item) => item.note!.noteId),
+        unorderedEquals(['authorized-for-b', 'own-note-for-b']),
+      );
+    },
+  );
 
   test('re-emits the task list at an injected temporal boundary', () async {
     final database = AppDatabase.test();
