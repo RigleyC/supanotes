@@ -33,6 +33,7 @@ class TaskForm extends StatelessWidget {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: AppSpacing.md,
         children: [
           AppInput(
             controller: titleController,
@@ -43,7 +44,6 @@ class TaskForm extends StatelessWidget {
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => onSave(),
           ),
-          const SizedBox(height: AppSpacing.md),
           AppTile(
             contentPadding: EdgeInsets.zero,
             title: 'Data, horário e lembrete',
@@ -57,7 +57,6 @@ class TaskForm extends StatelessWidget {
             leading: const Icon(Icons.event_note_outlined),
             onTap: onMetadataTap,
           ),
-          const SizedBox(height: AppSpacing.md),
           AppButton(
             text: 'Salvar',
             icon: const Icon(Icons.check_rounded),
@@ -65,7 +64,6 @@ class TaskForm extends StatelessWidget {
             onPressed: isSaving ? null : onSave,
           ),
           if (onDelete != null) ...[
-            const SizedBox(height: AppSpacing.sm),
             AppButton(
               text: 'Excluir task',
               variant: AppButtonVariant.danger,

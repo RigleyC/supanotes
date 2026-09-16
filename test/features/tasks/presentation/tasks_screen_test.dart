@@ -22,26 +22,39 @@ Task _task(String id) {
 GoRouter _router() => GoRouter(
   initialLocation: '/tasks',
   routes: [
-    GoRoute(
-      path: '/tasks',
-      builder: (_, _) => const TasksScreen(),
-      routes: [
-        GoRoute(
-          path: 'completed',
-          builder: (_, _) => const Scaffold(body: Text('history')),
+    StatefulShellRoute.indexedStack(
+      builder: (_, _, navigationShell) => navigationShell,
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/tasks',
+              builder: (_, _) => const TasksScreen(),
+              routes: [
+                GoRoute(
+                  path: 'completed',
+                  builder: (_, _) => const Scaffold(body: Text('history')),
+                ),
+                GoRoute(
+                  path: 'standalone/:id',
+                  builder: (_, state) => Scaffold(
+                    body: Text(
+                      'standalone-route:${state.pathParameters['id']}',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ],
     ),
     GoRoute(
-      path: '/tasks/standalone/:id',
-      builder: (_, state) => Scaffold(
-        body: Text(state.pathParameters['id']!),
-      ),
-    ),
-    GoRoute(
       path: '/notes/:id',
       builder: (_, state) => Scaffold(
-        body: Text(state.uri.queryParameters['blockId'] ?? ''),
+        body: Text(
+          '${state.pathParameters['id']}:${state.uri.queryParameters['blockId']}',
+        ),
       ),
     ),
   ],
@@ -123,5 +136,41 @@ void main() {
     await tester.tap(find.text('note task'));
     expect(standaloneOpened, isTrue);
     expect(noteOpened, isTrue);
+  });
+
+  testWidgets('navigates standalone and note tasks with their route identity', (
+    tester,
+  ) async {
+    final router = _router();
+    await tester.pumpWidget(_wrap(router));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.tap(find.text('standalone'));
+    await tester.pumpAndSettle();
+    router.go('/tasks/standalone/standalone');
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/tasks/standalone/standalone',
+    );
+    expect(find.text('standalone-route:standalone'), findsOneWidget);
+
+    router.go('/tasks');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('show-note-tasks-toggle')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.tap(find.text('note task'));
+    await tester.pumpAndSettle();
+    router.go('/notes/note-1?blockId=block-1');
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/notes/note-1');
+    expect(
+      router.routeInformationProvider.value.uri.queryParameters['blockId'],
+      'block-1',
+    );
+    expect(find.text('note-1:block-1'), findsOneWidget);
   });
 }

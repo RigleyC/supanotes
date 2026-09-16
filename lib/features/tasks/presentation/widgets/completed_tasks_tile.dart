@@ -28,10 +28,9 @@ class CompletedTasksTile extends StatelessWidget {
         title: title,
         subtitleWidget: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: AppSpacing.xs,
           children: [
-            const SizedBox(height: AppSpacing.xs),
             TaskSourceLabel(item: entry.task),
-            const SizedBox(height: AppSpacing.xs),
             Text(
               'Concluída em ${DateFormat('dd/MM/yyyy HH:mm').format(entry.completedAt.toLocal())}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(

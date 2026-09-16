@@ -55,71 +55,81 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isNew) return _editor(context, null);
+    if (_isNew) {
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            const SliverAppBar.medium(title: Text('Nova task')),
+            SliverPadding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  TaskForm(
+                    titleController: _titleController,
+                    metadata: _metadata,
+                    onMetadataTap: _openMetadata,
+                    onSave: () => _save(null),
+                    isSaving: _saveState.isLoading,
+                    errorText: _saveState.hasError
+                        ? _saveState.error.toString()
+                        : null,
+                  ),
+                ]),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     final taskAsync = ref.watch(standaloneTaskProvider(widget.taskId!));
-    return taskAsync.when(
-      loading: () => _shell(
-        const SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      ),
-      error: (error, _) => _shell(
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: AppErrorView(
-            title: 'Erro ao carregar a task',
-            subtitle: error.toString(),
-          ),
-        ),
-      ),
-      data: (task) {
-        if (task == null) {
-          return _shell(
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: AppErrorView(title: 'Task não encontrada'),
-            ),
-          );
-        }
-        _synchronizeTask(task);
-        return _editor(context, task);
-      },
-    );
-  }
-
-  Widget _editor(BuildContext context, Task? task) {
-    return _shell(
-      SliverPadding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        sliver: SliverList(
-          delegate: SliverChildListDelegate([
-            TaskForm(
-              titleController: _titleController,
-              metadata: _metadata,
-              onMetadataTap: _openMetadata,
-              onSave: () => _save(task),
-              onDelete: task == null ? null : () => _delete(task),
-              isSaving: _saveState.isLoading,
-              errorText: _saveState.hasError
-                  ? _saveState.error.toString()
-                  : null,
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _shell(Widget content) {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar.medium(
-            title: Text(_isNew ? 'Nova task' : 'Editar task'),
+          const SliverAppBar.medium(title: Text('Editar task')),
+          taskAsync.when(
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, _) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: AppErrorView(
+                title: 'Erro ao carregar a task',
+                subtitle: error.toString(),
+                onRetry: () => ref.invalidate(
+                  standaloneTaskProvider(widget.taskId!),
+                ),
+              ),
+            ),
+            data: (task) {
+              if (task == null) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: AppErrorView(title: 'Task não encontrada'),
+                );
+              }
+              _synchronizeTask(task);
+              return SliverPadding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    TaskForm(
+                      titleController: _titleController,
+                      metadata: _metadata,
+                      onMetadataTap: _openMetadata,
+                      onSave: () => _save(task),
+                      onDelete: () => _delete(task),
+                      isSaving: _saveState.isLoading,
+                      errorText: _saveState.hasError
+                          ? _saveState.error.toString()
+                          : null,
+                    ),
+                  ]),
+                ),
+              );
+            },
           ),
-          content,
         ],
       ),
     );

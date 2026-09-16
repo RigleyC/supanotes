@@ -79,45 +79,45 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 ),
               ),
             ),
-            data: (tasks) => _buildTaskSliver(context, tasks),
+            data: (tasks) {
+              if (tasks.isEmpty) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyState(
+                    icon: Icons.check_circle_outline_rounded,
+                    title: 'Tudo em dia',
+                    subtitle: 'Adicione uma task para começar.',
+                  ),
+                );
+              }
+
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                ),
+                sliver: SliverList.builder(
+                  itemCount: tasks.length,
+                  itemBuilder: (context, index) {
+                    final item = tasks[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: TaskListTile(
+                        item: item,
+                        onTap: () => _openTask(context, item),
+                        onToggle: item.isStandalone
+                            ? () => _completeTask(item)
+                            : null,
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTaskSliver(BuildContext context, List<TaskListItem> tasks) {
-    if (tasks.isEmpty) {
-      return const SliverFillRemaining(
-        hasScrollBody: false,
-        child: EmptyState(
-          icon: Icons.check_circle_outline_rounded,
-          title: 'Tudo em dia',
-          subtitle: 'Adicione uma task para começar.',
-        ),
-      );
-    }
-
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.lg,
-      ),
-      sliver: SliverList.builder(
-        itemCount: tasks.length,
-        itemBuilder: (context, index) {
-          final item = tasks[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: TaskListTile(
-              item: item,
-              onTap: () => _openTask(context, item),
-              onToggle: item.isStandalone ? () => _completeTask(item) : null,
-            ),
-          );
-        },
       ),
     );
   }

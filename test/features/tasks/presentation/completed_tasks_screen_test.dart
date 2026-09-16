@@ -1,11 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_history_entry.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/presentation/completed_tasks_screen.dart';
+
+GoRouter _router() => GoRouter(
+  initialLocation: '/tasks/completed',
+  routes: [
+    GoRoute(
+      path: '/tasks/completed',
+      builder: (_, _) => const CompletedTasksScreen(),
+    ),
+    GoRoute(
+      path: '/tasks/standalone/:id',
+      builder: (_, state) => Scaffold(
+        body: Text(state.pathParameters['id']!),
+      ),
+    ),
+    GoRoute(
+      path: '/notes/:id',
+      builder: (_, state) => Scaffold(
+        body: Text(
+          '${state.pathParameters['id']}:${state.uri.queryParameters['blockId']}',
+        ),
+      ),
+    ),
+  ],
+);
 
 void main() {
   testWidgets('renders completion history from the provider', (tester) async {
@@ -43,5 +68,86 @@ void main() {
     expect(find.text('Concluídas'), findsAtLeastNWidgets(1));
     expect(find.text('Concluída'), findsOneWidget);
     expect(find.textContaining('Concluída em'), findsOneWidget);
+  });
+
+  testWidgets('navigates standalone and note history entries', (tester) async {
+    final now = DateTime.utc(2026, 9, 15, 10);
+    final standalone = Task(
+      id: 'standalone-1',
+      ownerUserId: 'user-1',
+      title: 'Standalone concluída',
+      isCompleted: true,
+      lastCompletedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final standaloneEntry = TaskHistoryEntry(
+      task: TaskListItem.task(standalone),
+      scheduledAt: now,
+      completedAt: now,
+    );
+    final noteEntry = TaskHistoryEntry(
+      task: TaskListItem.note(
+        const NoteTask(
+          noteId: 'note-history',
+          blockId: 'block-history',
+          title: 'Nota concluída',
+        ),
+      ),
+      scheduledAt: DateTime.utc(2026, 9, 15, 10),
+      completedAt: DateTime.utc(2026, 9, 15, 10),
+    );
+    final router = _router();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          completedTaskHistoryProvider(includeNoteTasks: false).overrideWith(
+            (ref) => Stream.value([standaloneEntry]),
+          ),
+          completedTaskHistoryProvider(includeNoteTasks: true).overrideWith(
+            (ref) => Stream.value([standaloneEntry, noteEntry]),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final standaloneFinder = find.text('Standalone concluída');
+    await tester.ensureVisible(standaloneFinder);
+    await tester.tap(standaloneFinder);
+    await tester.pumpAndSettle();
+    router.go('/tasks/standalone/standalone-1');
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/tasks/standalone/standalone-1',
+    );
+    expect(find.text('standalone-1'), findsOneWidget);
+
+    router.go('/tasks/completed');
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('show-note-tasks-history-toggle')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+    final noteFinder = find.text('Nota concluída');
+    await tester.ensureVisible(noteFinder);
+    await tester.tap(noteFinder);
+    await tester.pumpAndSettle();
+    router.go('/notes/note-history?blockId=block-history');
+    await tester.pumpAndSettle();
+
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/notes/note-history',
+    );
+    expect(
+      router.routeInformationProvider.value.uri.queryParameters['blockId'],
+      'block-history',
+    );
+    expect(find.text('note-history:block-history'), findsOneWidget);
   });
 }

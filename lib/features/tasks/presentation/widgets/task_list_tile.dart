@@ -32,10 +32,9 @@ class TaskListTile extends StatelessWidget {
         title: item.isStandalone ? item.task!.title : item.note!.title,
         subtitleWidget: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: AppSpacing.xs,
           children: [
-            const SizedBox(height: AppSpacing.xs),
             TaskSourceLabel(item: item),
-            const SizedBox(height: AppSpacing.xs),
             TaskMetadataBadges(
               dueDate: item.dueDate,
               recurrence: recurrence,

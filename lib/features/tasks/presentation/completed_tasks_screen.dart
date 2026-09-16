@@ -65,46 +65,42 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
                 ),
               ),
             ),
-            data: (entries) => _buildHistorySliver(context, entries),
+            data: (entries) {
+              if (entries.isEmpty) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyState(
+                    icon: Icons.history_rounded,
+                    title: 'Nenhuma conclusão ainda',
+                    subtitle: 'Tasks concluídas aparecerão aqui.',
+                  ),
+                );
+              }
+
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                ),
+                sliver: SliverList.builder(
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: CompletedTasksTile(
+                        entry: entry,
+                        onTap: () => _openEntry(context, entry),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildHistorySliver(
-    BuildContext context,
-    List<TaskHistoryEntry> entries,
-  ) {
-    if (entries.isEmpty) {
-      return const SliverFillRemaining(
-        hasScrollBody: false,
-        child: EmptyState(
-          icon: Icons.history_rounded,
-          title: 'Nenhuma conclusão ainda',
-          subtitle: 'Tasks concluídas aparecerão aqui.',
-        ),
-      );
-    }
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.lg,
-      ),
-      sliver: SliverList.builder(
-        itemCount: entries.length,
-        itemBuilder: (context, index) {
-          final entry = entries[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: CompletedTasksTile(
-              entry: entry,
-              onTap: () => _openEntry(context, entry),
-            ),
-          );
-        },
       ),
     );
   }
