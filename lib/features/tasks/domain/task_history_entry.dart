@@ -11,4 +11,6 @@ class TaskHistoryEntry {
   final DateTime scheduledAt;
   final DateTime completedAt;
   final NoteTask? note;
+
+  String get uiKey => '${task.uiKey}:${completedAt.toUtc().toIso8601String()}';
 }

@@ -78,6 +78,11 @@ class TaskRepository {
 
   Stream<List<TaskData>> watchTasks() => _dao.watchTasks(_ownerUserId);
 
+  /// Decodes a Drift row using the same canonical JSON rules as repository
+  /// reads. Presentation providers use this instead of maintaining a second
+  /// task-row parser.
+  static Task fromData(TaskData row) => _fromRow(row);
+
   Stream<TaskData?> watchTask(String taskId) =>
       _dao.watchTask(_ownerUserId, taskId);
 
