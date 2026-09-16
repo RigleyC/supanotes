@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,9 +86,11 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final coordinator = ref.read(shareIntakeCoordinatorProvider);
-      unawaited(coordinator.onAuthStateChanged(
-        ref.read(authControllerProvider).asData?.value,
-      ));
+      unawaited(
+        coordinator.onAuthStateChanged(
+          ref.read(authControllerProvider).asData?.value,
+        ),
+      );
       final notes = ref.read(activeNotesProvider).asData?.value;
       if (notes != null && notes.isNotEmpty) {
         unawaited(coordinator.publishNotesIndex(notes));
@@ -217,6 +220,10 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
               ? AppTheme.darkTheme
               : AppTheme.lightTheme;
           result = Theme(data: themeData, child: result);
+          final cupertinoTheme = brightness == Brightness.dark
+              ? AppTheme.cupertinoDarkTheme
+              : AppTheme.cupertinoLightTheme;
+          result = CupertinoTheme(data: cupertinoTheme, child: result);
         }
         result = SnackOverlay(child: result);
         return result;

@@ -28,12 +28,12 @@ class AppNavigationShell extends StatelessWidget {
           AdaptiveNavigationDestination(
             icon: isIos ? 'checkmark.circle' : Icons.check_box_outlined,
             selectedIcon: isIos ? 'checkmark.circle.fill' : Icons.check_box,
-            label: 'Tasks',
+            label: '',
           ),
           AdaptiveNavigationDestination(
             icon: isIos ? 'note' : Icons.notes_outlined,
             selectedIcon: isIos ? 'note.fill' : Icons.notes,
-            label: 'Notas',
+            label: '',
           ),
         ],
       ),

@@ -53,6 +53,7 @@ class AppTheme {
       brightness: brightness,
       primaryColor: colorScheme.primary,
       scaffoldBackgroundColor: colorScheme.surface,
+      barBackgroundColor: colorScheme.surface,
       textTheme: CupertinoTextThemeData(
         primaryColor: colorScheme.onSurface,
         textStyle:
@@ -164,7 +165,10 @@ class AppTheme {
         ),
       ),
       extensions: [
-        if (brightness == Brightness.light) AppSemanticColors.light else AppSemanticColors.dark,
+        if (brightness == Brightness.light)
+          AppSemanticColors.light
+        else
+          AppSemanticColors.dark,
       ],
     );
   }

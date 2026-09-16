@@ -43,6 +43,7 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
           ],
         ),
         cupertinoNavigationBar: CupertinoNavigationBar(
+          backgroundColor: CupertinoTheme.of(context).barBackgroundColor,
           border: null,
           trailing: TaskSourceFilterMenu(
             key: const ValueKey('task-source-filter-menu'),

@@ -20,58 +20,62 @@ class TaskListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = item.isStandalone ? item.task?.title : item.note?.title;
     final recurrence = TaskRecurrence.parse(
-      item.isStandalone ? item.task!.recurrenceRule : item.note!.recurrenceRule,
+      item.isStandalone ? item.task?.recurrenceRule : item.note?.recurrenceRule,
     );
-    final reminder = item.isStandalone && item.task!.reminder != null;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      spacing: AppSpacing.md,
-      children: [
-        Semantics(
-          button: onToggle != null,
-          enabled: onToggle != null,
-          child: GestureDetector(
-            key: ValueKey('task-toggle-${item.uiKey}'),
-            behavior: HitTestBehavior.opaque,
-            onTap: onToggle,
-            child: const SizedBox(
-              width: 48,
-              height: 48,
-              child: Center(child: AppTaskCheckbox(value: false)),
+    final reminder = item.isStandalone && item.task?.reminder != null;
+    final hasMetadata = item.dueDate != null || recurrence != null || reminder;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Row(
+        spacing: AppSpacing.md,
+        children: [
+          Semantics(
+            button: onToggle != null,
+            enabled: onToggle != null,
+            child: GestureDetector(
+              key: ValueKey('task-toggle-${item.uiKey}'),
+              behavior: HitTestBehavior.opaque,
+              onTap: onToggle,
+              child: const SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(child: AppTaskCheckbox(value: false)),
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 spacing: AppSpacing.xs,
                 children: [
-                  Text(
-                    item.isStandalone ? item.task!.title : item.note!.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
+                  if (title != null && title.isNotEmpty)
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
                   TaskSourceLabel(item: item),
-                  TaskMetadataBadges(
-                    dueDate: item.dueDate,
-                    recurrence: recurrence,
-                    hasReminder: reminder,
-                    hasTime: item.hasTime,
-                    now: DateTime.now(),
-                  ),
+                  if (hasMetadata)
+                    TaskMetadataBadges(
+                      dueDate: item.dueDate,
+                      recurrence: recurrence,
+                      hasReminder: reminder,
+                      hasTime: item.hasTime,
+                      now: DateTime.now(),
+                    ),
                 ],
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

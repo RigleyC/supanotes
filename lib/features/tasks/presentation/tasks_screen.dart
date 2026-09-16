@@ -35,6 +35,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     final tasksAsync = ref.watch(
       taskListProvider(includeNoteTasks: _includeNoteTasks),
     );
+    final bottomContentPadding =
+        MediaQuery.paddingOf(context).bottom +
+        (PlatformInfo.isIOS26OrHigher() ? AppSpacing.xxl : AppSpacing.lg);
 
     return AdaptiveScaffold(
       appBar: AdaptiveAppBar(
@@ -52,6 +55,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           ],
         ),
         cupertinoNavigationBar: CupertinoNavigationBar(
+          backgroundColor: CupertinoTheme.of(context).barBackgroundColor,
           border: null,
           trailing: TaskSourceFilterMenu(
             key: const ValueKey('task-source-filter-menu'),
@@ -60,25 +64,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           ),
         ),
       ),
+      floatingActionButton: AppButton(
+        variant: AppButtonVariant.fab,
+        onPressed: () => context.push(AppRoutes.standaloneTask),
+        icon: const Icon(Icons.add_rounded),
+      ),
       body: CustomScrollView(
         slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                AppButton(
-                  text: 'Nova task',
-                  icon: const Icon(Icons.add_rounded),
-                  onPressed: () => context.push(AppRoutes.standaloneTask),
-                ),
-              ]),
-            ),
-          ),
           tasksAsync.when(
             loading: () => const SliverFillRemaining(
               hasScrollBody: false,
@@ -131,11 +123,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             },
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               AppSpacing.md,
-              0,
               AppSpacing.md,
-              AppSpacing.lg,
+              AppSpacing.md,
+              bottomContentPadding,
             ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
