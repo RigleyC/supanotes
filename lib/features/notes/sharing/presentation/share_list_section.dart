@@ -25,11 +25,11 @@ class ShareListSection extends ConsumerWidget {
     );
     if (!confirmed) return;
 
-    await ref
+    final succeeded = await ref
         .read(shareNoteControllerProvider(noteId).notifier)
         .revoke(userId: share.userId);
 
-    if (ref.read(shareNoteControllerProvider(noteId)).hasError) {
+    if (!succeeded) {
       if (context.mounted) {
         AppMessenger.showError('Erro ao remover compartilhamento');
       }

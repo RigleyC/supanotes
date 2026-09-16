@@ -85,8 +85,8 @@ DioException _dioError({
   );
 }
 
-/// Build the [RefreshHandler] and [ReplayHandler] callbacks from a shared
-/// [Dio] so tests can inspect [adapter] for both refresh and replay hits.
+/// Builds refresh and replay callbacks from a shared Dio so tests can inspect
+/// the adapter for both refresh and replay hits.
 ({RefreshHandler onRefresh, ReplayHandler replay}) _refreshCallbacks(Dio dio) {
   return (
     onRefresh: (token) async {
@@ -195,6 +195,29 @@ void main() {
 
       expect(capturedHeaders.containsKey('Authorization'), isFalse);
     });
+
+    test('does not attach Authorization for an empty token', () async {
+      final storage = _MockAuthLocalStorage();
+      when(storage.getAccessToken).thenAnswer((_) async => '');
+      final interceptor = buildTestAuthInterceptor(
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
+        onAuthFailure: () async {},
+        onRefresh: (_) async => null,
+        replay: (_) => throw UnimplementedError('not used in this test'),
+      );
+
+      final adapter = _TestAdapter((_) async {
+        return _jsonResponse(200, {'ok': true});
+      });
+      final dio = Dio()..httpClientAdapter = adapter;
+      dio.interceptors.add(interceptor);
+
+      await dio.get<dynamic>('/notes');
+
+      expect(adapter.hits.single.headers.containsKey('Authorization'), isFalse);
+    });
   });
 
   group('AuthInterceptor.onError (401 refresh flow)', () {
@@ -214,11 +237,7 @@ void main() {
         ),
       ).thenAnswer((_) async {});
 
-      var tokenReadCount = 0;
-      when(storage.getAccessToken).thenAnswer((_) async {
-        tokenReadCount++;
-        return tokenReadCount == 1 ? 'old-access' : 'new-access';
-      });
+      when(storage.getAccessToken).thenAnswer((_) async => 'old-access');
 
       var refreshCount = 0;
       final refreshAdapter = _TestAdapter((options) async {
@@ -366,6 +385,47 @@ void main() {
       },
     );
 
+    test(
+      'replays with a token installed by another request instead of refreshing again',
+      () async {
+        final storage = _MockAuthLocalStorage();
+        var accessTokenReads = 0;
+        when(storage.getAccessToken).thenAnswer((_) async {
+          accessTokenReads++;
+          return accessTokenReads == 1 ? 'old-access' : 'new-access';
+        });
+        when(storage.getRefreshToken).thenAnswer((_) async => 'refresh');
+
+        var refreshCalls = 0;
+        final interceptor = buildTestAuthInterceptor(
+          getAccessToken: storage.getAccessToken,
+          getRefreshToken: storage.getRefreshToken,
+          saveTokens: storage.saveTokens,
+          onAuthFailure: () async {},
+          onRefresh: (_) async {
+            refreshCalls++;
+            return (accessToken: 'unexpected', refreshToken: 'unexpected');
+          },
+          replay: (options) async {
+            return Response<dynamic>(
+              requestOptions: options,
+              statusCode: options.extra['retry'] == true ? 200 : 401,
+            );
+          },
+        );
+        final dio = Dio()
+          ..httpClientAdapter = _TestAdapter(
+            (_) async => _jsonResponse(401, {'error': 'late'}),
+          )
+          ..interceptors.add(interceptor);
+
+        final response = await dio.get<dynamic>('/notes');
+
+        expect(response.statusCode, 200);
+        expect(refreshCalls, 0);
+      },
+    );
+
     test('on 401 with a failed refresh, invokes onAuthFailure and propagates '
         'the original error', () async {
       final storage = _MockAuthLocalStorage();
@@ -471,6 +531,50 @@ void main() {
       );
     });
 
+    test(
+      'does not refresh again when the single replay also returns 401',
+      () async {
+        final storage = _MockAuthLocalStorage();
+        when(storage.getAccessToken).thenAnswer((_) async => 'old');
+        when(storage.getRefreshToken).thenAnswer((_) async => 'refresh');
+        when(
+          () => storage.saveTokens(
+            accessToken: any(named: 'accessToken'),
+            refreshToken: any(named: 'refreshToken'),
+          ),
+        ).thenAnswer((_) async {});
+
+        var refreshCalls = 0;
+        late Dio dio;
+        final interceptor = buildTestAuthInterceptor(
+          getAccessToken: storage.getAccessToken,
+          getRefreshToken: storage.getRefreshToken,
+          saveTokens: storage.saveTokens,
+          onAuthFailure: () async {},
+          onRefresh: (_) async {
+            refreshCalls++;
+            return (accessToken: 'new', refreshToken: 'new-refresh');
+          },
+          replay: (options) => dio.fetch<dynamic>(options),
+        );
+        var requestHits = 0;
+        dio = Dio()
+          ..httpClientAdapter = _TestAdapter((_) async {
+            requestHits++;
+            return _jsonResponse(401, {'error': 'still expired'});
+          })
+          ..interceptors.add(interceptor);
+
+        await expectLater(
+          () => dio.get<dynamic>('/notes'),
+          throwsA(isA<DioException>()),
+        );
+
+        expect(requestHits, 2);
+        expect(refreshCalls, 1);
+      },
+    );
+
     test('concurrent 401s share a single refresh and a single onAuthFailure '
         'call when the refresh fails', () async {
       final storage = _MockAuthLocalStorage();
@@ -552,10 +656,41 @@ void main() {
         throwsA(isA<DioException>()),
       );
     });
+
+    test('403 is passed through without refresh or session failure', () async {
+      final storage = _MockAuthLocalStorage();
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
+      var failureCalls = 0;
+      final interceptor = buildTestAuthInterceptor(
+        getAccessToken: storage.getAccessToken,
+        getRefreshToken: storage.getRefreshToken,
+        saveTokens: storage.saveTokens,
+        onAuthFailure: () async {
+          failureCalls++;
+        },
+        onRefresh: (_) async {
+          fail('refresh should not be called on a 403');
+        },
+        replay: (_) {
+          fail('replay should not be called on a 403');
+        },
+      );
+      final dio = Dio()
+        ..httpClientAdapter = _TestAdapter(
+          (_) async => _jsonResponse(403, {'error': 'forbidden'}),
+        )
+        ..interceptors.add(interceptor);
+
+      await expectLater(
+        () => dio.get<dynamic>('/notes'),
+        throwsA(isA<DioException>()),
+      );
+      expect(failureCalls, 0);
+    });
   });
 
   group('AuthInterceptor.onError (401 on auth route)', () {
-    test('auth route 401s skip refresh and are passed through', () async {
+    test('login, register, refresh and logout 401s skip refresh', () async {
       final storage = _MockAuthLocalStorage();
       when(storage.getAccessToken).thenAnswer((_) async => 'tok');
       final interceptor = buildTestAuthInterceptor(
@@ -573,19 +708,23 @@ void main() {
         },
       );
 
-      final dio = Dio()
-        ..httpClientAdapter = _TestAdapter((_) async {
-          return _jsonResponse(401, {'error': 'invalid credentials'});
-        })
-        ..interceptors.add(interceptor);
+      for (final path in [
+        '/auth/login',
+        '/auth/register',
+        '/auth/refresh',
+        '/auth/logout',
+      ]) {
+        final dio = Dio()
+          ..httpClientAdapter = _TestAdapter((_) async {
+            return _jsonResponse(401, {'error': 'auth rejected'});
+          })
+          ..interceptors.add(interceptor);
 
-      await expectLater(
-        () => dio.post<dynamic>(
-          '/auth/login',
-          data: {'email': 'a@b.com', 'password': 'x'},
-        ),
-        throwsA(isA<DioException>()),
-      );
+        await expectLater(
+          () => dio.post<dynamic>(path),
+          throwsA(isA<DioException>()),
+        );
+      }
     });
   });
 }

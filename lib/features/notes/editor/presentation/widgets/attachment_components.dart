@@ -49,6 +49,7 @@ class AttachmentComponentBuilder implements ComponentBuilder {
               fileName: node.metadata['filename'] is String
                   ? node.metadata['filename'] as String
                   : 'Anexo',
+              downloadUrl: node.metadata['url'] as String?,
             )
           : null,
       attachmentDelivery: attachmentDelivery,

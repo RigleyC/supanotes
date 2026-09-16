@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/fmpwizard/go-quilljs-delta/delta"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/noteoperations"
-	"github.com/RigleyC/supanotes/internal/notes"
 )
 
 const ShoppingListTitle = "Lista de compras"
@@ -23,15 +24,19 @@ var (
 )
 
 type Service struct {
-	notes *notes.Service
+	notes noteReader
 	ops   noteoperations.DocumentService
 }
 
-func NewService(notesSvc *notes.Service, opsSvc noteoperations.DocumentService) *Service {
+type noteReader interface {
+	GetNotes(ctx context.Context, userID pgtype.UUID, favorite *bool, limit int32, cursorUpdatedAt *time.Time, cursorID *pgtype.UUID) ([]sqlcgen.GetNotesRow, error)
+}
+
+func NewService(notesSvc noteReader, opsSvc noteoperations.DocumentService) *Service {
 	return &Service{notes: notesSvc, ops: opsSvc}
 }
 
-func (s *Service) AddItem(ctx context.Context, userID pgtype.UUID, item string) error {
+func (s *Service) AddItem(ctx context.Context, userID pgtype.UUID, item string, operationID uuid.UUID) error {
 	item = strings.TrimSpace(item)
 	if item == "" {
 		return ErrEmptyItem
@@ -50,14 +55,18 @@ func (s *Service) AddItem(ctx context.Context, userID pgtype.UUID, item string) 
 	if err := json.Unmarshal(doc.Document, &current); err != nil {
 		return err
 	}
+	blockID := "shopping-list-item-" + operationID.String()
+	for _, block := range current.Blocks {
+		if block.ID == blockID {
+			return nil
+		}
+	}
 	var after string
 	if len(current.Blocks) > 0 {
 		after = current.Blocks[len(current.Blocks)-1].ID
 	}
-	blockID := uuid.New()
-	opID := uuid.New()
 	payload, err := json.Marshal(noteoperations.CreateBlockPayload{
-		ID: blockID.String(), Type: string(noteoperations.BlockTask),
+		ID: blockID, Type: string(noteoperations.BlockTask),
 		Delta: []delta.Op{{Insert: []rune(item)}}, Metadata: map[string]any{}, AfterBlockID: after,
 	})
 	if err != nil {
@@ -67,8 +76,8 @@ func (s *Service) AddItem(ctx context.Context, userID pgtype.UUID, item string) 
 		KnownRevision: doc.Revision,
 		ClientID:      "shopping-list-command",
 		Operations: []noteoperations.OperationRequest{{
-			OperationID: opID.String(), BaseRevision: doc.Revision,
-			Kind: string(noteoperations.KindCreateBlock), BlockID: ptr(blockID.String()), Payload: payload,
+			OperationID: operationID.String(), BaseRevision: doc.Revision,
+			Kind: string(noteoperations.KindCreateBlock), BlockID: ptr(blockID), Payload: payload,
 		}},
 	})
 	return err

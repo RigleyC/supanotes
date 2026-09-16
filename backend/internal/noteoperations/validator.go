@@ -28,6 +28,14 @@ type ValidationError struct {
 	Err     error
 }
 
+type OperationIDConflictError struct {
+	OperationID string
+}
+
+func (e *OperationIDConflictError) Error() string {
+	return fmt.Sprintf("operation id %q is already used with a different identity", e.OperationID)
+}
+
 func (e *ValidationError) Error() string {
 	if e.Err != nil {
 		return fmt.Sprintf("%s: %s", e.Code, e.Err.Error())

@@ -11,7 +11,7 @@ de operações. Ele não conhece widgets nem `MutableDocument`.
 | `syncPending` | envia todas as operações pendentes de uma nota e confirma o snapshot |
 | `pollAndReconcile` | busca operações posteriores à revisão confirmada |
 | `getConfirmedDocument` | lê o snapshot local confirmado |
-| `loadPendingProjection` | lê as operações ainda não confirmadas para rebase |
+  | `getPendingOperations` | lê as operações ainda não confirmadas para rebase |
 
 ## Por que há uma sessão de sync persistida?
 

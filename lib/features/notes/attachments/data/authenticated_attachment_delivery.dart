@@ -23,7 +23,8 @@ final class AuthenticatedAttachmentDelivery implements AttachmentDelivery {
   @override
   Future<void> open(AttachmentReference attachment) async {
     final response = await _api.get<ResponseBody>(
-      '/attachments/${Uri.encodeComponent(attachment.id)}/content',
+      attachment.downloadUrl ??
+          '/attachments/${Uri.encodeComponent(attachment.id)}/content',
       options: Options(responseType: ResponseType.stream),
     );
     final body = response.data;

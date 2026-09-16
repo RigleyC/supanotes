@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
+import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
@@ -115,17 +116,20 @@ void main() {
   group('AuthRepository.register', () {
     test('sends a POST to /auth/register and persists tokens', () async {
       final storage = _MockAuthLocalStorage();
+      final writes = <String>[];
       when(
         () => storage.saveUser(user: any(named: 'user')),
-      ).thenAnswer((_) async {});
+      ).thenAnswer((_) async {
+        writes.add('user');
+      });
       when(
         () => storage.saveTokens(
           accessToken: any(named: 'accessToken'),
           refreshToken: any(named: 'refreshToken'),
         ),
-      ).thenAnswer((_) async {});
-      when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
-
+      ).thenAnswer((_) async {
+        writes.add('tokens');
+      });
       late _StubAdapter adapter;
       adapter = _StubAdapter((options) async {
         expect(options.method, 'POST');
@@ -146,6 +150,7 @@ void main() {
       final repo = AuthRepository(
         apiClient: _apiClient(adapter),
         storage: storage,
+        tokenManager: AuthTokenManager(storage: storage),
       );
 
       final result = await repo.register(
@@ -168,6 +173,7 @@ void main() {
           refreshToken: 'refresh-1',
         ),
       ).called(1);
+      expect(writes, ['tokens', 'user']);
     });
 
     test('translates a 409 into ConflictException', () async {
@@ -178,6 +184,7 @@ void main() {
       final repo = AuthRepository(
         apiClient: _apiClient(adapter),
         storage: storage,
+        tokenManager: AuthTokenManager(storage: storage),
       );
 
       await expectLater(
@@ -196,6 +203,40 @@ void main() {
         ),
       );
     });
+
+    test('clears the session when token installation fails', () async {
+      final storage = _MockAuthLocalStorage();
+      when(
+        () => storage.saveTokens(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      ).thenThrow(StateError('secure storage unavailable'));
+      when(storage.clear).thenAnswer((_) async {});
+      final adapter = _StubAdapter((_) async {
+        return _jsonResponse(201, {
+          'user': {'id': 'u-1', 'email': 'a@b.com', 'name': 'Alice'},
+          'access_token': 'access-1',
+          'refresh_token': 'refresh-1',
+        });
+      });
+      final repo = AuthRepository(
+        apiClient: _apiClient(adapter),
+        storage: storage,
+        tokenManager: AuthTokenManager(storage: storage),
+      );
+
+      await expectLater(
+        () => repo.register(
+          email: 'a@b.com',
+          password: 'hunter2hunter2',
+          name: 'Alice',
+        ),
+        throwsA(isA<AuthSessionInstallationException>()),
+      );
+      verifyNever(() => storage.saveUser(user: any(named: 'user')));
+      verify(storage.clear).called(1);
+    });
   });
 
   group('AuthRepository.login', () {
@@ -210,8 +251,6 @@ void main() {
           refreshToken: any(named: 'refreshToken'),
         ),
       ).thenAnswer((_) async {});
-      when(() => storage.saveSessionData(any())).thenAnswer((_) async {});
-
       final adapter = _StubAdapter((options) async {
         expect(options.path, '/auth/login');
         return _jsonResponse(200, {
@@ -224,6 +263,7 @@ void main() {
       final repo = AuthRepository(
         apiClient: _apiClient(adapter),
         storage: storage,
+        tokenManager: AuthTokenManager(storage: storage),
       );
 
       final result = await repo.login(
@@ -245,6 +285,44 @@ void main() {
       ).called(1);
     });
 
+    test('clears the session when saving the new user fails', () async {
+      final storage = _MockAuthLocalStorage();
+      when(
+        () => storage.saveTokens(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      ).thenAnswer((_) async {});
+      when(() => storage.saveUser(user: any(named: 'user'))).thenThrow(
+        StateError('secure storage unavailable'),
+      );
+      when(storage.clear).thenAnswer((_) async {});
+      final adapter = _StubAdapter((_) async {
+        return _jsonResponse(200, {
+          'user': {'id': 'u-2', 'email': 'b@c.com', 'name': 'Bob'},
+          'access_token': 'access-2',
+          'refresh_token': 'refresh-2',
+        });
+      });
+      final repo = AuthRepository(
+        apiClient: _apiClient(adapter),
+        storage: storage,
+        tokenManager: AuthTokenManager(storage: storage),
+      );
+
+      await expectLater(
+        () => repo.login(email: 'b@c.com', password: 'hunter2hunter2'),
+        throwsA(isA<AuthSessionInstallationException>()),
+      );
+      verify(
+        () => storage.saveTokens(
+          accessToken: 'access-2',
+          refreshToken: 'refresh-2',
+        ),
+      ).called(1);
+      verify(storage.clear).called(1);
+    });
+
     test('translates a 401 into UnauthorizedException', () async {
       final storage = _MockAuthLocalStorage();
       final adapter = _StubAdapter((_) async {
@@ -253,6 +331,7 @@ void main() {
       final repo = AuthRepository(
         apiClient: _apiClient(adapter),
         storage: storage,
+        tokenManager: AuthTokenManager(storage: storage),
       );
 
       await expectLater(
@@ -264,9 +343,10 @@ void main() {
 
   group('AuthRepository.logout', () {
     test(
-      'calls /auth/logout with the refresh token and clears storage',
+      'calls /auth/logout with the refresh token without local cleanup',
       () async {
         final storage = _MockAuthLocalStorage();
+        when(storage.getAccessToken).thenAnswer((_) async => 'a-1');
         when(storage.getRefreshToken).thenAnswer((_) async => 'r-1');
         when(storage.clear).thenAnswer((_) async {});
 
@@ -278,34 +358,41 @@ void main() {
         final repo = AuthRepository(
           apiClient: _apiClient(adapter),
           storage: storage,
+          tokenManager: AuthTokenManager(storage: storage),
         );
 
         await repo.logout();
         expect(adapter.hits.length, 1);
-        verify(storage.clear).called(1);
+        verifyNever(storage.clear);
       },
     );
 
-    test('still clears storage when /auth/logout fails', () async {
-      final storage = _MockAuthLocalStorage();
-      when(storage.getRefreshToken).thenAnswer((_) async => 'r-1');
-      when(storage.clear).thenAnswer((_) async {});
+    test(
+      'keeps local cleanup outside the repository when logout fails',
+      () async {
+        final storage = _MockAuthLocalStorage();
+        when(storage.getAccessToken).thenAnswer((_) async => 'a-1');
+        when(storage.getRefreshToken).thenAnswer((_) async => 'r-1');
+        when(storage.clear).thenAnswer((_) async {});
 
-      final adapter = _StubAdapter((_) async {
-        return _jsonResponse(500, {'error': 'server down'});
-      });
+        final adapter = _StubAdapter((_) async {
+          return _jsonResponse(500, {'error': 'server down'});
+        });
 
-      final repo = AuthRepository(
-        apiClient: _apiClient(adapter),
-        storage: storage,
-      );
+        final repo = AuthRepository(
+          apiClient: _apiClient(adapter),
+          storage: storage,
+          tokenManager: AuthTokenManager(storage: storage),
+        );
 
-      await repo.logout();
-      verify(storage.clear).called(1);
-    });
+        await repo.logout();
+        verifyNever(storage.clear);
+      },
+    );
 
     test('skips the HTTP call when there is no refresh token', () async {
       final storage = _MockAuthLocalStorage();
+      when(storage.getAccessToken).thenAnswer((_) async => null);
       when(storage.getRefreshToken).thenAnswer((_) async => null);
       when(storage.clear).thenAnswer((_) async {});
 
@@ -316,49 +403,12 @@ void main() {
       final repo = AuthRepository(
         apiClient: _apiClient(adapter),
         storage: storage,
+        tokenManager: AuthTokenManager(storage: storage),
       );
 
       await repo.logout();
       expect(adapter.hits, isEmpty);
-      verify(storage.clear).called(1);
-    });
-  });
-
-  group('AuthRepository.isAuthenticated', () {
-    test('returns true when an access token is present', () async {
-      final storage = _MockAuthLocalStorage();
-      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
-      final repo = AuthRepository(
-        apiClient: _apiClient(
-          _StubAdapter((_) async => _jsonResponse(200, {})),
-        ),
-        storage: storage,
-      );
-      expect(await repo.isAuthenticated(), isTrue);
-    });
-
-    test('returns false when no access token is stored', () async {
-      final storage = _MockAuthLocalStorage();
-      when(storage.getAccessToken).thenAnswer((_) async => null);
-      final repo = AuthRepository(
-        apiClient: _apiClient(
-          _StubAdapter((_) async => _jsonResponse(200, {})),
-        ),
-        storage: storage,
-      );
-      expect(await repo.isAuthenticated(), isFalse);
-    });
-
-    test('returns false when the stored access token is empty', () async {
-      final storage = _MockAuthLocalStorage();
-      when(storage.getAccessToken).thenAnswer((_) async => '');
-      final repo = AuthRepository(
-        apiClient: _apiClient(
-          _StubAdapter((_) async => _jsonResponse(200, {})),
-        ),
-        storage: storage,
-      );
-      expect(await repo.isAuthenticated(), isFalse);
+      verifyNever(storage.clear);
     });
   });
 }

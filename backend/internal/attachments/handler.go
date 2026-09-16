@@ -3,9 +3,12 @@ package attachments
 import (
 	"errors"
 	"net/http"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
+	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/RigleyC/supanotes/pkg/uid"
 )
@@ -100,13 +103,25 @@ func (h *Handler) Upload(c echo.Context) error {
 		return web.JSONError(c, http.StatusInternalServerError, "upload failed")
 	}
 
-	return c.JSON(http.StatusCreated, AttachmentResponse{
+	response, err := newAttachmentResponse(noteID, attachment)
+	if err != nil {
+		c.Logger().Errorf("attachment upload returned invalid metadata errorClass=%T", err)
+		return web.JSONError(c, http.StatusInternalServerError, "invalid attachment upload response")
+	}
+	return c.JSON(http.StatusCreated, response)
+}
+
+func newAttachmentResponse(noteID pgtype.UUID, attachment sqlcgen.Attachment) (AttachmentResponse, error) {
+	if !attachment.ID.Valid || attachment.NoteID != noteID || attachment.Filename == "" || attachment.MimeType == "" || attachment.SizeBytes < 0 || !attachment.CreatedAt.Valid {
+		return AttachmentResponse{}, ErrAttachmentMetadata
+	}
+	return AttachmentResponse{
 		ID:          uid.UUIDToString(attachment.ID),
 		NoteID:      uid.UUIDToString(attachment.NoteID),
 		Filename:    attachment.Filename,
 		DownloadURL: "/api/v1/attachments/" + uid.UUIDToString(attachment.ID) + "/content",
 		MimeType:    attachment.MimeType,
 		SizeBytes:   attachment.SizeBytes,
-		CreatedAt:   attachment.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-	})
+		CreatedAt:   attachment.CreatedAt.Time.Format(time.RFC3339),
+	}, nil
 }

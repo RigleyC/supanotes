@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_upload.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
@@ -24,6 +25,7 @@ class NoteEditor extends StatefulWidget {
     required this.noteId,
     required this.session,
     required this.delegate,
+    required this.attachmentUploader,
     super.key,
     this.hideCompleted = false,
     this.collapseImages = false,
@@ -37,6 +39,7 @@ class NoteEditor extends StatefulWidget {
   final AttachmentDelivery? attachmentDelivery;
   final bool requestInitialFocus;
   final NoteEditorDelegate delegate;
+  final AttachmentUploader attachmentUploader;
 
   @override
   State<NoteEditor> createState() => _NoteEditorState();
@@ -73,7 +76,6 @@ class _NoteEditorState extends State<NoteEditor> {
   void _attachSession(NoteEditorSession session) {
     final controller = session.controller;
     if (identical(_attachedSession, session)) return;
-    _controller?.removeListener(_onControllerReady);
     _controller?.focusNode.removeListener(_syncToolbarVisibility);
     _controller?.onHasContentChanged = null;
     unawaited(_captureSubscription?.cancel());
@@ -92,7 +94,6 @@ class _NoteEditorState extends State<NoteEditor> {
       _taskComponentBuilder = null;
       setState(() {});
     });
-    _controller!.addListener(_onControllerReady);
     _controller!.onHasContentChanged = (hasContent) {
       widget.delegate.onHasContentChanged?.call(hasContent);
     };
@@ -226,11 +227,6 @@ class _NoteEditorState extends State<NoteEditor> {
     _taskComponentBuilder = null;
   }
 
-  void _onControllerReady() {
-    if (!mounted) return;
-    setState(() {});
-  }
-
   void _syncToolbarVisibility() {
     if (!_keyboardPanelController.hasDelegate) return;
     final controller = _controller;
@@ -249,7 +245,6 @@ class _NoteEditorState extends State<NoteEditor> {
 
   @override
   void dispose() {
-    _controller?.removeListener(_onControllerReady);
     _controller?.focusNode.removeListener(_syncToolbarVisibility);
     _controller?.onHasContentChanged = null;
     unawaited(_captureSubscription?.cancel());
@@ -277,11 +272,13 @@ class _NoteEditorState extends State<NoteEditor> {
           bottom: 24,
         );
 
-        final theme = Theme.of(context);
         if (_cachedStylesheet == null ||
-            !identical(_cachedColorScheme, theme.colorScheme) ||
+            !identical(
+              _cachedColorScheme,
+              Theme.of(context).colorScheme,
+            ) ||
             _cachedStylesheet!.documentPadding != docPadding) {
-          _cachedColorScheme = theme.colorScheme;
+          _cachedColorScheme = Theme.of(context).colorScheme;
           _cachedStylesheet = mobileNoteStylesheet(
             context,
             documentPadding: docPadding,
@@ -295,7 +292,9 @@ class _NoteEditorState extends State<NoteEditor> {
             documentLayoutKey: _docLayoutKey,
             selectionLayerLinks: _selectionLayerLinks,
             stylesheet: _cachedStylesheet,
-            selectionStyle: editorSelectionStyle(theme.colorScheme),
+            selectionStyle: editorSelectionStyle(
+              Theme.of(context).colorScheme,
+            ),
             componentBuilders: _componentBuilders,
             contentTapDelegateFactory: (readerContext) => NoteLinkTapHandler(
               readerContext.document,
@@ -331,7 +330,7 @@ class _NoteEditorState extends State<NoteEditor> {
                           selectionLayerLinks: _selectionLayerLinks,
                           stylesheet: _cachedStylesheet,
                           selectionStyle: editorSelectionStyle(
-                            theme.colorScheme,
+                            Theme.of(context).colorScheme,
                           ),
                           documentOverlayBuilders: [
                             ...defaultSuperEditorDocumentOverlayBuilders.where(
@@ -340,7 +339,7 @@ class _NoteEditorState extends State<NoteEditor> {
                             ),
                             DefaultCaretOverlayBuilder(
                               caretStyle: CaretStyle(
-                                color: theme.colorScheme.primary,
+                                color: Theme.of(context).colorScheme.primary,
                                 width: 1.5,
                               ),
                             ),
@@ -366,8 +365,13 @@ class _NoteEditorState extends State<NoteEditor> {
           toolbarBuilder: (context, _) => NoteToolbar(
             editor: controller.editor,
             composer: controller.composer,
-            onAttachFile: controller.pickAndAttachFile,
-            onAttachImage: () => controller.pickAndAttachFile(imageOnly: true),
+            onAttachFile: () => controller.pickAndAttachFile(
+              uploader: widget.attachmentUploader,
+            ),
+            onAttachImage: () => controller.pickAndAttachFile(
+              uploader: widget.attachmentUploader,
+              imageOnly: true,
+            ),
           ),
           keyboardPanelBuilder: (_, _) => const SizedBox.shrink(),
         );

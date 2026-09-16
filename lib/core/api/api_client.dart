@@ -21,7 +21,6 @@ import 'package:supanotes/core/api/auth_interceptor.dart';
 import 'package:supanotes/core/constants/api_constants.dart';
 
 class ApiClient {
-
   /// Production constructor — builds the [Dio] instance, creates the
   /// [AuthInterceptor] internally, and wires refresh + replay to use the
   /// same [Dio] (the interceptor's own path and retry guards prevent
@@ -34,8 +33,7 @@ class ApiClient {
     final interceptor = AuthInterceptor(
       getAccessToken: getAccessToken,
       onAuthFailure: onAuthFailure,
-      refreshSession: refreshSession,
-      onRefresh: (refreshToken) async {
+      refreshSession: () => refreshSession((refreshToken) async {
         try {
           final response = await _dio.post<Map<String, dynamic>>(
             '/auth/refresh',
@@ -45,13 +43,18 @@ class ApiClient {
           if (data == null) return null;
           final newAccess = data['access_token'] as String?;
           final newRefresh = data['refresh_token'] as String?;
-          if (newAccess == null || newRefresh == null) return null;
+          if (newAccess == null ||
+              newAccess.isEmpty ||
+              newRefresh == null ||
+              newRefresh.isEmpty) {
+            return null;
+          }
           return (accessToken: newAccess, refreshToken: newRefresh);
         } on DioException catch (error) {
           if (error.response?.statusCode == 401) return null;
           rethrow;
         }
-      },
+      }),
       replay: (options) => _dio.fetch<dynamic>(options),
     );
     _dio.interceptors.add(interceptor);

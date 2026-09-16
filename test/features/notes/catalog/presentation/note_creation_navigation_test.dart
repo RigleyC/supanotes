@@ -8,6 +8,7 @@ import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
 import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
+import 'package:supanotes/shared/widgets/empty_state.dart';
 
 class _RecordingNotesRepository implements INotesRepository {
   String? createdNoteId;
@@ -46,6 +47,10 @@ GoRouter _routerFor(Widget screen) {
             path: AppRoutes.note(':id'),
             builder: (_, state) => Text(state.uri.toString()),
           ),
+          GoRoute(
+            path: AppRoutes.completedTasks,
+            builder: (_, _) => const Text('completed-tasks'),
+          ),
         ],
       ),
     ],
@@ -83,5 +88,23 @@ void main() {
 
     expect(repository.createdNoteId, isNotNull);
     expect(find.text('/notes/${repository.createdNoteId}'), findsOneWidget);
+  });
+
+  testWidgets('empty notes expose the completed action', (
+    tester,
+  ) async {
+    final repository = _RecordingNotesRepository();
+    final router = _routerFor(const NotesListScreen());
+
+    await tester.pumpWidget(_app(router: router, repository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EmptyState), findsOneWidget);
+    expect(find.byKey(const ValueKey('completed-notes-entry')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('completed-notes-entry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('completed-tasks'), findsOneWidget);
   });
 }

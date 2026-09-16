@@ -1,26 +1,42 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
+import 'package:supanotes/features/tasks/domain/task_notification_scheduler.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_form.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_editor_form.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
+import 'package:supanotes/shared/widgets/global_sheet.dart';
 import 'package:uuid/uuid.dart';
 
+/// Opens the standalone task editor directly in the app's global sheet.
+Future<void> showTaskEditorSheet({
+  required BuildContext context,
+  String? taskId,
+  Task? task,
+}) async {
+  await showGlobalSheet<void>(
+    context: context,
+    builder: (_) => TaskEditorScreen(taskId: taskId, task: task),
+  );
+}
+
 class TaskEditorScreen extends ConsumerStatefulWidget {
-  const TaskEditorScreen({this.taskId, super.key});
+  const TaskEditorScreen({this.taskId, this.task, super.key})
+    : assert(taskId == null || task == null);
 
   final String? taskId;
+  final Task? task;
 
   @override
   ConsumerState<TaskEditorScreen> createState() => _TaskEditorScreenState();
@@ -33,13 +49,13 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   AsyncValue<void> _saveState = const AsyncData(null);
   String? _loadedTaskId;
 
-  bool get _isNew => widget.taskId == null;
+  bool get _isNew => widget.taskId == null && widget.task == null;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController();
-    _metadataKey = widget.taskId ?? const Uuid().v4();
+    _metadataKey = widget.task?.id ?? widget.taskId ?? const Uuid().v4();
     _metadata = const TaskMetadataDraft(
       scheduleAnchor: null,
       hasTime: false,
@@ -56,82 +72,71 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isNew) {
-      return AdaptiveScaffold(
-        appBar: const AdaptiveAppBar(useNativeToolbar: false),
-        body: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  TaskForm(
-                    titleController: _titleController,
-                    metadata: _metadata,
-                    onMetadataTap: _openMetadata,
-                    onSave: () => _save(null),
-                    isSaving: _saveState.isLoading,
-                    errorText: _saveState.hasError
-                        ? _saveState.error.toString()
-                        : null,
-                  ),
-                ]),
-              ),
-            ),
-          ],
+    final saveView = _saveState.when(
+      data: (_) => (isSaving: false, errorText: null),
+      loading: () => (isSaving: true, errorText: null),
+      error: (error, _) => (isSaving: false, errorText: error.toString()),
+    );
+
+    if (widget.task != null) {
+      _synchronizeTask(widget.task!);
+      return GlobalSheetPage(
+        title: 'Criar/Editar nota',
+        child: TaskEditorForm(
+          titleController: _titleController,
+          metadata: _metadata,
+          onMetadataTap: _openMetadata,
+          onCancel: context.pop,
+          onSave: () => _save(widget.task),
+          onDelete: () => _delete(widget.task!),
+          isSaving: saveView.isSaving,
+          errorText: saveView.errorText,
         ),
       );
     }
 
-    final taskAsync = ref.watch(standaloneTaskProvider(widget.taskId!));
-    return AdaptiveScaffold(
-      appBar: const AdaptiveAppBar(useNativeToolbar: false),
-      body: CustomScrollView(
-        slivers: [
-          taskAsync.when(
-            loading: () => const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (error, _) => SliverFillRemaining(
-              hasScrollBody: false,
-              child: AppErrorView(
-                title: 'Erro ao carregar a task',
-                subtitle: error.toString(),
-                onRetry: () => ref.invalidate(
-                  standaloneTaskProvider(widget.taskId!),
-                ),
-              ),
-            ),
-            data: (task) {
-              if (task == null) {
-                return const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: AppErrorView(title: 'Task não encontrada'),
-                );
-              }
-              _synchronizeTask(task);
-              return SliverPadding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    TaskForm(
-                      titleController: _titleController,
-                      metadata: _metadata,
-                      onMetadataTap: _openMetadata,
-                      onSave: () => _save(task),
-                      onDelete: () => _delete(task),
-                      isSaving: _saveState.isLoading,
-                      errorText: _saveState.hasError
-                          ? _saveState.error.toString()
-                          : null,
-                    ),
-                  ]),
-                ),
-              );
-            },
-          ),
-        ],
+    if (_isNew) {
+      return GlobalSheetPage(
+        title: 'Criar/Editar nota',
+        child: TaskEditorForm(
+          titleController: _titleController,
+          metadata: _metadata,
+          onMetadataTap: _openMetadata,
+          onCancel: context.pop,
+          onSave: () => _save(null),
+          isSaving: saveView.isSaving,
+          errorText: saveView.errorText,
+        ),
+      );
+    }
+
+    final taskId = widget.taskId!;
+    final taskAsync = ref.watch(standaloneTaskProvider(taskId));
+    return GlobalSheetPage(
+      title: 'Criar/Editar nota',
+      child: taskAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => AppErrorView(
+          title: 'Erro ao carregar a task',
+          subtitle: error.toString(),
+          onRetry: () => ref.invalidate(standaloneTaskProvider(taskId)),
+        ),
+        data: (task) {
+          if (task == null) {
+            return const AppErrorView(title: 'Task não encontrada');
+          }
+          _synchronizeTask(task);
+          return TaskEditorForm(
+            titleController: _titleController,
+            metadata: _metadata,
+            onMetadataTap: _openMetadata,
+            onCancel: context.pop,
+            onSave: () => _save(task),
+            onDelete: () => _delete(task),
+            isSaving: saveView.isSaving,
+            errorText: saveView.errorText,
+          );
+        },
       ),
     );
   }
@@ -145,12 +150,10 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
       hasTime: task.hasTime,
       recurrence: TaskRecurrence.parse(task.recurrenceRule),
       reminder: TaskReminderOption.fromValue(task.reminder),
-      completions: {
-        for (final entry in task.completions.entries)
-          if (DateTime.tryParse(entry.key) != null &&
-              DateTime.tryParse(entry.value) != null)
-            DateTime.parse(entry.key): DateTime.parse(entry.value),
-      },
+      completions: readScheduledCompletions(
+        task.completions,
+        hasTime: task.hasTime,
+      ),
     );
   }
 
@@ -170,15 +173,17 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
             leading: const Icon(Icons.event_note_outlined),
             onTap: () async {
               Navigator.of(sheetContext).pop();
-              await showTaskMetadataSheet(
+              final draft = await showTaskMetadataSheet(
                 context: context,
-                ref: ref,
-                taskId: _metadataKey,
                 draft: _metadata,
-                onSave: (draft) async {
-                  if (mounted) setState(() => _metadata = draft);
-                },
               );
+              if (!mounted) return;
+              setState(() => _metadata = draft);
+              if (draft.reminder != null) {
+                await ref
+                    .read(taskNotificationSchedulerProvider.notifier)
+                    .requestPermissionForReminder();
+              }
             },
           ),
         ],
@@ -234,7 +239,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
         );
       }
       if (mounted) context.pop();
-    } catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
       if (mounted) {
         setState(() => _saveState = AsyncError(error, stackTrace));
       }
@@ -254,7 +259,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
     try {
       await ref.read(taskControllerProvider).delete(task.id);
       if (mounted) context.pop();
-    } catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
       if (mounted) setState(() => _saveState = AsyncError(error, stackTrace));
     }
   }

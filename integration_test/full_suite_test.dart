@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supanotes/app/supa_notes_app.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
@@ -12,7 +13,6 @@ import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:supanotes/main.dart';
 import 'package:super_editor/super_editor.dart';
 
 class _OfflineClient extends Mock implements NoteSyncClient {}
@@ -228,7 +228,7 @@ void main() {
         );
 
         expect(
-          await serviceB.loadPendingProjection('shared-account-note'),
+          await serviceB.getPendingOperations('shared-account-note'),
           isEmpty,
         );
         final result = await serviceB.syncPending('shared-account-note');

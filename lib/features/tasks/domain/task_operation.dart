@@ -141,17 +141,18 @@ Object? _sorted(Object? value) => value is Map
     ? value.map((item) => _sorted(item)).toList()
     : value;
 
-Map<String, dynamic> _freeze(Map<String, dynamic> value) => Map.unmodifiable({
-  for (final entry in value.entries) entry.key: _freezeValue(entry.value),
-});
+Map<String, dynamic> _freeze(Map<String, dynamic> value) =>
+    Map<String, dynamic>.unmodifiable({
+      for (final entry in value.entries) entry.key: _freezeValue(entry.value),
+    });
 
 Object? _freezeValue(Object? value) => value is Map
-    ? Map.unmodifiable({
+    ? Map<String, Object?>.unmodifiable({
         for (final entry in value.entries)
           entry.key.toString(): _freezeValue(entry.value),
       })
     : value is Iterable
-    ? List.unmodifiable(value.map(_freezeValue))
+    ? List<Object?>.unmodifiable(value.map(_freezeValue))
     : value;
 
 String _canonicalScheduledAt(String value, {required bool hasTime}) {

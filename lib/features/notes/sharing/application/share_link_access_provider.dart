@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod/src/providers/future_provider.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
@@ -12,7 +11,7 @@ final Provider<ShareLinkAccessResolver> shareLinkAccessResolverProvider =
           ShareLinkAccessResolver(ref.watch(shareLinkAccessRepositoryProvider)),
     );
 
-final FutureProviderFamily<ShareLinkAccessDecision, String> shareLinkAccessProvider = FutureProvider.autoDispose
+final shareLinkAccessProvider = FutureProvider.autoDispose
     .family<ShareLinkAccessDecision, String>((ref, token) async {
       // Wait for auth restoration. A resolved null user is the explicit guest
       // state; an auth error must remain an error instead of silently
@@ -27,7 +26,7 @@ final FutureProviderFamily<ShareLinkAccessDecision, String> shareLinkAccessProvi
 ///
 /// The route only opens after this completes. That keeps the editor's
 /// existing session provider and REST/OT revision path authoritative.
-final FutureProviderFamily<void, String> shareLinkNoteHydrationProvider = FutureProvider.autoDispose
+final shareLinkNoteHydrationProvider = FutureProvider.autoDispose
     .family<void, String>((ref, token) async {
       final userId = ref.watch(currentUserIdProvider);
       if (userId == null) {

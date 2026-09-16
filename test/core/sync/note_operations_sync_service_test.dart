@@ -81,26 +81,56 @@ void main() {
     when(() => mockDao.getAnySyncSession(any())).thenAnswer((_) async => null);
     when(() => mockDao.getNoteOwnerId(any())).thenAnswer((_) async => null);
     when(() => mockDao.adoptLegacyRows(any(), any())).thenAnswer((_) async {});
-    when(() => mockDao.markInFlight(any(), any())).thenAnswer((_) async {});
-    when(() => mockDao.upsertSyncSession(any())).thenAnswer((_) async {});
-    when(() => mockDao.deleteAccepted(any())).thenAnswer((_) async {});
     when(
-      () => mockDao.replacePendingOps(any(), any()),
+      () => mockDao.markInFlightInTransaction(
+        any(),
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(() => mockDao.upsertSyncSession(any())).thenAnswer((_) async {});
+    when(
+      () => mockDao.deleteAcceptedInTransaction(
+        any(),
+        noteId: any(named: 'noteId'),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
     ).thenAnswer((_) async {});
     when(
-      () => mockDao.replacePendingOps(
+      () => mockDao.replacePendingOpsInTransaction(
         any(),
         any(),
         ownerUserId: any(named: 'ownerUserId'),
       ),
     ).thenAnswer((_) async {});
     when(() => mockDao.upsertNoteDocument(any())).thenAnswer((_) async {});
+    when(
+      () => mockDao.upsertNoteDocumentInTransaction(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockDao.saveMaterializedDocumentInTransaction(
+        noteId: any(named: 'noteId'),
+        documentJson: any(named: 'documentJson'),
+        content: any(named: 'content'),
+        excerpt: any(named: 'excerpt'),
+        updatedAt: any(named: 'updatedAt'),
+      ),
+    ).thenAnswer((_) async {});
     when(() => mockDao.deleteSyncSession(any())).thenAnswer((_) async {});
     when(
       () => mockDao.deleteSyncSession(
         any(),
         ownerUserId: any(named: 'ownerUserId'),
       ),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockDao.deleteSyncSessionInTransaction(
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockDao.insertPendingOperationsInTransaction(any()),
     ).thenAnswer((_) async {});
     when(
       () => mockDao.updatePendingOpsStatus(
@@ -135,7 +165,7 @@ void main() {
         () => mockDao.getPendingOperations('note-1', ownerUserId: 'test-actor'),
       ).thenAnswer((_) async => []);
       when(
-        () => mockDao.insertPendingOperation(any()),
+        () => mockDao.insertPendingOperationsInTransaction(any()),
       ).thenAnswer((_) async {});
 
       await service.enqueueOperation(
@@ -149,8 +179,8 @@ void main() {
       );
 
       verify(
-        () => mockDao.insertPendingOperation(
-          any(that: isA<PendingNoteOperationsCompanion>()),
+        () => mockDao.insertPendingOperationsInTransaction(
+          any(that: isA<List<PendingNoteOperationsCompanion>>()),
         ),
       ).called(1);
     });
@@ -173,7 +203,7 @@ void main() {
         () => mockDao.getPendingOperations('note-1', ownerUserId: 'test-actor'),
       ).thenAnswer((_) async => existing);
       when(
-        () => mockDao.insertPendingOperation(any()),
+        () => mockDao.insertPendingOperationsInTransaction(any()),
       ).thenAnswer((_) async {});
 
       await service.enqueueOperation(
@@ -188,14 +218,14 @@ void main() {
 
       final captured =
           verify(
-                () => mockDao.insertPendingOperation(
-                  captureAny(that: isA<PendingNoteOperationsCompanion>()),
+                () => mockDao.insertPendingOperationsInTransaction(
+                  captureAny(that: isA<List<PendingNoteOperationsCompanion>>()),
                 ),
               ).captured.first
-              as PendingNoteOperationsCompanion;
+              as List<PendingNoteOperationsCompanion>;
 
-      expect(captured.ordinal.value, 1);
-      expect(captured.baseRevision.value, 1);
+      expect(captured.single.ordinal.value, 1);
+      expect(captured.single.baseRevision.value, 1);
     });
 
     test('uses the confirmed revision when the outbox is empty', () async {
@@ -213,7 +243,7 @@ void main() {
         ),
       );
       when(
-        () => mockDao.insertPendingOperation(any()),
+        () => mockDao.insertPendingOperationsInTransaction(any()),
       ).thenAnswer((_) async {});
 
       await service.enqueueOperation(
@@ -228,18 +258,18 @@ void main() {
 
       final captured =
           verify(
-                () => mockDao.insertPendingOperation(
-                  captureAny(that: isA<PendingNoteOperationsCompanion>()),
+                () => mockDao.insertPendingOperationsInTransaction(
+                  captureAny(that: isA<List<PendingNoteOperationsCompanion>>()),
                 ),
               ).captured.single
-              as PendingNoteOperationsCompanion;
+              as List<PendingNoteOperationsCompanion>;
 
-      expect(captured.baseRevision.value, 7);
+      expect(captured.single.baseRevision.value, 7);
     });
 
     test('persists an operation batch in one transaction', () async {
       when(
-        () => mockDao.insertPendingOperation(any()),
+        () => mockDao.insertPendingOperationsInTransaction(any()),
       ).thenAnswer((_) async {});
 
       await service.enqueueOperations('note-1', [
@@ -258,7 +288,9 @@ void main() {
       ]);
 
       verify(() => mockDao.runInTransaction(any())).called(1);
-      verify(() => mockDao.insertPendingOperation(any())).called(2);
+      verify(
+        () => mockDao.insertPendingOperationsInTransaction(any()),
+      ).called(1);
     });
 
     test('serializes concurrent outbox appends for the same note', () async {
@@ -266,26 +298,30 @@ void main() {
       when(
         () => mockDao.getPendingOperations('note-1', ownerUserId: 'test-actor'),
       ).thenAnswer((_) async => List.of(stored));
-      when(() => mockDao.insertPendingOperation(any())).thenAnswer((
+      when(
+        () => mockDao.insertPendingOperationsInTransaction(any()),
+      ).thenAnswer((
         invocation,
       ) async {
-        final op =
+        final ops =
             invocation.positionalArguments.single
-                as PendingNoteOperationsCompanion;
-        stored.add(
-          PendingNoteOperationData(
-            operationId: op.operationId.value,
-            noteId: op.noteId.value,
-            baseRevision: op.baseRevision.value,
-            ordinal: op.ordinal.value,
-            kind: op.kind.value,
-            blockId: op.blockId.value,
-            payloadJson: op.payloadJson.value,
-            createdAt: op.createdAt.value,
-            attemptCount: 0,
-            status: 'pending',
-          ),
-        );
+                as List<PendingNoteOperationsCompanion>;
+        for (final op in ops) {
+          stored.add(
+            PendingNoteOperationData(
+              operationId: op.operationId.value,
+              noteId: op.noteId.value,
+              baseRevision: op.baseRevision.value,
+              ordinal: op.ordinal.value,
+              kind: op.kind.value,
+              blockId: op.blockId.value,
+              payloadJson: op.payloadJson.value,
+              createdAt: op.createdAt.value,
+              attemptCount: 0,
+              status: 'pending',
+            ),
+          );
+        }
       });
 
       await Future.wait([

@@ -71,7 +71,7 @@ func (q *Queries) CreateNoteLink(ctx context.Context, arg CreateNoteLinkParams) 
 const deleteNote = `-- name: DeleteNote :exec
 UPDATE notes
 SET deleted_at = NOW()
-WHERE id = $1 AND user_id = $2
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 `
 
 type DeleteNoteParams struct {

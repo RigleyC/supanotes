@@ -328,7 +328,7 @@ void main() {
       AppRoutes.completedTasks,
     );
 
-    await tester.tap(find.text('Notas'));
+    router.go(AppRoutes.notes);
     await settleRedirect(tester);
     expect(
       router.routerDelegate.currentConfiguration.uri.toString(),

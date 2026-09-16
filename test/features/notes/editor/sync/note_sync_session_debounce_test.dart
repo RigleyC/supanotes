@@ -79,7 +79,6 @@ void main() {
         syncService: syncService,
         document: document,
         editor: editor,
-        userId: 'user-1',
         captureLocalOperations: false,
         networkCoalescingWindow: const Duration(milliseconds: 300),
       );
@@ -156,7 +155,6 @@ void main() {
         syncService: syncService,
         document: document,
         editor: editor,
-        userId: 'user-1',
         captureLocalOperations: false,
         networkCoalescingWindow: const Duration(seconds: 5),
       );
@@ -235,7 +233,6 @@ void main() {
       syncService: syncService,
       document: document,
       editor: editor,
-      userId: 'user-1',
       captureLocalOperations: false,
       networkCoalescingWindow: const Duration(seconds: 5),
     );

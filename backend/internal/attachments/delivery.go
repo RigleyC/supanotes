@@ -30,11 +30,11 @@ type AttachmentDelivery struct {
 // DeliveryService centralizes authorization and private-object opening for
 // authenticated and Share Link downloads.
 type DeliveryService struct {
-	repo    Repository
+	repo    DeliveryRepository
 	storage StorageService
 }
 
-func NewDeliveryService(repo Repository, storage StorageService) *DeliveryService {
+func NewDeliveryService(repo DeliveryRepository, storage StorageService) *DeliveryService {
 	return &DeliveryService{repo: repo, storage: storage}
 }
 
@@ -85,6 +85,9 @@ func (s *DeliveryService) open(ctx context.Context, attachment sqlcgen.Attachmen
 	body, err := s.storage.Open(ctx, attachment.StorageKey)
 	if err != nil {
 		return AttachmentDelivery{}, fmt.Errorf("open attachment object: %w", err)
+	}
+	if body == nil {
+		return AttachmentDelivery{}, fmt.Errorf("open attachment object: %w", ErrStorageInvalidObject)
 	}
 	return AttachmentDelivery{
 		Body:      body,

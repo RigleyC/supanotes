@@ -1,7 +1,6 @@
 package tasks
 
 import (
-	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
@@ -11,7 +10,7 @@ import (
 
 func TestHandlerNeverLeaksOtherOwnerTask(t *testing.T) {
 	id := pgtype.UUID{Bytes: [16]byte{0x77}, Valid: true}
-	f := &fakeRepo{task: sqlcgen.Task{ID: id, OwnerUserID: id, Title: "secret"}}
+	f := &fakeRepo{task: taskRow{ID: id, OwnerUserID: id, Title: "secret"}}
 	h := NewHandler(NewService(f))
 	e := echo.New()
 	req := httptest.NewRequest("GET", "/tasks/77777777-7777-4777-8777-777777777777", nil)

@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/RigleyC/supanotes/internal/tasks"
 )
 
 // DecodeCanonicalDocument validates and decodes the schema-v1 snapshot shared
 // by REST/OT, the public HTML reader, and native clients.
 //
-// UnmarshalDocument repairs malformed persisted snapshots for internal
-// processing. Public delivery must not perform those repairs: a malformed
-// snapshot must fail consistently at the transport boundary.
+// UnmarshalDocument only accepts canonical snapshots. Explicit bootstrap or
+// migration code that needs recovery must call RepairDocument directly.
 func DecodeCanonicalDocument(data []byte) (Document, error) {
 	var envelope struct {
 		SchemaVersion *int              `json:"schemaVersion"`
@@ -178,25 +179,33 @@ func validateCanonicalBlockMetadata(blockType string, metadata map[string]any) e
 }
 
 func validateCanonicalTaskMetadata(metadata map[string]any) error {
+	var dueDateValue, recurrenceValue, reminderValue *string
 	if value, exists := metadata["dueDate"]; exists && value != nil {
 		dueDate, ok := value.(string)
 		if !ok || !isCanonicalScheduledAt(dueDate) {
 			return fmt.Errorf("invalid dueDate metadata")
 		}
+		dueDateValue = &dueDate
 	}
 
 	if value, exists := metadata["recurrenceRule"]; exists && value != nil {
 		recurrenceRule, ok := value.(string)
-		if !ok || !canonicalRecurrenceRules[recurrenceRule] {
+		if !ok || !tasks.IsCanonicalRecurrenceRule(recurrenceRule) {
 			return fmt.Errorf("invalid recurrenceRule metadata")
 		}
+		recurrenceValue = &recurrenceRule
 	}
 
 	if value, exists := metadata["reminder"]; exists && value != nil {
 		reminder, ok := value.(string)
-		if !ok || !canonicalReminders[reminder] {
+		if !ok || !tasks.IsCanonicalReminder(reminder) {
 			return fmt.Errorf("invalid reminder metadata")
 		}
+		reminderValue = &reminder
+	}
+
+	if !tasks.ValidScheduleMetadata(dueDateValue != nil, recurrenceValue, reminderValue) {
+		return fmt.Errorf("recurrenceRule and reminder require dueDate metadata")
 	}
 
 	if value, exists := metadata["lastCompletedAt"]; exists && value != nil {
@@ -220,22 +229,4 @@ func validateCanonicalTaskMetadata(metadata map[string]any) error {
 	}
 
 	return nil
-}
-
-var canonicalRecurrenceRules = map[string]bool{
-	"daily":    true,
-	"weekdays": true,
-	"weekly":   true,
-	"monthly":  true,
-}
-
-var canonicalReminders = map[string]bool{
-	"at_time":       true,
-	"5m_before":     true,
-	"1h_before":     true,
-	"1d_before":     true,
-	"9am":           true,
-	"12pm":          true,
-	"6pm":           true,
-	"1d_before_9am": true,
 }

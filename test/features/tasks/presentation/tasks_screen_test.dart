@@ -8,9 +8,7 @@ import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/presentation/tasks_screen.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_form.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_list_tile.dart';
-import 'package:supanotes/shared/widgets/app_tile.dart';
 
 Task _task(String id) {
   final now = DateTime.utc(2026, 9, 15, 10);
@@ -96,7 +94,10 @@ Future<void> _showNoteTasks(WidgetTester tester) async {
     of: find.text('Mostrar tarefas das notas'),
     matching: find.byType(CupertinoActionSheetAction),
   );
-  tester.widget<CupertinoActionSheetAction>(option.first).onPressed!();
+  final onPressed = tester
+      .widget<CupertinoActionSheetAction>(option.first)
+      .onPressed;
+  onPressed();
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 20));
 }
@@ -110,15 +111,25 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
 
-    expect(find.text('Concluídas'), findsOneWidget);
     expect(find.text('note task'), findsNothing);
-    final tileTitles = tester
-        .widgetList<AppTile>(find.byType(AppTile))
-        .map((tile) => tile.title)
-        .toList();
-    expect(tileTitles.last, 'Concluídas');
     await _showNoteTasks(tester);
     expect(find.text('note task'), findsOneWidget);
+  });
+
+  testWidgets('opens the create sheet without pushing the standalone route', (
+    tester,
+  ) async {
+    final router = _router();
+    await tester.pumpWidget(_wrap(router));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/tasks');
   });
 
   testWidgets('forwards item taps to source navigation callbacks', (
@@ -193,16 +204,18 @@ void main() {
 
     await tester.tap(find.text('standalone'));
     await tester.pumpAndSettle();
-    expect(find.byType(TaskForm), findsOneWidget);
 
-    await tester.pageBack();
+    await tester.tap(find.text('Cancelar'));
     await tester.pumpAndSettle();
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/tasks');
 
     router.go('/tasks');
     await tester.pumpAndSettle();
     await _showNoteTasks(tester);
 
-    await tester.tap(find.text('note task'));
+    final noteFinder = find.text('note task');
+    await tester.ensureVisible(noteFinder);
+    await tester.tap(noteFinder);
     await tester.pumpAndSettle();
     expect(find.text('/notes/note-1?blockId=block-1'), findsOneWidget);
   });

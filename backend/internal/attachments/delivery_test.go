@@ -98,6 +98,17 @@ func TestDeliveryServicePublicAccessStreamsPrivateObject(t *testing.T) {
 	require.Equal(t, "attachments/note/report.pdf", storage.openedKey)
 }
 
+func TestDeliveryServiceRejectsNilStorageBody(t *testing.T) {
+	t.Parallel()
+
+	repo := &deliveryRepo{attachment: deliveryAttachment()}
+	svc := NewDeliveryService(repo, &deliveryStorage{openNil: true})
+
+	_, err := svc.Public(context.Background(), testUUID(1), testUUID(3))
+
+	require.ErrorIs(t, err, ErrStorageInvalidObject)
+}
+
 var errStorageDown = errors.New("object storage unavailable")
 
 type deliveryRepo struct {
@@ -132,6 +143,7 @@ func (r *deliveryRepo) Delete(context.Context, pgtype.UUID) error {
 type deliveryStorage struct {
 	openedKey string
 	openErr   error
+	openNil   bool
 }
 
 func (s *deliveryStorage) Upload(context.Context, string, io.Reader, string, int64) (StoredObject, error) {
@@ -142,6 +154,9 @@ func (s *deliveryStorage) Open(_ context.Context, key string) (io.ReadCloser, er
 	s.openedKey = key
 	if s.openErr != nil {
 		return nil, s.openErr
+	}
+	if s.openNil {
+		return nil, nil
 	}
 	return io.NopCloser(strings.NewReader("private content")), nil
 }

@@ -110,5 +110,19 @@ void main() {
       expect(result.nextDue, isNull);
       expect(result.scheduledAt, isNull);
     });
+
+    test('completes an undated task as a whole task', () {
+      final result =
+          TaskCompletionCommand(
+            () => DateTime(2026, 7, 4, 15),
+          ).complete(
+            TaskSnapshot(dueDate: null, recurrence: TaskRecurrence.daily),
+          );
+
+      expect(result.completed, isTrue);
+      expect(result.previousDue, isNull);
+      expect(result.nextDue, isNull);
+      expect(result.scheduledAt, isNull);
+    });
   });
 }

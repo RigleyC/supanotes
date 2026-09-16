@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:riverpod/src/providers/future_provider.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
@@ -15,8 +14,7 @@ import 'package:supanotes/features/notes/sharing/model/share_link_document.dart'
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:super_editor/super_editor.dart';
 
-final FutureProviderFamily<ShareLinkDocument, String>
-shareLinkDocumentProvider = FutureProvider.autoDispose
+final shareLinkDocumentProvider = FutureProvider.autoDispose
     .family<ShareLinkDocument, String>((ref, token) async {
       final response = await ref
           .read(apiClientProvider)

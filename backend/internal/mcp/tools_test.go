@@ -37,8 +37,19 @@ type auditTestSecurityStore struct {
 
 type noOpConfirmationLease struct{}
 
-func (noOpConfirmationLease) Commit(context.Context) error  { return nil }
-func (noOpConfirmationLease) Release(context.Context) error { return nil }
+func (noOpConfirmationLease) Commit(context.Context, json.RawMessage) error { return nil }
+func (noOpConfirmationLease) CommitMutation(ctx context.Context, mutation ConfirmationMutation) (json.RawMessage, error) {
+	if mutation == nil {
+		return nil, nil
+	}
+	result, err := mutation(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(result)
+}
+func (noOpConfirmationLease) Release(context.Context) error         { return nil }
+func (noOpConfirmationLease) ReplayResult() (json.RawMessage, bool) { return nil, false }
 
 func (s *auditTestSecurityStore) Audit(context.Context, AuditEvent) error {
 	s.auditCalls++
@@ -119,7 +130,7 @@ func TestSchemas_haveCorrectType(t *testing.T) {
 		{"destructiveBlockMutationSchema", destructiveBlockMutationSchema},
 		{"noteRevisionSchema", noteRevisionSchema},
 		{"noteContentSchema", noteContentSchema},
-		{"updateNoteSchema", updateNoteSchema},
+		{"destructiveTaskOccurrenceSchema", destructiveTaskOccurrenceSchema},
 	}
 	for _, tt := range schemas {
 		t.Run(tt.name, func(t *testing.T) {
@@ -165,27 +176,16 @@ func TestSchemas_noteRevisionRequiresNoteID(t *testing.T) {
 	assert.Equal(t, []any{"note_id"}, required)
 }
 
-func TestGetOptionalTime(t *testing.T) {
-	parsed, err := getOptionalTime(map[string]any{"cursor_updated_at": "2026-07-30T12:00:00Z"}, "cursor_updated_at")
+func TestOptionalToolTime(t *testing.T) {
+	parsed, err := optionalToolTime("2026-07-30T12:00:00Z", "cursor_updated_at")
 	require.NoError(t, err)
 	require.NotNil(t, parsed)
 	assert.Equal(t, 2026, parsed.Year())
 }
 
-func TestGetOptionalTime_rejectsInvalidValue(t *testing.T) {
-	_, err := getOptionalTime(map[string]any{"cursor_updated_at": "not-a-time"}, "cursor_updated_at")
+func TestOptionalToolTime_rejectsInvalidValue(t *testing.T) {
+	_, err := optionalToolTime("not-a-time", "cursor_updated_at")
 	require.Error(t, err)
-}
-
-func TestSchemas_updateNote(t *testing.T) {
-	props, ok := updateNoteSchema["properties"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, props, "id")
-	assert.Contains(t, props, "content")
-
-	required, ok := updateNoteSchema["required"].([]any)
-	require.True(t, ok)
-	assert.ElementsMatch(t, []any{"id", "content"}, required)
 }
 
 func TestRegisterTools(t *testing.T) {
@@ -218,7 +218,6 @@ func TestCurrentToolNames_areRetainedProductContract(t *testing.T) {
 		"set_block_type",
 		"share_note",
 		"update_block_text",
-		"update_note",
 		"update_task_metadata",
 		"update_user_settings",
 		"upload_attachment",
@@ -233,44 +232,6 @@ func TestRemovedToolNames_areNotPartOfContract(t *testing.T) {
 	for _, removed := range removedToolNames {
 		assert.NotContains(t, CurrentToolNames, removed)
 	}
-}
-
-func TestParseArgs(t *testing.T) {
-	req := &mcp.CallToolRequest{
-		Params: &mcp.CallToolParamsRaw{
-			Arguments: json.RawMessage(`{"id":"abc","content":"hello"}`),
-		},
-	}
-	args, err := parseArgs(req)
-	require.NoError(t, err)
-	assert.Equal(t, "abc", args["id"])
-	assert.Equal(t, "hello", args["content"])
-}
-
-func TestParseArgs_invalidJSON(t *testing.T) {
-	req := &mcp.CallToolRequest{
-		Params: &mcp.CallToolParamsRaw{
-			Arguments: json.RawMessage(`not json`),
-		},
-	}
-	args, err := parseArgs(req)
-	assert.Nil(t, args)
-	assert.Error(t, err)
-}
-
-func TestGetStr_existingKey(t *testing.T) {
-	args := map[string]any{"key": "value", "num": 42}
-	assert.Equal(t, "value", getStr(args, "key"))
-}
-
-func TestGetStr_missingKey(t *testing.T) {
-	args := map[string]any{"key": "value"}
-	assert.Equal(t, "", getStr(args, "nonexistent"))
-}
-
-func TestGetStr_nonStringValue(t *testing.T) {
-	args := map[string]any{"num": 42}
-	assert.Equal(t, "", getStr(args, "num"))
 }
 
 func TestAsTextResult(t *testing.T) {
@@ -292,6 +253,103 @@ func TestAsError(t *testing.T) {
 	tc, ok := res.Content[0].(*mcp.TextContent)
 	require.True(t, ok)
 	assert.Equal(t, "something went wrong", tc.Text)
+}
+
+func TestScopeMiddleware_filtersDiscoveryAndRejectsDirectCalls(t *testing.T) {
+	readOnly := context.WithValue(context.Background(), mcpScopesKey, []string{"read"})
+	writeOnly := context.WithValue(context.Background(), mcpScopesKey, []string{"write"})
+	tools := &mcp.ListToolsResult{Tools: []*mcp.Tool{
+		{Name: toolListNotes},
+		{Name: toolCreateNote},
+	}}
+	next := func(context.Context, string, mcp.Request) (mcp.Result, error) {
+		return tools, nil
+	}
+
+	result, err := scopeMiddleware(next)(readOnly, "tools/list", &mcp.ServerRequest[*mcp.ListToolsParams]{})
+	require.NoError(t, err)
+	filtered := result.(*mcp.ListToolsResult)
+	require.Len(t, filtered.Tools, 1)
+	assert.Equal(t, toolListNotes, filtered.Tools[0].Name)
+
+	result, err = scopeMiddleware(next)(writeOnly, "tools/list", &mcp.ServerRequest[*mcp.ListToolsParams]{})
+	require.NoError(t, err)
+	filtered = result.(*mcp.ListToolsResult)
+	require.Len(t, filtered.Tools, 1)
+	assert.Equal(t, toolCreateNote, filtered.Tools[0].Name)
+
+	called := false
+	callNext := func(context.Context, string, mcp.Request) (mcp.Result, error) {
+		called = true
+		return &mcp.CallToolResult{}, nil
+	}
+	call := &mcp.ServerRequest[*mcp.CallToolParamsRaw]{
+		Params: &mcp.CallToolParamsRaw{Name: toolDeleteNote},
+	}
+	result, err = scopeMiddleware(callNext)(readOnly, "tools/call", call)
+	require.NoError(t, err)
+	assert.False(t, called)
+	assert.True(t, result.(*mcp.CallToolResult).IsError)
+}
+
+func TestDecodeToolArgs_rejectsInvalidTypesUnknownFieldsAndTrailingJSON(t *testing.T) {
+	tests := []string{
+		`{"content":42}`,
+		`{"content":"ok","unexpected":true}`,
+		`{"content":"ok"}{"content":"again"}`,
+		`[]`,
+	}
+	for _, raw := range tests {
+		t.Run(raw, func(t *testing.T) {
+			req := &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(raw)}}
+			_, err := decodeToolArgs[noteContentToolArgs](req)
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestToolPermission_rejectsUnknownEnum(t *testing.T) {
+	_, err := toolPermission("owner")
+	assert.Error(t, err)
+	permission, err := toolPermission("edit")
+	require.NoError(t, err)
+	assert.Equal(t, "edit", permission)
+}
+
+func TestToolOperationID_preservesRetryKeyAndRejectsInvalidValue(t *testing.T) {
+	const retryKey = "123e4567-e89b-12d3-a456-426614174002"
+	operationID, err := toolOperationID(retryKey)
+	require.NoError(t, err)
+	assert.Equal(t, retryKey, operationID)
+
+	_, err = toolOperationID("not-a-uuid")
+	assert.Error(t, err)
+}
+
+func TestAuditResource_redactsOpaqueArguments(t *testing.T) {
+	request := &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{
+		Arguments: json.RawMessage(`{"id":"https://example.test/s/sn_mcp_secret-token"}`),
+	}}
+	resource, err := resourceFromRequest(request)
+	require.NoError(t, err)
+	assert.Equal(t, "id", resource)
+	assert.NotContains(t, resource, "sn_mcp_secret-token")
+	assert.NotContains(t, resource, "https://")
+}
+
+func TestBuildTaskOccurrenceOperation_reopenUsesCanonicalKindAndNullCompletion(t *testing.T) {
+	completedAt := "2026-09-16T12:00:00Z"
+	operation, err := buildTaskOccurrenceOperation(
+		"task-1", "2026-09-16T09:00:00Z", 4,
+		"123e4567-e89b-12d3-a456-426614174002", &completedAt, true,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, string(noteoperations.KindCompleteTaskOccurrence), operation.Kind)
+	assert.Equal(t, "task-1", *operation.BlockID)
+	var payload noteoperations.CompleteTaskOccurrencePayload
+	require.NoError(t, json.Unmarshal(operation.Payload, &payload))
+	assert.Equal(t, "task-1", payload.TaskID)
+	assert.Nil(t, payload.CompletedAt)
 }
 
 func TestSyncNoteContentUsesCanonicalReplaceOperations(t *testing.T) {

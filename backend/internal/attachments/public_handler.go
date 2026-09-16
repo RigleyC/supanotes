@@ -21,7 +21,7 @@ type PublicHandler struct {
 	resolve  PublicNoteResolver
 }
 
-func NewPublicHandler(repo Repository, storage StorageService, resolve PublicNoteResolver) *PublicHandler {
+func NewPublicHandler(repo DeliveryRepository, storage StorageService, resolve PublicNoteResolver) *PublicHandler {
 	return &PublicHandler{delivery: NewDeliveryService(repo, storage), resolve: resolve}
 }
 

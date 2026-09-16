@@ -101,24 +101,34 @@ func (h *Handler) List(c echo.Context) error {
 	}
 
 	limit := int32(50)
-	if l := c.QueryParam("limit"); l != "" {
-		if parsed, err := parseInt32(l); err == nil && parsed > 0 && parsed <= 100 {
-			limit = parsed
+	if c.QueryParams().Has("limit") {
+		parsed, err := parseInt32(c.QueryParam("limit"))
+		if err != nil || parsed <= 0 || parsed > 100 {
+			return web.JSONError(c, http.StatusBadRequest, "invalid limit")
 		}
+		limit = parsed
 	}
 
 	var cursorUpdatedAt *time.Time
-	if cu := c.QueryParam("cursor_updated_at"); cu != "" {
-		if parsed, err := time.Parse(time.RFC3339, cu); err == nil {
-			cursorUpdatedAt = &parsed
+	hasCursorUpdatedAt := c.QueryParams().Has("cursor_updated_at")
+	if hasCursorUpdatedAt {
+		parsed, err := time.Parse(time.RFC3339, c.QueryParam("cursor_updated_at"))
+		if err != nil {
+			return web.JSONError(c, http.StatusBadRequest, "invalid cursor_updated_at")
 		}
+		cursorUpdatedAt = &parsed
 	}
 	var cursorID *pgtype.UUID
-	if ci := c.QueryParam("cursor_id"); ci != "" {
+	hasCursorID := c.QueryParams().Has("cursor_id")
+	if hasCursorID {
+		ci := c.QueryParam("cursor_id")
 		cursorID, err = web.OptUUID(&ci)
 		if err != nil {
-			cursorID = nil
+			return web.JSONError(c, http.StatusBadRequest, "invalid cursor_id")
 		}
+	}
+	if hasCursorUpdatedAt != hasCursorID {
+		return web.JSONError(c, http.StatusBadRequest, "cursor_updated_at and cursor_id must be provided together")
 	}
 
 	notes, err := h.svc.GetNotes(c.Request().Context(), userID, fav, limit, cursorUpdatedAt, cursorID)

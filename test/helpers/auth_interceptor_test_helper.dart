@@ -1,4 +1,5 @@
 import 'package:supanotes/core/api/auth_interceptor.dart';
+import 'package:supanotes/core/auth/auth_tokens.dart';
 
 /// Adapts the old storage-shaped test setup to the production interceptor
 /// contract without exposing that compatibility path from lib/.
@@ -17,11 +18,10 @@ AuthInterceptor buildTestAuthInterceptor({
   return AuthInterceptor(
     getAccessToken: getAccessToken,
     onAuthFailure: onAuthFailure,
-    onRefresh: onRefresh,
-    refreshSession: (refresh) async {
+    refreshSession: () async {
       final refreshToken = await getRefreshToken();
       if (refreshToken == null) return null;
-      final tokens = await refresh(refreshToken);
+      final tokens = await onRefresh(refreshToken);
       if (tokens == null) return null;
       await saveTokens(
         accessToken: tokens.accessToken,

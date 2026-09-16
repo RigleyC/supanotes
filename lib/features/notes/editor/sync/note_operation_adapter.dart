@@ -133,7 +133,7 @@ class NoteOperationAdapter {
   Future<void> _hydrateFromPersistedState() async {
     try {
       final doc = _confirmedDocument;
-      final pending = await _syncService.loadPendingProjection(_noteId);
+      final pending = await _syncService.getPendingOperations(_noteId);
       if (_disposed) return;
       if (doc == null && pending.isEmpty) return;
       if (doc == null && !_codec.isEmptyDocumentPlaceholder(_document)) {
@@ -305,7 +305,7 @@ class NoteOperationAdapter {
     _confirmedRevision = result.finalRevision;
     await flushNow();
     if (_disposed) return;
-    final rebasedOps = await _syncService.loadPendingProjection(_noteId);
+    final rebasedOps = await _syncService.getPendingOperations(_noteId);
     if (_disposed) return;
     NoteSyncDebug.log(
       'adapter.reconcile',
@@ -339,9 +339,7 @@ class NoteOperationAdapter {
   ) {
     if (_pendingOps.isEmpty) return persisted;
     final merged = List<PendingNoteOperationData>.from(persisted);
-    final startOrdinal = persisted.isEmpty
-        ? 0
-        : persisted.last.ordinal + 1;
+    final startOrdinal = persisted.isEmpty ? 0 : persisted.last.ordinal + 1;
     var ordinal = startOrdinal;
     for (final op in _pendingOps) {
       merged.add(

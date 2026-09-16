@@ -4,64 +4,139 @@ import 'package:supanotes/core/sync/sync_feed_client.dart';
 import 'package:supanotes/core/sync/sync_inbox_store.dart';
 import 'package:supanotes/core/sync/sync_inbox_worker.dart';
 
-/// A remote bootstrap fetched before the local checkpoint transaction starts.
-///
-/// The callbacks must only apply already-materialized data to the open local
-/// transaction. Network fetches belong in [NoteRemoteSyncBootstrapFetcher],
-/// before [SyncInboxStore.completeBootstrap] opens that transaction.
+/// Applies note feed changes. The coordinator only owns the account feed
+/// checkpoint; note ordering and reconciliation stay in the note service.
+final class NoteRemoteSyncNoteApplier {
+  const NoteRemoteSyncNoteApplier({
+    required this.isActive,
+    required this.syncPending,
+    required this.confirmedRevision,
+    required this.pollAndReconcile,
+    required this.hydrateRemote,
+    required this.deleteLocal,
+  });
+
+  final bool Function(String noteId) isActive;
+  final Future<void> Function(String noteId) syncPending;
+  final Future<int?> Function(String noteId) confirmedRevision;
+  final Future<void> Function(String noteId) pollAndReconcile;
+  final Future<void> Function(String noteId) hydrateRemote;
+  final Future<void> Function(String noteId) deleteLocal;
+
+  Future<void> apply(SyncInboxEntry change) async {
+    final noteId = change.noteId;
+    if (noteId == null || noteId.isEmpty) {
+      throw StateError(
+        'Sync change ${change.sequence} (${change.type}) is missing noteId',
+      );
+    }
+
+    switch (change.type) {
+      case 'note_changed':
+        await syncPending(noteId);
+        final currentRevision = await confirmedRevision(noteId);
+        final remoteRevision = change.revision;
+        if (currentRevision != null &&
+            (remoteRevision == null || currentRevision < remoteRevision)) {
+          await pollAndReconcile(noteId);
+        }
+        await hydrateRemote(noteId);
+      case 'note_access_changed':
+      case 'note_preferences_changed':
+        await syncPending(noteId);
+        await hydrateRemote(noteId);
+      case 'note_deleted':
+      case 'note_access_revoked':
+        await deleteLocal(noteId);
+      default:
+        throw StateError('Unsupported sync change type: ${change.type}');
+    }
+  }
+}
+
+/// Task feed adapter. Disabled sync is explicit instead of optional callbacks
+/// on the coordinator.
+abstract interface class NoteRemoteSyncTaskApplier {
+  bool get enabled;
+
+  Future<void> applyChanged(String taskId);
+  Future<void> applyDeleted(String taskId);
+}
+
+final class DisabledNoteRemoteSyncTaskApplier
+    implements NoteRemoteSyncTaskApplier {
+  const DisabledNoteRemoteSyncTaskApplier();
+
+  @override
+  bool get enabled => false;
+
+  @override
+  Future<void> applyChanged(String taskId) => _unsupported(taskId, 'changed');
+
+  @override
+  Future<void> applyDeleted(String taskId) => _unsupported(taskId, 'deleted');
+
+  Future<void> _unsupported(String taskId, String action) {
+    return Future.error(
+      StateError('Task $action handler is unavailable for $taskId'),
+    );
+  }
+}
+
+final class NoteRemoteSyncTaskCallbacks implements NoteRemoteSyncTaskApplier {
+  const NoteRemoteSyncTaskCallbacks({
+    required Future<void> Function(String taskId) applyChanged,
+    required Future<void> Function(String taskId) applyDeleted,
+  }) : _applyChanged = applyChanged,
+       _applyDeleted = applyDeleted;
+
+  @override
+  Future<void> applyChanged(String taskId) => _applyChanged(taskId);
+
+  @override
+  Future<void> applyDeleted(String taskId) => _applyDeleted(taskId);
+
+  final Future<void> Function(String taskId) _applyChanged;
+  final Future<void> Function(String taskId) _applyDeleted;
+
+  @override
+  bool get enabled => true;
+}
+
 final class NoteRemoteSyncBootstrap {
   const NoteRemoteSyncBootstrap({
     required this.applyNotesInTransaction,
-    this.applyTasksInTransaction,
+    required this.applyTasksInTransaction,
   });
 
   final Future<void> Function() applyNotesInTransaction;
-  final Future<void> Function()? applyTasksInTransaction;
+  final Future<void> Function() applyTasksInTransaction;
 }
 
 typedef NoteRemoteSyncBootstrapFetcher =
     Future<NoteRemoteSyncBootstrap> Function();
 
-/// Coordinates one account's remote synchronization lifecycle.
-///
-/// A new local account snapshot is bootstrapped once from the complete catalog
-/// at a stable server watermark. Every later remote mutation is consumed from
-/// the durable incremental inbox.
+/// Coordinates one account's feed checkpoint and delegates resource policy to
+/// typed note/task appliers.
 final class NoteRemoteSyncCoordinator {
   NoteRemoteSyncCoordinator({
     required this.userId,
     required SyncInboxStore store,
     required SyncChangesFetcher fetchChanges,
     required NoteRemoteSyncBootstrapFetcher fetchBootstrap,
-    required bool Function(String noteId) isNoteActive,
-    required Future<void> Function(String noteId) syncPending,
-    required Future<int?> Function(String noteId) confirmedRevision,
-    required Future<void> Function(String noteId) pollAndReconcile,
-    required Future<void> Function(String noteId) hydrateRemote,
-    required Future<void> Function(String noteId) deleteLocal,
-    bool bootstrapTasksAvailable = false,
-    Future<void> Function(String taskId)? applyTaskChanged,
-    Future<void> Function(String taskId)? applyTaskDeleted,
-    void Function(SyncInboxEntry change)? onApplied,
+    required NoteRemoteSyncNoteApplier noteApplier,
+    required NoteRemoteSyncTaskApplier taskApplier,
   }) : _store = store,
        _fetchChanges = fetchChanges,
        _fetchBootstrap = fetchBootstrap,
-       _syncPending = syncPending,
-       _confirmedRevision = confirmedRevision,
-       _pollAndReconcile = pollAndReconcile,
-       _hydrateRemote = hydrateRemote,
-       _deleteLocal = deleteLocal,
-       _bootstrapTasksAvailable = bootstrapTasksAvailable,
-       _applyTaskChanged = applyTaskChanged,
-       _applyTaskDeleted = applyTaskDeleted,
-       _onApplied = onApplied {
+       _taskApplier = taskApplier {
     _worker = SyncInboxWorker(
       userId: userId,
       store: store,
       fetchChanges: fetchChanges,
-      isNoteActive: isNoteActive,
-      applyChange: _applyChange,
-      scope: SyncFeedScope.notes,
+      isNoteActive: noteApplier.isActive,
+      applyChange: (change) => _applyChange(change, noteApplier),
+      scope: taskApplier.enabled ? SyncFeedScope.all : SyncFeedScope.notes,
     );
   }
 
@@ -69,15 +144,7 @@ final class NoteRemoteSyncCoordinator {
   final SyncInboxStore _store;
   final SyncChangesFetcher _fetchChanges;
   final NoteRemoteSyncBootstrapFetcher _fetchBootstrap;
-  final Future<void> Function(String noteId) _syncPending;
-  final Future<int?> Function(String noteId) _confirmedRevision;
-  final Future<void> Function(String noteId) _pollAndReconcile;
-  final Future<void> Function(String noteId) _hydrateRemote;
-  final Future<void> Function(String noteId) _deleteLocal;
-  final bool _bootstrapTasksAvailable;
-  final Future<void> Function(String taskId)? _applyTaskChanged;
-  final Future<void> Function(String taskId)? _applyTaskDeleted;
-  final void Function(SyncInboxEntry change)? _onApplied;
+  final NoteRemoteSyncTaskApplier _taskApplier;
 
   late final SyncInboxWorker _worker;
   Future<void> _tail = Future<void>.value();
@@ -92,53 +159,44 @@ final class NoteRemoteSyncCoordinator {
 
   Future<void> _syncOnce() async {
     final bootstrapVersion = await _store.getBootstrapVersion(userId);
-    if (bootstrapVersion < 2 && _bootstrapTasksAvailable) {
+    if (_taskApplier.enabled && bootstrapVersion < 2) {
       await _bootstrap();
     } else if (!await _store.isBootstrapComplete(userId)) {
       await _bootstrap();
     }
-    _worker.scope = (await _store.getBootstrapVersion(userId)) >= 2
+    _worker.scope = _taskApplier.enabled
         ? SyncFeedScope.all
         : SyncFeedScope.notes;
     await _worker.syncOnce();
   }
 
   Future<void> _bootstrap() async {
-    // Task-enabled clients need the all-resource watermark. A notes-only
-    // marker could leave the cursor below the newest task event, causing the
-    // task bootstrap snapshot to be replayed as historical changes after the
-    // checkpoint. Marker changes are intentionally ignored; only its
-    // watermark anchors the snapshot and subsequent feed reads.
     final marker = await _fetchChanges(
       after: 0,
       limit: 1,
-      scope: _bootstrapTasksAvailable ? SyncFeedScope.all : SyncFeedScope.notes,
+      scope: _taskApplier.enabled ? SyncFeedScope.all : SyncFeedScope.notes,
     );
     final watermark = marker.watermark;
     if (watermark == null) {
       throw StateError('Sync feed bootstrap response is missing a watermark');
     }
 
-    // Fetch and materialize remote snapshots before opening the local
-    // transaction. The returned callbacks only write those snapshots locally.
     final snapshot = await _fetchBootstrap();
-    if (_bootstrapTasksAvailable && snapshot.applyTasksInTransaction == null) {
-      throw StateError(
-        'Task bootstrap is enabled but the remote snapshot has no task apply callback',
-      );
-    }
     await _store.completeBootstrap(
       userId: userId,
       cursor: watermark,
-      bootstrapVersion: _bootstrapTasksAvailable ? 2 : 0,
+      bootstrapVersion: _taskApplier.enabled ? 2 : 0,
       applySnapshotInTransaction: () async {
         await snapshot.applyNotesInTransaction();
-        await snapshot.applyTasksInTransaction?.call();
+        await snapshot.applyTasksInTransaction();
       },
     );
   }
 
-  Future<void> _applyChange(SyncInboxEntry change) async {
+  Future<void> _applyChange(
+    SyncInboxEntry change,
+    NoteRemoteSyncNoteApplier noteApplier,
+  ) async {
     if (change.type == 'task_changed' || change.type == 'task_deleted') {
       final taskId = change.taskId;
       if (taskId == null || taskId.isEmpty) {
@@ -146,74 +204,23 @@ final class NoteRemoteSyncCoordinator {
           'Sync change ${change.sequence} (${change.type}) is missing taskId',
         );
       }
-      if (change.type == 'task_changed') {
-        final applyTaskChanged = _applyTaskChanged;
-        if (applyTaskChanged == null) {
-          throw StateError('No handler registered for task_changed');
-        }
-        await applyTaskChanged(taskId);
-      } else {
-        final applyTaskDeleted = _applyTaskDeleted;
-        if (applyTaskDeleted == null) {
-          throw StateError('No handler registered for task_deleted');
-        }
-        await applyTaskDeleted(taskId);
+      if (!_taskApplier.enabled) {
+        throw StateError('Task change received while task sync is disabled');
       }
-      _onApplied?.call(change);
+      if (change.type == 'task_changed') {
+        await _taskApplier.applyChanged(taskId);
+      } else {
+        await _taskApplier.applyDeleted(taskId);
+      }
       return;
     }
-
-    final noteId = change.noteId;
-    if (noteId == null || noteId.isEmpty) {
-      throw StateError(
-        'Sync change ${change.sequence} (${change.type}) is missing noteId',
-      );
-    }
-
-    switch (change.type) {
-      case 'note_changed':
-        await _applyNoteChanged(change, noteId);
-      case 'note_access_changed':
-      case 'note_preferences_changed':
-        await _syncPending(noteId);
-        await _hydrateRemote(noteId);
-      case 'note_deleted':
-      case 'note_access_revoked':
-        await _deleteLocal(noteId);
-      default:
-        throw StateError('Unsupported sync change type: ${change.type}');
-    }
-    _onApplied?.call(change);
-  }
-
-  Future<void> _applyNoteChanged(
-    SyncInboxEntry change,
-    String noteId,
-  ) async {
-    // Local edits are sent first so the following reconciliation cannot
-    // replace an effective document while durable local operations still wait
-    // to be rebased.
-    await _syncPending(noteId);
-
-    final currentRevision = await _confirmedRevision(noteId);
-    final remoteRevision = change.revision;
-    if (currentRevision != null &&
-        (remoteRevision == null || currentRevision < remoteRevision)) {
-      await _pollAndReconcile(noteId);
-    }
-
-    // The catalog endpoint remains the authoritative source for sharing,
-    // preferences and metadata. For a note that does not exist locally yet it
-    // also hydrates the full document snapshot.
-    await _hydrateRemote(noteId);
+    await noteApplier.apply(change);
   }
 
   void wake() {
     if (_disposed) return;
     unawaited(syncOnce());
   }
-
-  Future<void> drainInbox() => _worker.drainInbox();
 
   Future<void> dispose() async {
     if (_disposed) return;

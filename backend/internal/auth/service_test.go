@@ -417,6 +417,27 @@ func TestService_Login_WrongPassword(t *testing.T) {
 	}
 }
 
+func TestService_Login_RejectsMalformedSettingsPreferences(t *testing.T) {
+	q := newMockQuerier()
+	svc := NewService(q, testConfig(), nil)
+
+	registered, _, _, err := svc.Register(context.Background(), "malformed@example.com", "right-password", "User")
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	q.mu.Lock()
+	settings := q.settings[registered.User.ID]
+	settings.Preferences = []byte(`{"broken":`)
+	q.settings[registered.User.ID] = settings
+	q.mu.Unlock()
+
+	_, _, _, err = svc.Login(context.Background(), "malformed@example.com", "right-password")
+	if err == nil || !strings.Contains(err.Error(), "decode settings preferences") {
+		t.Fatalf("Login malformed preferences error = %v", err)
+	}
+}
+
 func TestService_Refresh_RotatesToken(t *testing.T) {
 	q := newMockQuerier()
 	svc := NewService(q, testConfig(), nil)

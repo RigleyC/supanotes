@@ -24,6 +24,10 @@ func NewRepository(q sqlcgen.Querier) Repository {
 	return &repository{q: q}
 }
 
+func (r *repository) WithQuerier(q sqlcgen.Querier) Repository {
+	return &repository{q: q}
+}
+
 func (r *repository) GetNoteOwner(ctx context.Context, noteID pgtype.UUID) (pgtype.UUID, error) {
 	return r.q.GetNoteOwner(ctx, noteID)
 }

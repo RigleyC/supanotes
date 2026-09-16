@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,7 +11,18 @@ import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
-final _testUserIdProvider = StateProvider<String?>((ref) => 'user-a');
+class _TestUserIdNotifier extends Notifier<String?> {
+  @override
+  String? build() => 'user-a';
+
+  void setUser(String? userId) {
+    state = userId;
+  }
+}
+
+final _testUserIdProvider = NotifierProvider<_TestUserIdNotifier, String?>(
+  _TestUserIdNotifier.new,
+);
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
@@ -47,7 +57,7 @@ void main() {
     final service = container.read(noteOperationsSyncServiceProvider);
     expect(service, isA<NoteOperationsSyncService>());
 
-    container.read(_testUserIdProvider.notifier).state = null;
+    container.read(_testUserIdProvider.notifier).setUser(null);
 
     expect(
       () => container.read(noteOperationsSyncServiceProvider),
@@ -124,7 +134,7 @@ void main() {
   test('logout invalidates the provider for new work', () {
     final authenticated = container.read(noteOperationsSyncServiceProvider);
 
-    container.read(_testUserIdProvider.notifier).state = null;
+    container.read(_testUserIdProvider.notifier).setUser(null);
 
     expect(
       () => container.read(noteOperationsSyncServiceProvider),
@@ -140,7 +150,7 @@ void main() {
     () {
       final userAService = container.read(noteOperationsSyncServiceProvider);
 
-      container.read(_testUserIdProvider.notifier).state = 'user-b';
+      container.read(_testUserIdProvider.notifier).setUser('user-b');
 
       final userBService = container.read(noteOperationsSyncServiceProvider);
       expect(identical(userAService, userBService), isFalse);
@@ -165,7 +175,7 @@ void main() {
       ),
     );
 
-    container.read(_testUserIdProvider.notifier).state = 'user-b';
+    container.read(_testUserIdProvider.notifier).setUser('user-b');
     final serviceB = container.read(noteOperationsSyncServiceProvider);
     final pending = await serviceB.getPendingOperations('note-outbox');
 
@@ -193,12 +203,12 @@ void main() {
       same(container.read(noteSessionCoordinatorProvider)),
     );
 
-    container.read(_testUserIdProvider.notifier).state = 'user-b';
+    container.read(_testUserIdProvider.notifier).setUser('user-b');
 
     final userBCoordinator = container.read(noteSessionCoordinatorProvider);
     expect(identical(userACoordinator, userBCoordinator), isFalse);
 
-    container.read(_testUserIdProvider.notifier).state = null;
+    container.read(_testUserIdProvider.notifier).setUser(null);
 
     expect(
       () => container.read(noteSessionCoordinatorProvider),

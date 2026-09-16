@@ -40,11 +40,11 @@ var destructiveBlockMutationSchema = map[string]any{
 		"block_id":        map[string]any{"type": "string", "description": "Block ID"},
 		"base_revision":   map[string]any{"type": "integer", "minimum": 0, "description": "Document revision used as the operation base"},
 		"payload":         map[string]any{"type": "object", "description": "Operation-specific payload"},
-		"operation_id":    map[string]any{"type": "string", "description": "Optional UUID used for idempotent retries"},
+		"operation_id":    map[string]any{"type": "string", "description": "UUID used for idempotent retries"},
 		"client_id":       map[string]any{"type": "string", "description": "Optional caller identifier"},
 		"confirmation_id": map[string]any{"type": "string", "description": "One-time confirmation ID"},
 	},
-	"required": []any{"note_id", "base_revision"},
+	"required": []any{"note_id", "base_revision", "operation_id"},
 }
 
 var taskOccurrenceSchema = map[string]any{
@@ -58,6 +58,19 @@ var taskOccurrenceSchema = map[string]any{
 		"operation_id":  map[string]any{"type": "string"},
 	},
 	"required": []any{"note_id", "block_id", "base_revision", "scheduled_at"},
+}
+
+var destructiveTaskOccurrenceSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"note_id":         map[string]any{"type": "string"},
+		"block_id":        map[string]any{"type": "string"},
+		"base_revision":   map[string]any{"type": "integer", "minimum": 0},
+		"scheduled_at":    map[string]any{"type": "string", "description": "Scheduled occurrence timestamp"},
+		"operation_id":    map[string]any{"type": "string", "description": "UUID used for idempotent retries"},
+		"confirmation_id": map[string]any{"type": "string", "description": "One-time confirmation ID"},
+	},
+	"required": []any{"note_id", "block_id", "base_revision", "scheduled_at", "operation_id"},
 }
 
 var attachmentUploadSchema = map[string]any{
@@ -108,19 +121,4 @@ var noteContentSchema = map[string]any{
 		},
 	},
 	"required": []any{"content"},
-}
-
-var updateNoteSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"id": map[string]any{
-			"type":        "string",
-			"description": "Note ID",
-		},
-		"content": map[string]any{
-			"type":        "string",
-			"description": "Note content",
-		},
-	},
-	"required": []any{"id", "content"},
 }

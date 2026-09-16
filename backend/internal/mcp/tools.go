@@ -13,6 +13,7 @@ func RegisterTools(
 	if deps.Security == nil {
 		panic("MCP security dependency is required")
 	}
+	server.AddReceivingMiddleware(scopeMiddleware)
 	security := deps.Security
 	addAttachmentTools(server, security, deps.Attachments, deps.DocumentReader)
 	addSharingAndSettingsTools(server, security, deps.Shares, deps.Settings)

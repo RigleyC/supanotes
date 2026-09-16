@@ -40,9 +40,9 @@ final class RemoteNoteChangeApplier {
     await _database.transaction(() async {
       await _database.notesDao.updateRemoteShareMetadata(
         id: metadata.id,
-        permission: _permission(metadata),
-        sharedByEmail: _sharedByEmail(metadata),
-        sharedByName: _sharedByName(metadata),
+        permission: Value(metadata.sharePermission),
+        sharedByEmail: Value(metadata.effectiveSharedByEmail),
+        sharedByName: Value(metadata.effectiveSharedByName),
         noteIconJson: Value(metadata.noteIconJson),
       );
       await _database.userNotePreferencesDao.applyRemotePreference(
@@ -62,24 +62,5 @@ final class RemoteNoteChangeApplier {
             .write(NotesCompanion(updatedAt: Value(metadata.updatedAt)));
       }
     });
-  }
-
-  Value<String?> _permission(RemoteNoteMetadata metadata) {
-    if (metadata.isOwner) return const Value(null);
-    return Value(
-      metadata.access == RemoteNoteAccess.edit ? 'edit' : 'view',
-    );
-  }
-
-  Value<String?> _sharedByEmail(RemoteNoteMetadata metadata) {
-    return metadata.isOwner
-        ? const Value(null)
-        : Value(metadata.sharedByEmail);
-  }
-
-  Value<String?> _sharedByName(RemoteNoteMetadata metadata) {
-    return metadata.isOwner
-        ? const Value(null)
-        : Value(metadata.sharedByName);
   }
 }

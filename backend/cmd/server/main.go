@@ -151,11 +151,14 @@ func connectDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 }
 
 func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCtx context.Context) {
-	e.GET("/debug/goroutine", func(c echo.Context) error {
-		c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
-		c.Response().WriteHeader(http.StatusOK)
-		return pprof.Lookup("goroutine").WriteTo(c.Response().Writer, 2)
-	})
+	// Keep runtime diagnostics local-only and opt-in. They are intentionally
+	// registered before the database guard so local debugging works without DB.
+	if cfg.IsDev() && cfg.EnableDebugEndpoints {
+		e.GET("/debug/goroutine", func(c echo.Context) error {
+			c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
+			return pprof.Lookup("goroutine").WriteTo(c.Response().Writer, 2)
+		})
+	}
 
 	api := e.Group("/api/v1")
 	api.GET("/health", handler.Health(pool))
@@ -272,30 +275,37 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 	shoppingListSvc := shoppinglist.NewService(notesSvc, noteOpsSvc)
 	shoppingListH := shoppinglist.NewHandler(shoppingListSvc)
 	protected.POST("/integrations/shopping-list/items", shoppingListH.AddItem)
-	alexaH := alexa.NewHandler(
-		shoppingListSvc,
-		cfg.JWTSecret,
-		cfg.AlexaApplicationID,
-		authpkg.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
-	)
-	api.POST("/integrations/alexa", alexaH.Handle)
-	oauthH := alexa.NewOAuthHandler(authSvc, pool, cfg, authRateLimiter)
-	api.GET("/integrations/alexa/oauth/authorize", oauthH.Authorize)
-	api.POST("/integrations/alexa/oauth/authorize", oauthH.AuthorizeSubmit)
-	api.POST("/integrations/alexa/oauth/token", oauthH.Token)
+	if cfg.AlexaConfigured() {
+		alexaH := alexa.NewHandler(
+			shoppingListSvc,
+			cfg.JWTSecret,
+			cfg.AlexaApplicationID,
+			authpkg.TokenOptions{Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience},
+			alexa.NewRequestVerifier(nil),
+			alexa.NewPostgresIdempotencyStore(pool),
+		)
+		api.POST("/integrations/alexa", alexaH.Handle)
+		oauthH := alexa.NewOAuthHandler(authSvc, pool, cfg, authRateLimiter)
+		api.GET("/integrations/alexa/oauth/authorize", oauthH.Authorize)
+		api.POST("/integrations/alexa/oauth/authorize", oauthH.AuthorizeSubmit)
+		api.POST("/integrations/alexa/oauth/token", oauthH.Token)
+	}
 
 	// GC cron for hard-deleting old notes
 	cronJob := cron.New(cron.WithSeconds())
 	cronJob.AddFunc("0 0 * * * *", func() {
-		tx, err := pool.Begin(cronCtx)
+		runCtx, runCancel := context.WithTimeout(cronCtx, 5*time.Minute)
+		defer runCancel()
+
+		tx, err := pool.Begin(runCtx)
 		if err != nil {
 			log.Error().Err(err).Msg("cron: failed to begin tx for GC")
 			return
 		}
-		defer tx.Rollback(cronCtx)
+		defer tx.Rollback(runCtx)
 
 		qtx := queries.WithTx(tx)
-		acquired, err := qtx.TryAcquireGCLock(cronCtx)
+		acquired, err := qtx.TryAcquireGCLock(runCtx)
 		if err != nil {
 			log.Error().Err(err).Msg("cron: failed to acquire GC lock")
 			return
@@ -303,12 +313,19 @@ func registerRoutes(e *echo.Echo, cfg *config.Config, pool *pgxpool.Pool, cronCt
 
 		if acquired {
 			log.Info().Msg("cron: acquired GC lock, running hard delete")
-			if err := qtx.HardDeleteOldNotes(cronCtx); err != nil {
+			if err := qtx.HardDeleteOldNotes(runCtx); err != nil {
 				log.Error().Err(err).Msg("cron: failed to hard delete old notes")
 				return
 			}
-			if err := tx.Commit(cronCtx); err != nil {
+			if err := tx.Commit(runCtx); err != nil {
 				log.Error().Err(err).Msg("cron: failed to commit GC tx")
+				return
+			}
+
+			cleanupCtx, cleanupCancel := context.WithTimeout(cronCtx, 5*time.Minute)
+			defer cleanupCancel()
+			if err := attachmentsSvc.CleanupPending(cleanupCtx); err != nil {
+				log.Error().Err(err).Msg("cron: failed to clean pending attachments")
 			}
 		} else {
 			log.Debug().Msg("cron: GC lock already held, skipping")

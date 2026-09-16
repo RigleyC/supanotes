@@ -11,6 +11,8 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/data/auth_repository.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
+import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart'
+    show AuthSessionCleanup, SessionCleanupException, authActionProvider;
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
@@ -105,8 +107,10 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(storage.getAccessToken).thenAnswer((_) async => null);
+      when(storage.getRefreshToken).thenAnswer((_) async => null);
       when(storage.getUser).thenAnswer((_) async => null);
       when(storage.getSessionData).thenAnswer((_) async => const {});
+      when(storage.clear).thenAnswer((_) async {});
 
       final container = await makeContainer(
         storage: storage,
@@ -121,7 +125,10 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(storage.getAccessToken).thenAnswer((_) async => '');
+      when(storage.getRefreshToken).thenAnswer((_) async => null);
+      when(storage.getUser).thenAnswer((_) async => null);
       when(storage.getSessionData).thenAnswer((_) async => const {});
+      when(storage.clear).thenAnswer((_) async {});
 
       final container = await makeContainer(
         storage: storage,
@@ -136,6 +143,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(storage.getAccessToken).thenAnswer((_) async => 'tok');
+      when(storage.getRefreshToken).thenAnswer((_) async => 'refresh');
       when(storage.getSessionData).thenAnswer((_) async => const {});
       when(storage.getUser).thenAnswer(
         (_) async => const User(id: 'u-1', email: 'a@b', name: 'Alice'),
@@ -157,6 +165,7 @@ void main() {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
       when(storage.getAccessToken).thenAnswer((_) async => 'tok');
+      when(storage.getRefreshToken).thenAnswer((_) async => null);
       when(storage.getUser).thenAnswer((_) async => null);
       when(storage.getSessionData).thenAnswer((_) async => const {});
       when(storage.clear).thenAnswer((_) async {});
@@ -168,6 +177,27 @@ void main() {
       await waitForBuild(container);
       final user = container.read(authControllerProvider).requireValue;
       expect(user, isNull);
+      verify(storage.clear).called(1);
+    });
+
+    test('does not bootstrap a cached user without both tokens', () async {
+      final storage = _MockAuthLocalStorage();
+      final repository = _MockAuthRepository();
+      when(storage.getAccessToken).thenAnswer((_) async => 'tok');
+      when(storage.getRefreshToken).thenAnswer((_) async => null);
+      when(storage.getUser).thenAnswer(
+        (_) async => const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      );
+      when(storage.getSessionData).thenAnswer((_) async => const {});
+      when(storage.clear).thenAnswer((_) async {});
+
+      final container = await makeContainer(
+        storage: storage,
+        repository: repository,
+      );
+      await waitForBuild(container);
+
+      expect(container.read(authControllerProvider).requireValue, isNull);
       verify(storage.clear).called(1);
     });
   });
@@ -209,10 +239,46 @@ void main() {
       expect(user.name, 'Alice');
     });
 
-    test('on failure, rethrows and stores the error in state', () async {
+    test(
+      'on failure, rethrows in the action state and keeps session state',
+      () async {
+        final storage = _MockAuthLocalStorage();
+        final repository = _MockAuthRepository();
+        _stubEmptySession(storage);
+        when(
+          () => repository.login(
+            email: any(named: 'email'),
+            password: any(named: 'password'),
+          ),
+        ).thenThrow(const UnauthorizedException(message: 'wrong password'));
+
+        final container = await makeContainer(
+          storage: storage,
+          repository: repository,
+        );
+        await waitForBuild(container);
+
+        await expectLater(
+          () => container
+              .read(authControllerProvider.notifier)
+              .login(email: 'a@b.com', password: 'wrong'),
+          throwsA(isA<UnauthorizedException>()),
+        );
+        expect(container.read(authActionProvider).hasError, isTrue);
+        expect(container.read(authControllerProvider).requireValue, isNull);
+      },
+    );
+
+    test('on failure, preserves an already authenticated session', () async {
       final storage = _MockAuthLocalStorage();
       final repository = _MockAuthRepository();
-      _stubEmptySession(storage);
+      when(storage.getAccessToken).thenAnswer((_) async => 'access');
+      when(storage.getRefreshToken).thenAnswer((_) async => 'refresh');
+      when(storage.getSessionData).thenAnswer((_) async => const {});
+      when(storage.getUser).thenAnswer(
+        (_) async => const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+      );
+      when(storage.clear).thenAnswer((_) async {});
       when(
         () => repository.login(
           email: any(named: 'email'),
@@ -232,8 +298,48 @@ void main() {
             .login(email: 'a@b.com', password: 'wrong'),
         throwsA(isA<UnauthorizedException>()),
       );
-      expect(container.read(authControllerProvider).hasError, isTrue);
+
+      final user = container.read(authControllerProvider).requireValue;
+      expect(user, const User(id: 'u-1', email: 'a@b.com', name: 'Alice'));
+      expect(container.read(authActionProvider).hasError, isTrue);
     });
+
+    test(
+      'on session installation failure, clears the in-memory identity',
+      () async {
+        final storage = _MockAuthLocalStorage();
+        final repository = _MockAuthRepository();
+        when(storage.getAccessToken).thenAnswer((_) async => 'access');
+        when(storage.getRefreshToken).thenAnswer((_) async => 'refresh');
+        when(storage.getSessionData).thenAnswer((_) async => const {});
+        when(storage.getUser).thenAnswer(
+          (_) async => const User(id: 'u-1', email: 'a@b.com', name: 'Alice'),
+        );
+        when(storage.clear).thenAnswer((_) async {});
+        when(
+          () => repository.login(
+            email: any(named: 'email'),
+            password: any(named: 'password'),
+          ),
+        ).thenThrow(
+          AuthSessionInstallationException(StateError('write failed'), null),
+        );
+
+        final container = await makeContainer(
+          storage: storage,
+          repository: repository,
+        );
+        await waitForBuild(container);
+
+        await expectLater(
+          () => container
+              .read(authControllerProvider.notifier)
+              .login(email: 'a@b.com', password: 'new-password'),
+          throwsA(isA<AuthSessionInstallationException>()),
+        );
+        expect(container.read(authControllerProvider).requireValue, isNull);
+      },
+    );
   });
 
   group('AuthController.register', () {
@@ -421,6 +527,50 @@ void main() {
       expect(syncHandle.disposed, isTrue);
       expect(container.read(authControllerProvider).requireValue, isNull);
     });
+  });
+
+  test('cleanup keeps order and reports failures from later steps', () async {
+    final order = <String>[];
+    final cleanup = AuthSessionCleanup(
+      closeResources: () async {
+        order.add('resources');
+        throw StateError('resource close failed');
+      },
+      invalidateCredentials: () async {
+        order.add('credentials');
+        throw StateError('credential clear failed');
+      },
+      clearCache: () {
+        order.add('cache');
+      },
+      clearPreferences: () async {
+        order.add('preferences');
+        throw StateError('preferences clear failed');
+      },
+      clearInbox: () {
+        order.add('inbox');
+      },
+      clearDatabase: () {
+        order.add('database');
+      },
+    );
+
+    final report = await cleanup.run(clearLocalData: true);
+
+    expect(order, [
+      'resources',
+      'credentials',
+      'cache',
+      'preferences',
+      'inbox',
+      'database',
+    ]);
+    expect(report.failures.map((failure) => failure.step), [
+      'resources',
+      'credentials',
+      'preferences',
+    ]);
+    expect(report.error, isA<SessionCleanupException>());
   });
 }
 

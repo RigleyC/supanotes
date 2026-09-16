@@ -89,8 +89,8 @@ void main() {
       completedAt: now,
     );
     final noteEntry = TaskHistoryEntry(
-      task: TaskListItem.note(
-        const NoteTask(
+      task: const TaskListItem.note(
+        NoteTask(
           noteId: 'note-history',
           blockId: 'block-history',
           title: 'Nota concluída',
@@ -120,7 +120,12 @@ void main() {
     await tester.ensureVisible(standaloneFinder);
     await tester.tap(standaloneFinder);
     await tester.pumpAndSettle();
-    expect(find.text('/tasks/standalone/standalone-1'), findsOneWidget);
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/tasks/completed',
+    );
 
     router.go('/tasks/completed');
     await tester.pumpAndSettle();
@@ -130,7 +135,7 @@ void main() {
       of: find.text('Mostrar tarefas das notas'),
       matching: find.byType(CupertinoActionSheetAction),
     );
-    tester.widget<CupertinoActionSheetAction>(option.first).onPressed!();
+    tester.widget<CupertinoActionSheetAction>(option.first).onPressed();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
     final noteFinder = find.text('Nota concluída');

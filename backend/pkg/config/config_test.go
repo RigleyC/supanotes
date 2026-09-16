@@ -5,9 +5,10 @@ import (
 )
 
 func TestLoad_Defaults(t *testing.T) {
-	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_REDIRECT_URIS", "IOS_TEAM_ID", "ANDROID_SHA256_CERT"} {
+	for _, k := range []string{"PORT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "JWT_ISSUER", "JWT_AUDIENCE", "ALEXA_APPLICATION_ID", "ALEXA_CLIENT_ID", "ALEXA_CLIENT_SECRET", "ALEXA_REDIRECT_URIS", "IOS_TEAM_ID", "ANDROID_SHA256_CERT", "ENABLE_DEBUG_ENDPOINTS"} {
 		t.Setenv(k, "")
 	}
+	t.Setenv("ENVIRONMENT", "dev")
 
 	cfg, err := Load()
 	if err != nil {
@@ -25,6 +26,9 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 	if cfg.JWTSecret == "" {
 		t.Errorf("JWTSecret: want dev fallback in dev mode, got empty")
+	}
+	if cfg.EnableDebugEndpoints {
+		t.Error("EnableDebugEndpoints: want false unless explicitly enabled")
 	}
 	if cfg.JWTIssuer != "supanotes-api" || cfg.JWTAudience != "supanotes-client" {
 		t.Errorf("JWT claims defaults: issuer=%q audience=%q", cfg.JWTIssuer, cfg.JWTAudience)
@@ -46,6 +50,10 @@ func TestLoad_FromEnv(t *testing.T) {
 	t.Setenv("JWT_ISSUER", "custom-api")
 	t.Setenv("JWT_AUDIENCE", "custom-client")
 	t.Setenv("ALEXA_REDIRECT_URIS", "https://example.com/one, https://example.com/two")
+	t.Setenv("ALEXA_APPLICATION_ID", "amzn1.ask.skill.example")
+	t.Setenv("ALEXA_CLIENT_ID", "alexa-client")
+	t.Setenv("ALEXA_CLIENT_SECRET", "alexa-client-secret")
+	t.Setenv("ENABLE_DEBUG_ENDPOINTS", "false")
 
 	cfg, err := Load()
 	if err != nil {
@@ -86,6 +94,62 @@ func TestLoad_ProdRequiresJWTSecret(t *testing.T) {
 
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() in prod with no JWT_SECRET: want error, got nil")
+	}
+}
+
+func TestLoad_RequiresExplicitEnvironment(t *testing.T) {
+	for _, k := range []string{"PORT", "ENVIRONMENT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "ALEXA_APPLICATION_ID", "ALEXA_CLIENT_ID", "ALEXA_CLIENT_SECRET", "ALEXA_REDIRECT_URIS", "ENABLE_DEBUG_ENDPOINTS"} {
+		t.Setenv(k, "")
+	}
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() without ENVIRONMENT: want error, got nil")
+	}
+}
+
+func TestLoad_ProductionRejectsPartialAlexaConfig(t *testing.T) {
+	for _, k := range []string{"PORT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "ALEXA_APPLICATION_ID", "ALEXA_CLIENT_ID", "ALEXA_CLIENT_SECRET", "ALEXA_REDIRECT_URIS", "ENABLE_DEBUG_ENDPOINTS"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("ENVIRONMENT", "prod")
+	t.Setenv("JWT_SECRET", "prod-jwt-secret-at-least-32-characters-long")
+	t.Setenv("SHARE_LINK_SECRET", "prod-share-secret-at-least-32-characters-long")
+	t.Setenv("PUBLIC_BASE_URL", "https://notes.example")
+	t.Setenv("ALEXA_APPLICATION_ID", "amzn1.ask.skill.example")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() with partial Alexa config: want error, got nil")
+	}
+}
+
+func TestLoad_DevKeepsPartialAlexaDisabled(t *testing.T) {
+	for _, k := range []string{"PORT", "DATABASE_URL", "JWT_SECRET", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "ALEXA_APPLICATION_ID", "ALEXA_CLIENT_ID", "ALEXA_CLIENT_SECRET", "ALEXA_REDIRECT_URIS", "ENABLE_DEBUG_ENDPOINTS"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("ENVIRONMENT", "dev")
+	t.Setenv("ALEXA_REDIRECT_URIS", "https://layla.amazon.com/api/skill/link/supanotes")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() with partial Alexa config in dev: %v", err)
+	}
+	if cfg.AlexaConfigured() {
+		t.Fatal("partial Alexa config in dev must not enable the integration")
+	}
+}
+
+func TestLoad_RejectsDebugEndpointsOutsideDev(t *testing.T) {
+	for _, k := range []string{"PORT", "DATABASE_URL", "SHARE_LINK_SECRET", "PUBLIC_BASE_URL", "ALEXA_APPLICATION_ID", "ALEXA_CLIENT_ID", "ALEXA_CLIENT_SECRET", "ALEXA_REDIRECT_URIS"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("ENVIRONMENT", "prod")
+	t.Setenv("JWT_SECRET", "prod-jwt-secret-at-least-32-characters-long")
+	t.Setenv("SHARE_LINK_SECRET", "prod-share-secret-at-least-32-characters-long")
+	t.Setenv("PUBLIC_BASE_URL", "https://notes.example")
+	t.Setenv("ENABLE_DEBUG_ENDPOINTS", "true")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() with debug endpoints outside dev: want error, got nil")
 	}
 }
 

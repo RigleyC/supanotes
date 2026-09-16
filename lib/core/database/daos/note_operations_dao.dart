@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:drift/drift.dart';
 
 import 'package:supanotes/core/database/database.dart';
@@ -9,7 +7,6 @@ import 'package:supanotes/core/database/tables/note_sync_errors.dart';
 import 'package:supanotes/core/database/tables/notes.dart';
 import 'package:supanotes/core/database/tables/pending_note_operations.dart';
 import 'package:supanotes/core/database/tables/sync_sessions.dart';
-import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 
 part 'note_operations_dao.g.dart';
 
@@ -46,21 +43,45 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<void> upsertNoteDocument(LocalNoteDocumentsCompanion doc) async {
-    await transaction(() async {
-      await into(
-        localNoteDocuments,
-      ).insert(doc, onConflict: DoUpdate((_) => doc));
-      if (doc.noteId.present) {
-        await attachedDatabase.noteLifecycleDao.markMaterialized(
-          doc.noteId.value,
-        );
-      }
-    });
+    await transaction(() => upsertNoteDocumentInTransaction(doc));
   }
 
-  Future<void> updateMaterializedDocument({
+  Future<void> upsertNoteDocumentInTransaction(
+    LocalNoteDocumentsCompanion doc,
+  ) async {
+    await into(
+      localNoteDocuments,
+    ).insert(doc, onConflict: DoUpdate((_) => doc));
+    if (doc.noteId.present) {
+      await attachedDatabase.noteLifecycleDao.markMaterialized(
+        doc.noteId.value,
+      );
+    }
+  }
+
+  Future<void> saveMaterializedDocument({
     required String noteId,
     required String documentJson,
+    required String content,
+    required String? excerpt,
+    required DateTime updatedAt,
+  }) async {
+    await transaction(
+      () => saveMaterializedDocumentInTransaction(
+        noteId: noteId,
+        documentJson: documentJson,
+        content: content,
+        excerpt: excerpt,
+        updatedAt: updatedAt,
+      ),
+    );
+  }
+
+  Future<void> saveMaterializedDocumentInTransaction({
+    required String noteId,
+    required String documentJson,
+    required String content,
+    required String? excerpt,
     required DateTime updatedAt,
   }) async {
     final changed =
@@ -82,34 +103,15 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
           materializedDocumentJson: Value(documentJson),
           materializedUpdatedAt: Value(updatedAt),
         ),
-        mode: InsertMode.insertOrReplace,
       );
     }
-    await _projectToNotesTable(noteId, documentJson, updatedAt: updatedAt);
-  }
-
-  Future<void> _projectToNotesTable(
-    String noteId,
-    String documentJson, {
-    DateTime? updatedAt,
-  }) async {
-    try {
-      final decoded = jsonDecode(documentJson);
-      if (decoded is Map && decoded['blocks'] is List) {
-        final projection = const NoteDocumentCodec().projectContent(
-          decoded['blocks'] as List<dynamic>,
-        );
-        await attachedDatabase.notesDao.updateNoteProjection(
-          id: noteId,
-          content: projection.content,
-          excerpt: projection.excerpt,
-          materialized: projection.content.isNotEmpty,
-          updatedAt: updatedAt,
-        );
-      }
-    } catch (_) {
-      // Best-effort projection
-    }
+    await attachedDatabase.notesDao.updateNoteProjection(
+      id: noteId,
+      content: content,
+      excerpt: excerpt,
+      materialized: content.isNotEmpty,
+      updatedAt: updatedAt,
+    );
   }
 
   Future<void> deleteNoteDocument(String noteId) async {
@@ -128,18 +130,68 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<void> insertPendingOperation(PendingNoteOperationsCompanion op) {
-    return transaction(() => _insertPendingOperationAndMarkMaterialized(op));
+    return transaction(() => insertPendingOperationsInTransaction([op]));
   }
 
-  Future<void> _insertPendingOperationAndMarkMaterialized(
-    PendingNoteOperationsCompanion op,
+  Future<void> insertPendingOperationsInTransaction(
+    List<PendingNoteOperationsCompanion> operations,
   ) async {
-    await into(
-      pendingNoteOperations,
-    ).insert(op, mode: InsertMode.insertOrReplace);
-    if (op.noteId.present) {
-      await attachedDatabase.noteLifecycleDao.markMaterialized(op.noteId.value);
+    if (operations.isEmpty) return;
+    final inputIds = <String>{};
+    final newOperations = <PendingNoteOperationsCompanion>[];
+    for (final operation in operations) {
+      if (!operation.operationId.present || !operation.noteId.present) {
+        throw ArgumentError('Pending operation identity is required');
+      }
+      final operationId = operation.operationId.value;
+      if (!inputIds.add(operationId)) {
+        throw StateError(
+          'Duplicate operationId in pending batch: $operationId',
+        );
+      }
     }
+
+    final existingOperations = await (select(
+      pendingNoteOperations,
+    )..where((row) => row.operationId.isIn(inputIds))).get();
+    final existingById = {
+      for (final operation in existingOperations)
+        operation.operationId: operation,
+    };
+    for (final operation in operations) {
+      final operationId = operation.operationId.value;
+      final existing = existingById[operationId];
+      if (existing != null) {
+        if (!_sameOperation(existing, operation)) {
+          throw StateError(
+            'Operation ID $operationId was reused with a different payload',
+          );
+        }
+      } else {
+        newOperations.add(operation);
+      }
+    }
+    if (newOperations.isNotEmpty) {
+      await batch((batch) {
+        batch.insertAll(pendingNoteOperations, newOperations);
+      });
+      await attachedDatabase.noteLifecycleDao.markMaterialized(
+        newOperations.first.noteId.value,
+      );
+    }
+  }
+
+  bool _sameOperation(
+    PendingNoteOperationData existing,
+    PendingNoteOperationsCompanion incoming,
+  ) {
+    return existing.noteId == incoming.noteId.value &&
+        existing.ownerUserId == incoming.ownerUserId.value &&
+        existing.baseRevision == incoming.baseRevision.value &&
+        existing.ordinal == incoming.ordinal.value &&
+        existing.kind == incoming.kind.value &&
+        existing.blockId == incoming.blockId.value &&
+        existing.payloadJson == incoming.payloadJson.value;
   }
 
   Stream<List<PendingNoteOperationData>> watchPendingOperations(
@@ -284,16 +336,21 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     await query.write(PendingNoteOperationsCompanion(status: Value(toStatus)));
   }
 
-  Future<void> markInFlight(String noteId, Set<String> operationIds) async {
-    await transaction(() async {
-      for (final id in operationIds) {
-        await (update(
-          pendingNoteOperations,
-        )..where((t) => t.operationId.equals(id))).write(
-          const PendingNoteOperationsCompanion(status: Value('in_flight')),
-        );
-      }
-    });
+  Future<void> markInFlightInTransaction(
+    String noteId,
+    Set<String> operationIds, {
+    String? ownerUserId,
+  }) async {
+    if (operationIds.isEmpty) return;
+    final query = update(
+      pendingNoteOperations,
+    )..where((t) => t.noteId.equals(noteId) & t.operationId.isIn(operationIds));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    await query.write(
+      const PendingNoteOperationsCompanion(status: Value('in_flight')),
+    );
   }
 
   Future<int> getProjectedOutboxOperationCount(
@@ -318,40 +375,33 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     return count.length;
   }
 
-  Future<void> replacePendingOps(
+  Future<void> replacePendingOpsInTransaction(
     String noteId,
     List<PendingNoteOperationData> ops, {
     String? ownerUserId,
   }) async {
-    await transaction(() async {
-      final deleteQuery = delete(pendingNoteOperations)
-        ..where((t) => t.noteId.equals(noteId));
-      if (ownerUserId != null) {
-        deleteQuery.where((t) => t.ownerUserId.equals(ownerUserId));
-      }
-      await deleteQuery.go();
-      for (var i = 0; i < ops.length; i++) {
-        final op = ops[i];
-        await into(pendingNoteOperations).insert(
-          PendingNoteOperationsCompanion(
-            operationId: Value(op.operationId),
-            noteId: Value(op.noteId),
-            ownerUserId: Value(ownerUserId ?? op.ownerUserId),
-            baseRevision: Value(op.baseRevision),
-            ordinal: Value(i),
-            kind: Value(op.kind),
-            blockId: Value(op.blockId),
-            payloadJson: Value(op.payloadJson),
-            createdAt: Value(op.createdAt),
-            status: const Value('pending'),
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
-      }
-      if (ops.isNotEmpty) {
-        await attachedDatabase.noteLifecycleDao.markMaterialized(noteId);
-      }
-    });
+    final deleteQuery = delete(pendingNoteOperations)
+      ..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      deleteQuery.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    await deleteQuery.go();
+    final companions = [
+      for (var i = 0; i < ops.length; i++)
+        PendingNoteOperationsCompanion(
+          operationId: Value(ops[i].operationId),
+          noteId: Value(ops[i].noteId),
+          ownerUserId: Value(ownerUserId ?? ops[i].ownerUserId),
+          baseRevision: Value(ops[i].baseRevision),
+          ordinal: Value(i),
+          kind: Value(ops[i].kind),
+          blockId: Value(ops[i].blockId),
+          payloadJson: Value(ops[i].payloadJson),
+          createdAt: Value(ops[i].createdAt),
+          status: const Value('pending'),
+        ),
+    ];
+    await insertPendingOperationsInTransaction(companions);
   }
 
   Future<void> deletePendingOpsByStatus(
@@ -367,16 +417,34 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     await query.go();
   }
 
-  Future<void> deleteAccepted(Set<String> operationIds) async {
-    for (final id in operationIds) {
-      await (delete(
-        pendingNoteOperations,
-      )..where((t) => t.operationId.equals(id))).go();
+  Future<void> deleteAcceptedInTransaction(
+    Set<String> operationIds, {
+    String? noteId,
+    String? ownerUserId,
+  }) async {
+    if (operationIds.isEmpty) return;
+    final query = delete(pendingNoteOperations)
+      ..where((t) => t.operationId.isIn(operationIds));
+    if (noteId != null) query.where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
     }
+    await query.go();
   }
 
   Future<void> runInTransaction(Future<void> Function() fn) {
     return transaction(fn);
+  }
+
+  Future<void> deleteSyncSessionInTransaction(
+    String noteId, {
+    String? ownerUserId,
+  }) async {
+    final query = delete(syncSessions)..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    await query.go();
   }
 
   Future<void> insertSyncError(NoteSyncErrorsCompanion error) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
@@ -16,107 +17,98 @@ void main() {
     );
   });
 
-  test('successful sync keeps canonical plus newly pending ops materialized', () async {
-    final db = AppDatabase.test();
-    addTearDown(db.close);
-    final client = _MockNoteSyncClient();
-    final requestStarted = Completer<SyncRequest>();
-    final releaseResponse = Completer<SyncResponse>();
-    when(() => client.syncOperations(any(), any())).thenAnswer((invocation) {
-      final request = invocation.positionalArguments[1] as SyncRequest;
-      if (!requestStarted.isCompleted) requestStarted.complete(request);
-      return releaseResponse.future;
-    });
+  test(
+    'successful sync keeps canonical plus newly pending ops materialized',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      final client = _MockNoteSyncClient();
+      final requestStarted = Completer<SyncRequest>();
+      final releaseResponse = Completer<SyncResponse>();
+      when(() => client.syncOperations(any(), any())).thenAnswer((invocation) {
+        final request = invocation.positionalArguments[1] as SyncRequest;
+        if (!requestStarted.isCompleted) requestStarted.complete(request);
+        return releaseResponse.future;
+      });
 
-    await db.notesDao.createNote(
-      NotesCompanion.insert(
-        id: 'projection-note',
-        userId: 'user-1',
-        content: 'base',
-        createdAt: DateTime.utc(2026, 9, 2),
-        updatedAt: DateTime.utc(2026, 9, 2),
-        hasRemoteCopy: const Value(true),
-      ),
-    );
-    const baseDocument = {
-      'schemaVersion': 1,
-      'blocks': [
-        {
-          'id': 'base',
-          'type': 'paragraph',
-          'delta': [
-            {'insert': 'base'},
-          ],
-        },
-      ],
-    };
-    await db.noteOperationsDao.upsertNoteDocument(
-      LocalNoteDocumentsCompanion.insert(
-        noteId: 'projection-note',
-        revision: 0,
-        documentJson: NoteOperationsSyncService.encodeDocument(baseDocument),
-        updatedAt: DateTime.utc(2026, 9, 2),
-        materializedDocumentJson: Value(
-          NoteOperationsSyncService.encodeDocument(baseDocument),
+      await db.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'projection-note',
+          userId: 'user-1',
+          content: 'base',
+          createdAt: DateTime.utc(2026, 9, 2),
+          updatedAt: DateTime.utc(2026, 9, 2),
+          hasRemoteCopy: const Value(true),
         ),
-      ),
-    );
+      );
+      const baseDocument = {
+        'schemaVersion': 1,
+        'blocks': [
+          {
+            'id': 'base',
+            'type': 'paragraph',
+            'delta': [
+              {'insert': 'base'},
+            ],
+          },
+        ],
+      };
+      await db.noteOperationsDao.upsertNoteDocument(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: 'projection-note',
+          revision: 0,
+          documentJson: jsonEncode(baseDocument),
+          updatedAt: DateTime.utc(2026, 9, 2),
+          materializedDocumentJson: Value(
+            jsonEncode(baseDocument),
+          ),
+        ),
+      );
 
-    final service = NoteOperationsSyncService(
-      syncClient: client,
-      dao: db.noteOperationsDao,
-      clientId: 'client-1',
-      actorId: 'user-1',
-    );
-    await service.enqueueOperation(
-      'projection-note',
-      OperationRequest(
-        operationId: 'op-accepted',
-        baseRevision: 0,
-        kind: 'create_block',
-        payload: const {
-          'id': 'accepted',
-          'type': 'paragraph',
-          'afterBlockId': 'base',
-          'delta': [
-            {'insert': 'accepted'},
-          ],
-        },
-      ),
-    );
+      final service = NoteOperationsSyncService(
+        syncClient: client,
+        dao: db.noteOperationsDao,
+        clientId: 'client-1',
+        actorId: 'user-1',
+      );
+      await service.enqueueOperation(
+        'projection-note',
+        OperationRequest(
+          operationId: 'op-accepted',
+          baseRevision: 0,
+          kind: 'create_block',
+          payload: const {
+            'id': 'accepted',
+            'type': 'paragraph',
+            'afterBlockId': 'base',
+            'delta': [
+              {'insert': 'accepted'},
+            ],
+          },
+        ),
+      );
 
-    final sync = service.syncPending('projection-note');
-    final sent = await requestStarted.future;
+      final sync = service.syncPending('projection-note');
+      final sent = await requestStarted.future;
 
-    await service.enqueueOperation(
-      'projection-note',
-      OperationRequest(
-        operationId: 'op-pending',
-        baseRevision: 1,
-        kind: 'create_block',
-        payload: const {
-          'id': 'pending',
-          'type': 'paragraph',
-          'afterBlockId': 'accepted',
-          'delta': [
-            {'insert': 'pending-local'},
-          ],
-        },
-      ),
-    );
-
-    releaseResponse.complete(
-      SyncResponse(
-        accepted: [
-          AcceptedOperation(
-            operationId: sent.operations.single.operationId,
-            revision: 1,
+      final append = service.enqueueOperations(
+        'projection-note',
+        [
+          OperationRequest(
+            operationId: 'op-pending',
+            baseRevision: 1,
             kind: 'create_block',
+            payload: const {
+              'id': 'pending',
+              'type': 'paragraph',
+              'afterBlockId': 'accepted',
+              'delta': [
+                {'insert': 'pending-local'},
+              ],
+            },
           ),
         ],
-        finalRevision: 1,
-        remoteOperations: const [],
-        canonicalDocument: const {
+        materializedDocumentJson: jsonEncode({
           'schemaVersion': 1,
           'blocks': [
             {
@@ -133,18 +125,102 @@ void main() {
                 {'insert': 'accepted'},
               ],
             },
+            {
+              'id': 'pending',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'pending-local'},
+              ],
+            },
           ],
-        },
-        serverTime: DateTime.utc(2026, 9, 2, 12),
-      ),
-    );
-    await sync;
+        }),
+      );
 
-    final stored = await db.noteOperationsDao.watchNoteDocument('projection-note').first;
-    expect(stored, isNotNull);
-    expect(stored!.documentJson, isNot(contains('pending-local')));
-    expect(stored.materializedDocumentJson, contains('pending-local'));
-    final pending = await service.getPendingOperations('projection-note');
-    expect(pending.map((op) => op.operationId), contains('op-pending'));
-  });
+      releaseResponse.complete(
+        SyncResponse(
+          accepted: [
+            AcceptedOperation(
+              operationId: sent.operations.single.operationId,
+              revision: 1,
+              kind: 'create_block',
+            ),
+          ],
+          finalRevision: 1,
+          remoteOperations: const [],
+          canonicalDocument: const {
+            'schemaVersion': 1,
+            'blocks': [
+              {
+                'id': 'base',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'base'},
+                ],
+              },
+              {
+                'id': 'accepted',
+                'type': 'paragraph',
+                'delta': [
+                  {'insert': 'accepted'},
+                ],
+              },
+            ],
+          },
+          serverTime: DateTime.utc(2026, 9, 2, 12),
+        ),
+      );
+      await sync;
+      await append;
+
+      final stored = await db.noteOperationsDao
+          .watchNoteDocument('projection-note')
+          .first;
+      expect(stored, isNotNull);
+      expect(stored!.documentJson, isNot(contains('pending-local')));
+      expect(stored.materializedDocumentJson, contains('pending-local'));
+      final pending = await service.getPendingOperations('projection-note');
+      expect(pending.map((op) => op.operationId), contains('op-pending'));
+    },
+  );
+
+  test(
+    'projection errors propagate without changing the confirmed snapshot',
+    () async {
+      final db = AppDatabase.test();
+      addTearDown(db.close);
+      await db.noteOperationsDao.upsertNoteDocument(
+        LocalNoteDocumentsCompanion.insert(
+          noteId: 'invalid-projection-note',
+          revision: 3,
+          documentJson: '{"schemaVersion":1,"blocks":[]}',
+          updatedAt: DateTime.utc(2026, 9, 2),
+          materializedDocumentJson: const Value(
+            '{"schemaVersion":1,"blocks":[]}',
+          ),
+        ),
+      );
+      final service = NoteOperationsSyncService(
+        syncClient: _MockNoteSyncClient(),
+        dao: db.noteOperationsDao,
+        clientId: 'client-1',
+        actorId: 'user-1',
+      );
+
+      await expectLater(
+        service.storeMaterializedDocument(
+          noteId: 'invalid-projection-note',
+          documentJson: '{"schemaVersion":1,"blocks":',
+        ),
+        throwsA(isA<FormatException>()),
+      );
+      final stored = await db.noteOperationsDao
+          .watchNoteDocument('invalid-projection-note')
+          .first;
+      expect(stored!.revision, 3);
+      expect(
+        stored.materializedDocumentJson,
+        '{"schemaVersion":1,"blocks":[]}',
+      );
+    },
+  );
 }

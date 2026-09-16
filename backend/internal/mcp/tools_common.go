@@ -1,13 +1,15 @@
 package mcpapp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/RigleyC/supanotes/pkg/uid"
@@ -18,6 +20,9 @@ func addTool(server *mcp.Server, security SecurityStore, tool *mcp.Tool, handler
 		panic("MCP security dependency is required")
 	}
 	server.AddTool(tool, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := requireToolScope(ctx, tool.Name); err != nil {
+			return asError(err)
+		}
 		userID, userErr := UserIDFromContext(ctx)
 		if userErr != nil {
 			return asError(userErr)
@@ -40,7 +45,7 @@ func addTool(server *mcp.Server, security SecurityStore, tool *mcp.Tool, handler
 		result, err := handler(ctx, request)
 		status := "success"
 		if err != nil {
-			status = "error: " + err.Error()
+			status = "error"
 		} else if result != nil && result.IsError {
 			status = "tool_error"
 		}
@@ -55,7 +60,7 @@ func addTool(server *mcp.Server, security SecurityStore, tool *mcp.Tool, handler
 			if result == nil {
 				result = &mcp.CallToolResult{}
 			}
-			result.Content = append(result.Content, &mcp.TextContent{Text: "MCP audit warning: " + auditErr.Error()})
+			result.Content = append(result.Content, &mcp.TextContent{Text: "MCP audit warning: final audit was not recorded"})
 		}
 		return result, err
 	})
@@ -66,9 +71,9 @@ func agentFromRequest(request *mcp.CallToolRequest) string {
 		if session, ok := request.GetSession().(*mcp.ServerSession); ok {
 			if params := session.InitializeParams(); params != nil && params.ClientInfo != nil {
 				if params.ClientInfo.Version == "" {
-					return params.ClientInfo.Name
+					return safeLogValue(params.ClientInfo.Name)
 				}
-				return params.ClientInfo.Name + "/" + params.ClientInfo.Version
+				return safeLogValue(params.ClientInfo.Name) + "/" + safeLogValue(params.ClientInfo.Version)
 			}
 		}
 	}
@@ -76,33 +81,33 @@ func agentFromRequest(request *mcp.CallToolRequest) string {
 }
 
 func resourceFromRequest(request *mcp.CallToolRequest) (string, error) {
-	args, err := parseArgs(request)
+	args, err := rawArgumentMap(request)
 	if err != nil {
 		return "", err
 	}
-	if noteID := getStr(args, "note_id"); noteID != "" {
-		if userID := getStr(args, "user_id"); userID != "" {
-			return "note:" + noteID + "/user:" + userID, nil
+	if _, ok := args["note_id"]; ok {
+		if _, ok := args["user_id"]; ok {
+			return "note/user", nil
 		}
-		return "note:" + noteID, nil
+		return "note", nil
 	}
 	for _, key := range []string{"note_id", "block_id", "attachment_id", "id", "user_id"} {
-		if value := getStr(args, key); value != "" {
-			return key + ":" + value, nil
+		if _, ok := args[key]; ok {
+			return key, nil
 		}
 	}
 	return "", nil
 }
 
 func confirmationArguments(request *mcp.CallToolRequest) (json.RawMessage, error) {
-	args, err := parseArgs(request)
+	args, err := rawArgumentMap(request)
 	if err != nil {
 		return nil, err
 	}
 	delete(args, "confirmation_id")
 	encoded, err := json.Marshal(args)
 	if err != nil {
-		return nil, fmt.Errorf("invalid confirmation arguments: %w", err)
+		return nil, errors.New("invalid confirmation arguments")
 	}
 	return encoded, nil
 }
@@ -115,11 +120,17 @@ func requireConfirmation(ctx context.Context, security SecurityStore, request *m
 	if err != nil {
 		return nil, err
 	}
-	args, err := parseArgs(request)
+	args, err := rawArgumentMap(request)
 	if err != nil {
 		return nil, err
 	}
-	confirmationID := getStr(args, "confirmation_id")
+	var confirmationID string
+	if rawID, ok := args["confirmation_id"]; ok {
+		if err := json.Unmarshal(rawID, &confirmationID); err != nil {
+			return nil, errors.New("confirmation_id must be a UUID")
+		}
+	}
+	confirmationID = strings.TrimSpace(confirmationID)
 	arguments, err := confirmationArguments(request)
 	if err != nil {
 		return nil, err
@@ -138,17 +149,43 @@ func requireConfirmation(ctx context.Context, security SecurityStore, request *m
 	return security.ReserveConfirmation(ctx, userID, id, toolName, resource, arguments)
 }
 
-func finishConfirmation(ctx context.Context, lease ConfirmationLease, operationErr error) error {
+func replayConfirmation(lease ConfirmationLease) (*mcp.CallToolResult, bool, error) {
+	if lease == nil {
+		return nil, false, nil
+	}
+	payload, ok := lease.ReplayResult()
+	if !ok {
+		return nil, false, nil
+	}
+	if !json.Valid(payload) {
+		return nil, false, errors.New("MCP confirmation replay result is invalid")
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(payload)}}}, true, nil
+}
+
+func finishConfirmation(ctx context.Context, lease ConfirmationLease, result any, operationErr error) error {
 	if lease == nil {
 		return operationErr
 	}
 	if operationErr != nil {
-		if releaseErr := lease.Release(ctx); releaseErr != nil {
-			return errors.Join(operationErr, fmt.Errorf("failed to release MCP confirmation: %w", releaseErr))
-		}
+		// The mutation may have reached its owner before returning an error or
+		// before the process crashed. Keep the confirmation pending so a retry
+		// cannot execute an effect a second time. Explicit Release is reserved
+		// for callers that know no mutation was attempted.
 		return operationErr
 	}
-	return lease.Commit(ctx)
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("failed to persist MCP confirmation result: %w", err)
+	}
+	return lease.Commit(ctx, payload)
+}
+
+func finishConfirmationMutation(ctx context.Context, lease ConfirmationLease, mutation ConfirmationMutation) (json.RawMessage, error) {
+	if lease == nil {
+		return nil, errors.New("MCP confirmation lease is missing")
+	}
+	return lease.CommitMutation(ctx, mutation)
 }
 
 func asTextResult(v any) (*mcp.CallToolResult, error) {
@@ -164,7 +201,7 @@ func asTextResultWithWarning(v any, warning error) (*mcp.CallToolResult, error) 
 	if err != nil || warning == nil {
 		return result, err
 	}
-	result.Content = append(result.Content, &mcp.TextContent{Text: "MCP confirmation warning: " + warning.Error()})
+	result.Content = append(result.Content, &mcp.TextContent{Text: "MCP confirmation warning: finalization failed; retry may be required"})
 	return result, nil
 }
 
@@ -175,15 +212,19 @@ func asError(err error) (*mcp.CallToolResult, error) {
 	}, nil
 }
 
-func parseArgs(req *mcp.CallToolRequest) (map[string]any, error) {
+func rawArgumentMap(req *mcp.CallToolRequest) (map[string]json.RawMessage, error) {
 	if req == nil || req.Params == nil {
 		return nil, errors.New("MCP tool arguments are missing")
 	}
-	var m map[string]any
-	if len(req.Params.Arguments) == 0 {
-		return map[string]any{}, nil
+	var m map[string]json.RawMessage
+	raw := bytes.TrimSpace(req.Params.Arguments)
+	if len(raw) == 0 {
+		return map[string]json.RawMessage{}, nil
 	}
-	if err := json.Unmarshal(req.Params.Arguments, &m); err != nil {
+	if raw[0] != '{' {
+		return nil, errors.New("MCP tool arguments must be a JSON object")
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, fmt.Errorf("invalid MCP tool arguments: %w", err)
 	}
 	if m == nil {
@@ -192,48 +233,71 @@ func parseArgs(req *mcp.CallToolRequest) (map[string]any, error) {
 	return m, nil
 }
 
-func getStr(args map[string]any, key string) string {
-	if v, ok := args[key].(string); ok {
-		return v
+func decodeToolArgs[T any](req *mcp.CallToolRequest) (T, error) {
+	var args T
+	if req == nil || req.Params == nil {
+		return args, errors.New("MCP tool arguments are missing")
 	}
-	return ""
+	raw := bytes.TrimSpace(req.Params.Arguments)
+	if len(raw) == 0 {
+		raw = []byte("{}")
+	}
+	if raw[0] != '{' {
+		return args, errors.New("MCP tool arguments must be a JSON object")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&args); err != nil {
+		return args, fmt.Errorf("invalid MCP tool arguments: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return args, errors.New("invalid MCP tool arguments: multiple JSON values")
+		}
+		return args, fmt.Errorf("invalid MCP tool arguments: %w", err)
+	}
+	return args, nil
 }
 
-func getInt(args map[string]any, key string, fallback int32) int32 {
-	if value, ok := args[key].(float64); ok {
-		return int32(value)
+func objectPayload(payload json.RawMessage) (json.RawMessage, error) {
+	if len(bytes.TrimSpace(payload)) == 0 {
+		return json.RawMessage(`{}`), nil
 	}
-	return fallback
+	trimmed := bytes.TrimSpace(payload)
+	if trimmed[0] != '{' {
+		return nil, errors.New("payload must be a JSON object")
+	}
+	var value map[string]any
+	if err := json.Unmarshal(trimmed, &value); err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
+	}
+	return json.RawMessage(trimmed), nil
 }
 
-func getUUID(args map[string]any, key string) (pgtype.UUID, error) {
-	id := getStr(args, key)
-	if id == "" {
-		return pgtype.UUID{}, fmt.Errorf("%s is required", key)
-	}
-	return uid.UUIDFromString(id)
-}
-
-func getOptionalTime(args map[string]any, key string) (*time.Time, error) {
-	value := getStr(args, key)
+func safeLogValue(value string) string {
+	value = strings.TrimSpace(value)
 	if value == "" {
+		return "unknown"
+	}
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f || strings.ContainsRune("/?#&=", r) {
+			return "redacted"
+		}
+	}
+	if len(value) > 128 {
+		return "redacted"
+	}
+	return value
+}
+
+func optionalToolTime(value, name string) (*time.Time, error) {
+	if strings.TrimSpace(value) == "" {
 		return nil, nil
 	}
 	parsed, err := time.Parse(time.RFC3339, value)
 	if err != nil {
-		return nil, fmt.Errorf("%s must be RFC3339: %w", key, err)
+		return nil, fmt.Errorf("%s must be RFC3339", name)
 	}
 	return &parsed, nil
-}
-
-func operationPayload(args map[string]any) (json.RawMessage, error) {
-	payload, ok := args["payload"]
-	if !ok {
-		return json.RawMessage(`{}`), nil
-	}
-	encoded, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("invalid payload: %w", err)
-	}
-	return encoded, nil
 }

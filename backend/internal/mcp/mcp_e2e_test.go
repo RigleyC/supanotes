@@ -23,8 +23,19 @@ type inMemorySecurityStore struct {
 
 type inMemoryConfirmationLease struct{}
 
-func (inMemoryConfirmationLease) Commit(context.Context) error  { return nil }
-func (inMemoryConfirmationLease) Release(context.Context) error { return nil }
+func (inMemoryConfirmationLease) Commit(context.Context, json.RawMessage) error { return nil }
+func (inMemoryConfirmationLease) CommitMutation(ctx context.Context, mutation ConfirmationMutation) (json.RawMessage, error) {
+	if mutation == nil {
+		return nil, nil
+	}
+	result, err := mutation(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(result)
+}
+func (inMemoryConfirmationLease) Release(context.Context) error         { return nil }
+func (inMemoryConfirmationLease) ReplayResult() (json.RawMessage, bool) { return nil, false }
 
 func (s *inMemorySecurityStore) Audit(_ context.Context, event AuditEvent) error {
 	s.mu.Lock()

@@ -67,6 +67,33 @@
 - [ ] Run Go verification and commit after thermo-nuclear review on a machine
   with the Go toolchain available.
 
+## Code quality and reliability corrections (2026-09-16)
+
+- [x] Correct backend runtime/configuration/Alexa security contracts.
+- [x] Correct attachment upload errors and safe storage lifecycle.
+- [x] Harden MCP, sharing intake, destructive confirmation and sensitive logs.
+- [x] Simplify backend task/note/auth method and repository boundaries.
+- [x] Simplify Flutter auth/session cleanup and token contracts.
+- [x] Simplify editor/codec/controller boundaries and attachment upload flow.
+- [x] Simplify task metadata, recurrence, preference and sharing controllers.
+- [x] Simplify sync/catalog/DAO ownership, atomicity and diagnostics.
+- [x] Align documentation and remove confirmed dead code.
+- [x] Validate the aggregate diff with Sol low and focused checks.
+
+## Navigation, task creation and auth follow-up (2026-09-16)
+
+- [x] Keep `AdaptiveScaffold` as the host for the adaptive navbar, show the bar
+  only on root tab destinations, restore iOS back affordances on
+  nested/completed routes, and place FABs above the navigation bar.
+- [x] Implement standalone task creation/editing with the shared modal/input,
+  existing date/time/reminder options, and cancel/save actions.
+- [x] Simplify notes empty state and focus-dismiss control; remove the
+  task-to-note navigation trampoline without adding visual-only tests.
+- [x] Validate the Dio access-token injection, single-flight refresh, one-time
+  request replay, and failed-refresh session cleanup contract.
+- [x] Run focused Flutter tests/analyzer, aggregate Go checks, and Sol low
+  validation.
+
 ## Per-note preference sync (plan 2026-08-14) — Task 2: collapse ownership → preference row
 
 - [x] Failing DAO tests: collapse changes dirty the shared preference row; remote

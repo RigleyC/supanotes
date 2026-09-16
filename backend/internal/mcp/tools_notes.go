@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -26,7 +27,7 @@ func addNoteTools(
 			if err := requireReadScope(ctx); err != nil {
 				return asError(err)
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[listNotesToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -34,17 +35,24 @@ func addNoteTools(
 			if err != nil {
 				return asError(err)
 			}
-			limit := getInt(args, "limit", 50)
+			limit := int32(50)
+			if args.Limit != nil {
+				limit = *args.Limit
+			}
 			if limit < 1 || limit > 100 {
 				return asError(fmt.Errorf("limit must be between 1 and 100"))
 			}
-			cursorTime, err := getOptionalTime(args, "cursor_updated_at")
+			cursorTime, err := optionalToolTime(args.CursorUpdatedAt, "cursor_updated_at")
 			if err != nil {
 				return asError(err)
 			}
 			var cursorID *pgtype.UUID
-			if getStr(args, "cursor_id") != "" {
-				parsed, parseErr := getUUID(args, "cursor_id")
+			if strings.TrimSpace(args.CursorID) != "" {
+				cursorValue, parseErr := toolUUID(args.CursorID, "cursor_id")
+				if parseErr != nil {
+					return asError(parseErr)
+				}
+				parsed, parseErr := uid.UUIDFromString(cursorValue)
 				if parseErr != nil {
 					return asError(parseErr)
 				}
@@ -65,7 +73,7 @@ func addNoteTools(
 			if err := requireReadScope(ctx); err != nil {
 				return asError(err)
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[idToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -73,7 +81,11 @@ func addNoteTools(
 			if err != nil {
 				return asError(err)
 			}
-			noteID, err := getUUID(args, "id")
+			id, err := toolUUID(args.ID, "id")
+			if err != nil {
+				return asError(err)
+			}
+			noteID, err := uid.UUIDFromString(id)
 			if err != nil {
 				return asError(err)
 			}
@@ -89,7 +101,7 @@ func addNoteTools(
 			if err := requireReadScope(ctx); err != nil {
 				return asError(err)
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[noteRevisionToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -97,11 +109,22 @@ func addNoteTools(
 			if err != nil {
 				return asError(err)
 			}
-			noteID, err := getUUID(args, "note_id")
+			noteIDValue, err := toolUUID(args.NoteID, "note_id")
 			if err != nil {
 				return asError(err)
 			}
-			operations, err := documentReader.GetOperationsSince(ctx, noteID, userID, int64(getInt(args, "after_revision", 0)))
+			noteID, err := uid.UUIDFromString(noteIDValue)
+			if err != nil {
+				return asError(err)
+			}
+			afterRevision := int64(0)
+			if args.AfterRevision != nil {
+				afterRevision = *args.AfterRevision
+			}
+			if afterRevision < 0 {
+				return asError(fmt.Errorf("after_revision must be non-negative"))
+			}
+			operations, err := documentReader.GetOperationsSince(ctx, noteID, userID, afterRevision)
 			if err != nil {
 				return asError(err)
 			}
@@ -113,7 +136,7 @@ func addNoteTools(
 			if err := requireReadScope(ctx); err != nil {
 				return asError(err)
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[idToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -121,7 +144,11 @@ func addNoteTools(
 			if err != nil {
 				return asError(err)
 			}
-			id, err := uid.UUIDFromString(getStr(args, "id"))
+			idValue, err := toolUUID(args.ID, "id")
+			if err != nil {
+				return asError(err)
+			}
+			id, err := uid.UUIDFromString(idValue)
 			if err != nil {
 				return asError(err)
 			}
@@ -137,7 +164,7 @@ func addNoteTools(
 			if err := requireWriteScope(ctx); err != nil {
 				return asError(err)
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[noteContentToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -145,7 +172,7 @@ func addNoteTools(
 			if err != nil {
 				return asError(err)
 			}
-			content := getStr(args, "content")
+			content := args.Content
 			if strings.TrimSpace(content) == "" {
 				return asError(notes.ErrEmptyNote)
 			}
@@ -157,45 +184,12 @@ func addNoteTools(
 			return asTextResult(noteContentMutationResult{NoteID: uid.UUIDToString(noteID), Sync: res})
 		},
 	)
-	addTool(server, security, &mcp.Tool{Name: toolUpdateNote, Description: "Update note", InputSchema: updateNoteSchema},
-		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if err := requireWriteScope(ctx); err != nil {
-				return asError(err)
-			}
-			args, err := parseArgs(request)
-			if err != nil {
-				return asError(err)
-			}
-			userID, err := UserIDFromContext(ctx)
-			if err != nil {
-				return asError(err)
-			}
-			id, err := uid.UUIDFromString(getStr(args, "id"))
-			if err != nil {
-				return asError(err)
-			}
-			content := getStr(args, "content")
-			documentResponse, err := documentReader.GetDocument(ctx, id, userID)
-			if err != nil {
-				return asError(err)
-			}
-			doc, err := noteoperations.UnmarshalDocument(documentResponse.Document)
-			if err != nil {
-				return asError(fmt.Errorf("decode canonical note document: %w", err))
-			}
-			res, err := syncNoteContent(ctx, documentCommands, id, userID, documentResponse.Revision, doc, content)
-			if err != nil {
-				return asError(err)
-			}
-			return asTextResult(noteContentMutationResult{NoteID: uid.UUIDToString(id), Sync: res})
-		},
-	)
 	addTool(server, security, &mcp.Tool{Name: toolDeleteNote, Description: "Delete note", InputSchema: destructiveIDSchema},
 		func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if err := requireWriteScope(ctx); err != nil {
 				return asError(err)
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[destructiveIDToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -203,7 +197,11 @@ func addNoteTools(
 			if err != nil {
 				return asError(err)
 			}
-			id, err := uid.UUIDFromString(getStr(args, "id"))
+			idValue, err := toolUUID(args.ID, "id")
+			if err != nil {
+				return asError(err)
+			}
+			id, err := uid.UUIDFromString(idValue)
 			if err != nil {
 				return asError(err)
 			}
@@ -211,11 +209,21 @@ func addNoteTools(
 			if err != nil {
 				return asError(err)
 			}
-			if err := notesSvc.DeleteNote(ctx, userID, id); err != nil {
-				return asError(finishConfirmation(ctx, confirmationLease, err))
+			if replay, ok, replayErr := replayConfirmation(confirmationLease); replayErr != nil {
+				return asError(replayErr)
+			} else if ok {
+				return replay, nil
 			}
-			confirmationErr := finishConfirmation(ctx, confirmationLease, nil)
-			return asTextResultWithWarning("deleted", confirmationErr)
+			result, err := finishConfirmationMutation(ctx, confirmationLease, func(ctx context.Context, tx pgx.Tx) (any, error) {
+				if err := notesSvc.DeleteNoteInTransaction(ctx, tx, userID, id); err != nil {
+					return nil, err
+				}
+				return "deleted", nil
+			})
+			if err != nil {
+				return asError(err)
+			}
+			return asTextResult(result)
 		},
 	)
 }

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:supanotes/core/api/api_client.dart';
 
@@ -241,10 +240,6 @@ class NoteSyncClient {
     } on DioException catch (e) {
       throw _mapError(e);
     }
-  }
-
-  Future<NoteDocumentResponse?> fetchDocument(String noteId) async {
-    return getDocument(noteId);
   }
 
   Future<List<Map<String, dynamic>>> listNotes({

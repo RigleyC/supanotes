@@ -32,7 +32,9 @@ enum QuickDueDate {
 
 class TaskMetadataDatePage extends StatelessWidget {
   const TaskMetadataDatePage({
-    required this.selected, required this.onSelected, super.key,
+    required this.selected,
+    required this.onSelected,
+    super.key,
   });
 
   final DateTime? selected;

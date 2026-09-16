@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -31,9 +32,11 @@ const (
 var ErrNoUserInContext = errors.New("mcpapp: no user id in context")
 var ErrMCPTokenInvalid = errors.New("mcpapp: invalid or revoked MCP token")
 var ErrConfirmationDenied = errors.New("MCP confirmation is missing, expired, already consumed, or does not match the requested action")
+var ErrConfirmationPending = errors.New("MCP confirmation has a pending operation and requires recovery")
 
 const mcpTokenLifetime = 30 * 24 * time.Hour
 const mcpConfirmationLifetime = 5 * time.Minute
+const mcpConfirmationExecutionLease = 2 * time.Minute
 
 type AuditEvent struct {
 	TokenID  pgtype.UUID
@@ -50,9 +53,16 @@ type Confirmation struct {
 }
 
 type ConfirmationLease interface {
-	Commit(context.Context) error
+	Commit(context.Context, json.RawMessage) error
+	CommitMutation(context.Context, ConfirmationMutation) (json.RawMessage, error)
 	Release(context.Context) error
+	ReplayResult() (json.RawMessage, bool)
 }
+
+// ConfirmationMutation runs inside the same PostgreSQL transaction that
+// records the confirmation result. Callers must keep the mutation local to
+// that transaction; external effects use their own durable/idempotent seam.
+type ConfirmationMutation func(context.Context, pgx.Tx) (any, error)
 
 // SecurityStore persists MCP audit events and one-time confirmations.
 // The interface keeps tool handlers testable without bypassing production controls.
@@ -100,44 +110,157 @@ type databaseConfirmationLease struct {
 	store          *databaseSecurityStore
 	userID         pgtype.UUID
 	confirmationID pgtype.UUID
+	ownerToken     string
+	replayResult   json.RawMessage
 }
 
 func (s *databaseSecurityStore) ReserveConfirmation(ctx context.Context, userID, confirmationID pgtype.UUID, toolName, resource string, arguments json.RawMessage) (ConfirmationLease, error) {
+	ownerToken, err := confirmationOwnerToken()
+	if err != nil {
+		return nil, err
+	}
+	leaseUntil := time.Now().UTC().Add(mcpConfirmationExecutionLease)
 	var reservedID pgtype.UUID
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 		UPDATE mcp_confirmations
-		SET reserved_at = NOW()
+		SET execution_status = 'pending', reserved_at = NOW(),
+			execution_owner_token = $6, execution_lease_until = $7
 		WHERE id = $1 AND user_id = $2 AND tool_name = $3 AND resource = $4
-		  AND arguments = $5::jsonb AND consumed_at IS NULL AND reserved_at IS NULL AND expires_at > NOW()
-		RETURNING id`, confirmationID, userID, toolName, resource, arguments).Scan(&reservedID)
+		  AND arguments = $5::jsonb
+		  AND (execution_status = 'available'
+		       OR (execution_status = 'pending' AND execution_lease_until <= NOW()))
+		  AND expires_at > NOW()
+		RETURNING id`, confirmationID, userID, toolName, resource, arguments, ownerToken, leaseUntil).Scan(&reservedID)
+	if err == nil {
+		return &databaseConfirmationLease{store: s, userID: userID, confirmationID: reservedID, ownerToken: ownerToken}, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	var status string
+	var result []byte
+	err = s.pool.QueryRow(ctx, `
+		SELECT execution_status, result
+		FROM mcp_confirmations
+		WHERE id = $1 AND user_id = $2 AND tool_name = $3 AND resource = $4
+		  AND arguments = $5::jsonb`, confirmationID, userID, toolName, resource, arguments).Scan(&status, &result)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrConfirmationDenied
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &databaseConfirmationLease{store: s, userID: userID, confirmationID: reservedID}, nil
+	if status == "pending" {
+		return nil, ErrConfirmationPending
+	}
+	if status == "committed" && len(result) > 0 {
+		return &databaseConfirmationLease{
+			store:          s,
+			userID:         userID,
+			confirmationID: confirmationID,
+			ownerToken:     ownerToken,
+			replayResult:   append(json.RawMessage(nil), result...),
+		}, nil
+	}
+	return nil, ErrConfirmationDenied
 }
 
-func (l *databaseConfirmationLease) Commit(ctx context.Context) error {
-	result, err := l.store.pool.Exec(ctx, `
+func (l *databaseConfirmationLease) Commit(ctx context.Context, result json.RawMessage) error {
+	if !json.Valid(result) {
+		return errors.New("MCP confirmation result is invalid")
+	}
+	commandResult, err := l.store.pool.Exec(ctx, `
 		UPDATE mcp_confirmations
-		SET consumed_at = NOW(), reserved_at = NULL
-		WHERE id = $1 AND user_id = $2 AND reserved_at IS NOT NULL AND consumed_at IS NULL`, l.confirmationID, l.userID)
+		SET execution_status = 'committed', consumed_at = NOW(), reserved_at = NULL,
+			execution_owner_token = NULL, execution_lease_until = NULL, result = $4::jsonb
+		WHERE id = $1 AND user_id = $2 AND execution_status = 'pending'
+		  AND execution_owner_token = $3`, l.confirmationID, l.userID, l.ownerToken, result)
 	if err != nil {
 		return err
 	}
-	if result.RowsAffected() != 1 {
+	if commandResult.RowsAffected() != 1 {
 		return ErrConfirmationDenied
 	}
 	return nil
+}
+
+func (l *databaseConfirmationLease) CommitMutation(ctx context.Context, mutation ConfirmationMutation) (json.RawMessage, error) {
+	if mutation == nil {
+		return nil, errors.New("MCP confirmation mutation is missing")
+	}
+	if replay, ok := l.ReplayResult(); ok {
+		return replay, nil
+	}
+
+	tx, err := l.store.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	var ownerToken string
+	var committedResult []byte
+	err = tx.QueryRow(ctx, `
+		SELECT execution_status, COALESCE(execution_owner_token, ''),
+			COALESCE(result, 'null'::jsonb)
+		FROM mcp_confirmations
+		WHERE id = $1 AND user_id = $2
+		FOR UPDATE`, l.confirmationID, l.userID).Scan(&status, &ownerToken, &committedResult)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrConfirmationDenied
+	}
+	if err != nil {
+		return nil, err
+	}
+	if status == "committed" {
+		if !json.Valid(committedResult) || bytesEqualJSONNull(committedResult) {
+			return nil, errors.New("MCP confirmation committed result is invalid")
+		}
+		return append(json.RawMessage(nil), committedResult...), nil
+	}
+	if status != "pending" || ownerToken != l.ownerToken {
+		return nil, ErrConfirmationDenied
+	}
+
+	result, err := mutation(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode MCP confirmation result: %w", err)
+	}
+	commandResult, err := tx.Exec(ctx, `
+		UPDATE mcp_confirmations
+		SET execution_status = 'committed', consumed_at = NOW(), reserved_at = NULL,
+			execution_owner_token = NULL, execution_lease_until = NULL, result = $3::jsonb
+		WHERE id = $1 AND user_id = $2 AND execution_status = 'pending'
+		  AND execution_owner_token = $4`, l.confirmationID, l.userID, payload, l.ownerToken)
+	if err != nil {
+		return nil, err
+	}
+	if commandResult.RowsAffected() != 1 {
+		return nil, ErrConfirmationDenied
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func bytesEqualJSONNull(value []byte) bool {
+	return strings.TrimSpace(string(value)) == "null"
 }
 
 func (l *databaseConfirmationLease) Release(ctx context.Context) error {
 	result, err := l.store.pool.Exec(ctx, `
 		UPDATE mcp_confirmations
-		SET reserved_at = NULL
-		WHERE id = $1 AND user_id = $2 AND reserved_at IS NOT NULL AND consumed_at IS NULL`, l.confirmationID, l.userID)
+		SET execution_status = 'available', reserved_at = NULL,
+			execution_owner_token = NULL, execution_lease_until = NULL
+		WHERE id = $1 AND user_id = $2 AND execution_status = 'pending'
+		  AND execution_owner_token = $3`, l.confirmationID, l.userID, l.ownerToken)
 	if err != nil {
 		return err
 	}
@@ -145,6 +268,21 @@ func (l *databaseConfirmationLease) Release(ctx context.Context) error {
 		return ErrConfirmationDenied
 	}
 	return nil
+}
+
+func confirmationOwnerToken() (string, error) {
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(tokenBytes), nil
+}
+
+func (l *databaseConfirmationLease) ReplayResult() (json.RawMessage, bool) {
+	if len(l.replayResult) == 0 {
+		return nil, false
+	}
+	return append(json.RawMessage(nil), l.replayResult...), true
 }
 
 func issueMCPToken(ctx context.Context, db interface {
@@ -174,7 +312,7 @@ func issueMCPToken(ctx context.Context, db interface {
 
 func requestedMCPScopes(raw string) ([]string, error) {
 	if strings.TrimSpace(raw) == "" {
-		return []string{"read", "write"}, nil
+		return []string{"read"}, nil
 	}
 	seen := map[string]bool{}
 	var scopes []string

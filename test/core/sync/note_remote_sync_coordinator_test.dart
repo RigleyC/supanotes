@@ -16,7 +16,6 @@ void main() {
       final bootstrapPhases = <String>[];
       var catalogPulls = 0;
       var newChangeExists = false;
-      final applied = <int>[];
 
       final coordinator = NoteRemoteSyncCoordinator(
         userId: 'user-1',
@@ -67,15 +66,17 @@ void main() {
               bootstrapPhases.add('apply');
               newChangeExists = true;
             },
+            applyTasksInTransaction: () async {},
           );
         },
-        isNoteActive: (_) => false,
-        syncPending: (_) async {},
-        confirmedRevision: (_) async => 0,
-        pollAndReconcile: (_) async {},
-        hydrateRemote: (_) async {},
-        deleteLocal: (_) async {},
-        onApplied: (change) => applied.add(change.sequence),
+        noteApplier: _noteApplier(
+          syncPending: (_) async {},
+          confirmedRevision: (_) async => 0,
+          pollAndReconcile: (_) async {},
+          hydrateRemote: (_) async {},
+          deleteLocal: (_) async {},
+        ),
+        taskApplier: const DisabledNoteRemoteSyncTaskApplier(),
       );
 
       await coordinator.syncOnce();
@@ -89,7 +90,8 @@ void main() {
         SyncFeedScope.notes,
       ]);
       expect(fetchAfter.take(2), [0, 12]);
-      expect(applied, [13]);
+      final appliedRows = await (db.select(db.syncInbox)).get();
+      expect(appliedRows.single.appliedAt, isNotNull);
       expect(await store.isBootstrapComplete('user-1'), isTrue);
       expect(await store.getCursor('user-1'), 13);
     },
@@ -128,13 +130,16 @@ void main() {
             ),
         fetchBootstrap: () async => NoteRemoteSyncBootstrap(
           applyNotesInTransaction: () async {},
+          applyTasksInTransaction: () async {},
         ),
-        isNoteActive: (_) => false,
-        syncPending: (id) async => calls.add('outbox:$id'),
-        confirmedRevision: (_) async => 6,
-        pollAndReconcile: (id) async => calls.add('poll:$id'),
-        hydrateRemote: (id) async => calls.add('hydrate:$id'),
-        deleteLocal: (_) async {},
+        noteApplier: _noteApplier(
+          syncPending: (id) async => calls.add('outbox:$id'),
+          confirmedRevision: (_) async => 6,
+          pollAndReconcile: (id) async => calls.add('poll:$id'),
+          hydrateRemote: (id) async => calls.add('hydrate:$id'),
+          deleteLocal: (_) async {},
+        ),
+        taskApplier: const DisabledNoteRemoteSyncTaskApplier(),
       );
 
       await coordinator.syncOnce();
@@ -180,13 +185,16 @@ void main() {
           ),
       fetchBootstrap: () async => NoteRemoteSyncBootstrap(
         applyNotesInTransaction: () async {},
+        applyTasksInTransaction: () async {},
       ),
-      isNoteActive: (_) => false,
-      syncPending: (_) async {},
-      confirmedRevision: (_) async => null,
-      pollAndReconcile: (_) async {},
-      hydrateRemote: (_) async => hydrated++,
-      deleteLocal: (id) async => deleted.add(id),
+      noteApplier: _noteApplier(
+        syncPending: (_) async {},
+        confirmedRevision: (_) async => null,
+        pollAndReconcile: (_) async {},
+        hydrateRemote: (_) async => hydrated++,
+        deleteLocal: (id) async => deleted.add(id),
+      ),
+      taskApplier: const DisabledNoteRemoteSyncTaskApplier(),
     );
 
     await coordinator.syncOnce();
@@ -262,15 +270,17 @@ void main() {
           applyNotesInTransaction: () async {},
           applyTasksInTransaction: () async => bootstrappedTasks++,
         ),
-        bootstrapTasksAvailable: true,
-        applyTaskChanged: (id) async => applied.add('changed:$id'),
-        applyTaskDeleted: (id) async => applied.add('deleted:$id'),
-        isNoteActive: (_) => false,
-        syncPending: (_) async {},
-        confirmedRevision: (_) async => null,
-        pollAndReconcile: (_) async {},
-        hydrateRemote: (_) async {},
-        deleteLocal: (_) async {},
+        noteApplier: _noteApplier(
+          syncPending: (_) async {},
+          confirmedRevision: (_) async => null,
+          pollAndReconcile: (_) async {},
+          hydrateRemote: (_) async {},
+          deleteLocal: (_) async {},
+        ),
+        taskApplier: NoteRemoteSyncTaskCallbacks(
+          applyChanged: (id) async => applied.add('changed:$id'),
+          applyDeleted: (id) async => applied.add('deleted:$id'),
+        ),
       );
 
       await coordinator.syncOnce();
@@ -324,13 +334,17 @@ void main() {
             if (taskAttempts == 1) throw StateError('offline');
           },
         ),
-        bootstrapTasksAvailable: true,
-        isNoteActive: (_) => false,
-        syncPending: (_) async {},
-        confirmedRevision: (_) async => null,
-        pollAndReconcile: (_) async {},
-        hydrateRemote: (_) async {},
-        deleteLocal: (_) async {},
+        noteApplier: _noteApplier(
+          syncPending: (_) async {},
+          confirmedRevision: (_) async => null,
+          pollAndReconcile: (_) async {},
+          hydrateRemote: (_) async {},
+          deleteLocal: (_) async {},
+        ),
+        taskApplier: NoteRemoteSyncTaskCallbacks(
+          applyChanged: (id) async {},
+          applyDeleted: (id) async {},
+        ),
       );
 
       await expectLater(coordinator.syncOnce(), throwsStateError);
@@ -346,5 +360,22 @@ void main() {
         SyncFeedScope.all,
       ]);
     },
+  );
+}
+
+NoteRemoteSyncNoteApplier _noteApplier({
+  required Future<void> Function(String) syncPending,
+  required Future<int?> Function(String) confirmedRevision,
+  required Future<void> Function(String) pollAndReconcile,
+  required Future<void> Function(String) hydrateRemote,
+  required Future<void> Function(String) deleteLocal,
+}) {
+  return NoteRemoteSyncNoteApplier(
+    isActive: (_) => false,
+    syncPending: syncPending,
+    confirmedRevision: confirmedRevision,
+    pollAndReconcile: pollAndReconcile,
+    hydrateRemote: hydrateRemote,
+    deleteLocal: deleteLocal,
   );
 }

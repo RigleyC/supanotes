@@ -1,7 +1,4 @@
-
-import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/api_exceptions.dart';
@@ -9,75 +6,48 @@ import 'package:supanotes/core/auth/auth_token_manager.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 
-abstract class IAuthRepository {
-  Future<AuthResult> register({
-    required String email,
-    required String password,
-    required String name,
-  });
-  Future<AuthResult> login({required String email, required String password});
-  Future<void> logout();
-  Future<bool> isAuthenticated();
-  Future<void> registerDeviceToken(String token);
-}
-
-class AuthRepository implements IAuthRepository {
+class AuthRepository {
   AuthRepository({
     required ApiClient apiClient,
     required AuthLocalStorage storage,
-    AuthTokenManager? tokenManager,
+    required AuthTokenManager tokenManager,
   }) : _api = apiClient,
        _storage = storage,
        _tokenManager = tokenManager;
 
   final ApiClient _api;
   final AuthLocalStorage _storage;
-  final AuthTokenManager? _tokenManager;
+  final AuthTokenManager _tokenManager;
 
-  @override
   Future<AuthResult> register({
     required String email,
     required String password,
     required String name,
-  }) async {
-    try {
-      final response = await _api.post<Map<String, dynamic>>(
-        '/auth/register',
-        data: {'email': email, 'password': password, 'name': name},
-      );
-      final body = response.data;
-      if (body == null) {
-        throw const ServerException(
-          message: 'Empty response from server',
-          statusCode: 500,
-        );
-      }
-      final result = AuthResult.fromJson(body);
-      await _storage.saveUser(user: result.user);
-      await (_tokenManager?.installSession(
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-          ) ??
-          _storage.saveTokens(
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-          ));
-      await _storage.saveSessionData({'settings': result.session.settings});
-      return result;
-    } on DioException catch (e) {
-      throw fromDioError(e);
-    }
+  }) {
+    return _authenticate(
+      '/auth/register',
+      data: {'email': email, 'password': password, 'name': name},
+    );
   }
 
-  @override
   Future<AuthResult> login({
     required String email,
     required String password,
+  }) {
+    return _authenticate(
+      '/auth/login',
+      data: {'email': email, 'password': password},
+    );
+  }
+
+  Future<AuthResult> _authenticate(
+    String path, {
+    required Map<String, dynamic> data,
   }) async {
     try {
       final response = await _api.post<Map<String, dynamic>>(
-        '/auth/login',
-        data: {'email': email, 'password': password},
+        path,
+        data: data,
       );
       final body = response.data;
       if (body == null) {
@@ -86,64 +56,68 @@ class AuthRepository implements IAuthRepository {
           statusCode: 500,
         );
       }
+
       final result = AuthResult.fromJson(body);
-      await _storage.saveUser(user: result.user);
-      await (_tokenManager?.installSession(
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-          ) ??
-          _storage.saveTokens(
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken,
-          ));
-      await _storage.saveSessionData({'settings': result.session.settings});
+      try {
+        await _tokenManager.installSession(
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+        );
+        await _storage.saveUser(user: result.user);
+      } catch (error, stackTrace) {
+        Object? cleanupError;
+        try {
+          await _tokenManager.clearSession();
+        } on Object catch (cleanupFailure) {
+          cleanupError = cleanupFailure;
+        }
+        Error.throwWithStackTrace(
+          AuthSessionInstallationException(error, cleanupError),
+          stackTrace,
+        );
+      }
       return result;
-    } on DioException catch (e) {
-      throw fromDioError(e);
+    } on DioException catch (error) {
+      throw fromDioError(error);
     }
   }
 
-  @override
   Future<void> logout() async {
-    final refreshToken =
-        await (_tokenManager?.getRefreshToken() ?? _storage.getRefreshToken());
+    await _tokenManager.withSessionLock(_logoutWithRefreshToken);
+  }
+
+  Future<void> _logoutWithRefreshToken(String? refreshToken) async {
     try {
-      if (refreshToken != null) {
+      if (refreshToken != null && refreshToken.isNotEmpty) {
         await _api.post<dynamic>(
           '/auth/logout',
           data: {'refresh_token': refreshToken},
         );
       }
     } on DioException {
-      // Ignored: best-effort logout clean up
-    } finally {
-      await (_tokenManager?.clearSession() ?? _storage.clear());
-    }
-  }
-
-  @override
-  Future<bool> isAuthenticated() async {
-    final token =
-        await (_tokenManager?.getAccessToken() ?? _storage.getAccessToken());
-    return token != null && token.isNotEmpty;
-  }
-
-  @override
-  Future<void> registerDeviceToken(String token) async {
-    try {
-      await _api.post<dynamic>(
-        '/device-tokens',
-        data: {'token': token, 'platform': _getPlatformName()},
-      );
-    } on DioException {
-      // Ignored: best-effort device token registration
+      // Logout is best effort; the controller owns local cleanup.
     }
   }
 }
 
-String _getPlatformName() {
-  if (kIsWeb) return 'web';
-  if (Platform.isAndroid) return 'android';
-  if (Platform.isIOS) return 'ios';
-  return 'desktop';
+/// Indicates that a login or registration response could not be installed as
+/// a complete local session and the session was cleared.
+final class AuthSessionInstallationException implements Exception {
+  /// Creates an exception for a failed session installation and cleanup.
+  AuthSessionInstallationException(this.cause, this.cleanupError)
+    : message =
+          'Auth session installation failed: $cause'
+          '${cleanupError == null ? '' : '; cleanup: $cleanupError'}';
+
+  /// Error raised while installing the new session.
+  final Object cause;
+
+  /// Error raised while clearing the incomplete session, if any.
+  final Object? cleanupError;
+
+  /// Human-readable description of the installation and cleanup failures.
+  final String message;
+
+  @override
+  String toString() => message;
 }

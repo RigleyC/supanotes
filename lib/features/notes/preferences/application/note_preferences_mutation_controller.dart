@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
@@ -6,47 +6,61 @@ import 'package:supanotes/features/notes/preferences/data/user_note_preferences_
 
 enum NotePreferenceMutationStatus { idle, saving, error }
 
-class NotePreferenceMutationState {
-  const NotePreferenceMutationState({
-    this.status = NotePreferenceMutationStatus.idle,
-    this.error,
-    this.inFlightCount = 0,
-  });
-
-  final NotePreferenceMutationStatus status;
-  final Object? error;
-  final int inFlightCount;
-
-  NotePreferenceMutationState copyWith({
-    NotePreferenceMutationStatus? status,
-    Object? error,
-    bool clearError = false,
-    int? inFlightCount,
-  }) {
-    return NotePreferenceMutationState(
-      status: status ?? this.status,
-      error: clearError ? null : error ?? this.error,
-      inFlightCount: inFlightCount ?? this.inFlightCount,
+extension NotePreferenceMutationAsyncValueX on AsyncValue<void> {
+  NotePreferenceMutationStatus get status {
+    return when(
+      data: (_) => NotePreferenceMutationStatus.idle,
+      loading: () => NotePreferenceMutationStatus.saving,
+      error: (_, _) => NotePreferenceMutationStatus.error,
     );
   }
 }
 
-class NotePreferenceMutationController
-    extends StateNotifier<NotePreferenceMutationState> {
-  NotePreferenceMutationController({
-    required String userId,
-    required INotesRepository notesRepository,
-    required UserNotePreferencesRepository preferencesRepository,
-  }) : _userId = userId,
-       _notesRepository = notesRepository,
-       _preferencesRepository = preferencesRepository,
-       super(const NotePreferenceMutationState());
+final class NotePreferenceMutationException implements Exception {
+  const NotePreferenceMutationException({
+    required this.field,
+    required this.cause,
+    this.rollbackError,
+  });
 
-  final String _userId;
-  final INotesRepository _notesRepository;
-  final UserNotePreferencesRepository _preferencesRepository;
+  final String field;
+  final Object cause;
+  final Object? rollbackError;
+
+  @override
+  String toString() {
+    final rollback = rollbackError == null
+        ? ''
+        : '; rollback failed: $rollbackError';
+    return 'Failed to update note preference "$field": $cause$rollback';
+  }
+}
+
+class NotePreferenceMutationController extends Notifier<AsyncValue<void>> {
+  NotePreferenceMutationController();
+
+  late String _userId;
+  late INotesRepository _notesRepository;
+  late UserNotePreferencesRepository _preferencesRepository;
   final Map<_PreferenceField, int> _versions = {};
   int _nextVersion = 0;
+  int _inFlightCount = 0;
+  int? _errorVersion;
+
+  @override
+  AsyncValue<void> build() {
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      throw StateError(
+        'NotePreferenceMutationController requires an authenticated user',
+      );
+    }
+
+    _userId = userId;
+    _notesRepository = ref.watch(notesRepositoryProvider);
+    _preferencesRepository = ref.watch(userNotePreferencesRepositoryProvider);
+    return const AsyncValue.data(null);
+  }
 
   Future<void> setHideCompleted({
     required NoteModel current,
@@ -57,14 +71,6 @@ class NotePreferenceMutationController
       current: current,
       previousValue: current.hideCompleted,
       targetValue: value,
-      write: (next) =>
-          _preferencesRepository.setHideCompleted(_userId, current.id, next),
-      readCurrentValue: (note) => note.hideCompleted,
-      rollback: (previous) => _preferencesRepository.setHideCompleted(
-        _userId,
-        current.id,
-        previous,
-      ),
     );
   }
 
@@ -77,17 +83,6 @@ class NotePreferenceMutationController
       current: current,
       previousValue: current.collapseImages,
       targetValue: value,
-      write: (next) => _preferencesRepository.setCollapseImages(
-        _userId,
-        current.id,
-        next,
-      ),
-      readCurrentValue: (note) => note.collapseImages,
-      rollback: (previous) => _preferencesRepository.setCollapseImages(
-        _userId,
-        current.id,
-        previous,
-      ),
     );
   }
 
@@ -96,17 +91,20 @@ class NotePreferenceMutationController
     required NoteModel current,
     required bool previousValue,
     required bool targetValue,
-    required Future<void> Function(bool value) write,
-    required bool Function(NoteModel note) readCurrentValue,
-    required Future<void> Function(bool value) rollback,
   }) async {
     final version = ++_nextVersion;
     _versions[field] = version;
-    _markSaving();
+    _inFlightCount++;
+    state = const AsyncValue.loading();
 
     try {
-      await write(targetValue);
-    } catch (error) {
+      await _write(field, current.id, targetValue);
+    } on Object catch (error, stackTrace) {
+      Object failure = NotePreferenceMutationException(
+        field: field.name,
+        cause: error,
+      );
+      var failureStackTrace = stackTrace;
       try {
         await _rollbackIfStillCurrent(
           field: field,
@@ -114,15 +112,24 @@ class NotePreferenceMutationController
           version: version,
           targetValue: targetValue,
           previousValue: previousValue,
-          readCurrentValue: readCurrentValue,
-          rollback: rollback,
         );
+      } on Object catch (rollbackError, rollbackStackTrace) {
+        failure = NotePreferenceMutationException(
+          field: field.name,
+          cause: error,
+          rollbackError: rollbackError,
+        );
+        failureStackTrace = rollbackStackTrace;
       } finally {
-        _markComplete(error: _versions[field] == version ? error : null);
+        _finish(
+          version: version,
+          error: _versions[field] == version ? failure : null,
+          stackTrace: failureStackTrace,
+        );
       }
-      return;
+      Error.throwWithStackTrace(failure, failureStackTrace);
     }
-    _markComplete();
+    _finish(version: version);
   }
 
   Future<void> _rollbackIfStillCurrent({
@@ -131,64 +138,55 @@ class NotePreferenceMutationController
     required int version,
     required bool targetValue,
     required bool previousValue,
-    required bool Function(NoteModel note) readCurrentValue,
-    required Future<void> Function(bool value) rollback,
   }) async {
     if (_versions[field] != version) return;
 
     final latest = await _notesRepository.getNoteById(noteId);
     if (latest == null) return;
-    if (readCurrentValue(latest) != targetValue) return;
+    if (_readValue(field, latest) != targetValue) return;
 
-    await rollback(previousValue);
+    await _write(field, noteId, previousValue);
   }
 
-  void _markSaving() {
-    state = state.copyWith(
-      status: NotePreferenceMutationStatus.saving,
-      clearError: true,
-      inFlightCount: state.inFlightCount + 1,
-    );
+  Future<void> _write(_PreferenceField field, String noteId, bool value) {
+    return switch (field) {
+      _PreferenceField.hideCompleted => _preferencesRepository.setHideCompleted(
+        _userId,
+        noteId,
+        value,
+      ),
+      _PreferenceField.collapseImages =>
+        _preferencesRepository.setCollapseImages(_userId, noteId, value),
+    };
   }
 
-  void _markComplete({Object? error}) {
-    final nextCount = state.inFlightCount - 1;
-    final nextInFlightCount = nextCount < 0 ? 0 : nextCount;
+  bool _readValue(_PreferenceField field, NoteModel note) {
+    return switch (field) {
+      _PreferenceField.hideCompleted => note.hideCompleted,
+      _PreferenceField.collapseImages => note.collapseImages,
+    };
+  }
+
+  void _finish({required int version, Object? error, StackTrace? stackTrace}) {
+    if (_inFlightCount > 0) _inFlightCount--;
     if (error != null) {
-      state = state.copyWith(
-        status: NotePreferenceMutationStatus.error,
-        error: error,
-        inFlightCount: nextInFlightCount,
-      );
+      _errorVersion = version;
+      state = AsyncValue.error(error, stackTrace ?? StackTrace.current);
       return;
     }
-    state = state.copyWith(
-      status: nextInFlightCount == 0
-          ? NotePreferenceMutationStatus.idle
-          : NotePreferenceMutationStatus.saving,
-      clearError: true,
-      inFlightCount: nextInFlightCount,
-    );
+    if (_errorVersion != null && version >= _errorVersion!) {
+      _errorVersion = null;
+    }
+    if (_errorVersion != null) return;
+    state = _inFlightCount == 0
+        ? const AsyncValue.data(null)
+        : const AsyncValue.loading();
   }
 }
 
 enum _PreferenceField { hideCompleted, collapseImages }
 
-final StateNotifierProviderFamily<NotePreferenceMutationController, NotePreferenceMutationState, String> notePreferenceMutationControllerProvider = StateNotifierProvider.family
-    .autoDispose<
-      NotePreferenceMutationController,
-      NotePreferenceMutationState,
-      String
-    >((ref, noteId) {
-      final userId = ref.watch(currentUserIdProvider);
-      if (userId == null || userId.isEmpty) {
-        throw StateError(
-          'NotePreferenceMutationController requires an authenticated user',
-        );
-      }
-      return NotePreferenceMutationController(
-        userId: userId,
-        notesRepository: ref.watch(notesRepositoryProvider),
-        preferencesRepository: ref.watch(userNotePreferencesRepositoryProvider),
-      );
-    });
+final notePreferenceMutationControllerProvider = NotifierProvider.autoDispose
+    .family<NotePreferenceMutationController, AsyncValue<void>, String>(
+      (_) => NotePreferenceMutationController(),
+    );

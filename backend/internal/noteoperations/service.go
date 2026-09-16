@@ -117,6 +117,9 @@ func syncOperationsInRepository(
 
 		dedupOp, err := repo.GetNoteOperationByOpID(ctx, noteID, opID)
 		if err == nil {
+			if !operationIdentityMatches(opReq, dedupOp) {
+				return SyncResponse{}, &OperationIDConflictError{OperationID: opReq.OperationID}
+			}
 			accepted = append(accepted, AcceptedOperation{
 				OperationID: opReq.OperationID,
 				Revision:    dedupOp.Revision,
@@ -134,7 +137,11 @@ func syncOperationsInRepository(
 		}
 
 		if err := doc.ApplyOperation(Kind(opReq.Kind), ptrStr(opReq.BlockID), opReq.Payload); err != nil {
-			return SyncResponse{}, fmt.Errorf("apply operation: %w", err)
+			return SyncResponse{}, &ValidationError{
+				Code:    "INVALID_DOCUMENT_MUTATION",
+				Message: "operation cannot be applied to the current document",
+				Err:     err,
+			}
 		}
 
 		currentRevision++

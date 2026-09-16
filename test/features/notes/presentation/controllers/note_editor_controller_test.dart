@@ -1,10 +1,41 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_upload.dart';
+import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 import 'package:super_editor/super_editor.dart';
+
+class _PendingAttachmentUploader implements AttachmentUploader {
+  _PendingAttachmentUploader(this.result);
+
+  final Future<AttachmentUploadResult> result;
+
+  @override
+  Future<AttachmentUploadResult> upload({
+    required String id,
+    required String noteId,
+    required File file,
+    required String mimeType,
+  }) => result;
+}
+
+class _CompletedAttachmentUploader implements AttachmentUploader {
+  _CompletedAttachmentUploader(this.result);
+
+  final AttachmentUploadResult result;
+
+  @override
+  Future<AttachmentUploadResult> upload({
+    required String id,
+    required String noteId,
+    required File file,
+    required String mimeType,
+  }) async => result;
+}
 
 void main() {
   test('default document starts with the canonical init paragraph', () async {
@@ -245,9 +276,8 @@ void main() {
   );
 
   test('stale upload failure does not mutate an inactive editor', () async {
-    final upload = Completer<void>();
+    final upload = Completer<AttachmentUploadResult>();
     var active = true;
-    var errorCalls = 0;
     final controller = NoteEditorController(
       userId: 'user-1',
       noteId: 'note-1',
@@ -264,22 +294,62 @@ void main() {
       if (!active) throw StateError('inactive session');
     });
 
-    controller.attachFileFromPath(
+    final uploadFuture = controller.attachFileFromPath(
       filePath: 'attachment.txt',
       mimeType: 'text/plain',
-      onUploadFile: (_, _, _, _) => upload.future,
-      onError: () => errorCalls++,
+      uploader: _PendingAttachmentUploader(upload.future),
     );
     expect(controller.document.nodeCount, 2);
 
     active = false;
     upload.completeError(StateError('upload failed'));
-    await pumpEventQueue();
+    await expectLater(uploadFuture, throwsStateError);
 
     expect(controller.document.nodeCount, 2);
-    expect(errorCalls, 0);
     await controller.dispose();
   });
+
+  test(
+    'successful upload writes the typed remote reference to the node',
+    () async {
+      final controller = NoteEditorController(
+        userId: 'user-1',
+        noteId: 'note-1',
+        nodes: [ParagraphNode(id: 'paragraph-1', text: AttributedText())],
+      );
+      controller.composer.setSelectionWithReason(
+        const DocumentSelection.collapsed(
+          position: DocumentPosition(
+            nodeId: 'paragraph-1',
+            nodePosition: TextNodePosition(offset: 0),
+          ),
+        ),
+      );
+      final result = AttachmentUploadResult(
+        id: 'remote-1',
+        noteId: 'note-1',
+        fileName: 'receipt.pdf',
+        downloadUrl: '/api/v1/attachments/remote-1/content',
+        mimeType: 'application/pdf',
+        fileSize: 42,
+        createdAt: DateTime.utc(2026, 9, 16),
+      );
+
+      await controller.attachFileFromPath(
+        filePath: 'receipt.pdf',
+        mimeType: 'application/pdf',
+        uploader: _CompletedAttachmentUploader(result),
+      );
+
+      final attachment = controller.document
+          .whereType<DocumentAttachmentNode>()
+          .single;
+      expect(attachment.metadata['attachmentId'], isNull);
+      expect(attachment.metadata['url'], result.downloadUrl);
+      expect(attachment.metadata['fileSize'], 42);
+      await controller.dispose();
+    },
+  );
 
   test('hidden tasks cannot be crossed by downstream deletion', () async {
     final controller = NoteEditorController(

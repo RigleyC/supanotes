@@ -1,55 +1,51 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 
 import 'package:supanotes/features/notes/sharing/data/shares_repository.dart';
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
 
-final StateNotifierProviderFamily<ShareNoteController, AsyncValue<void>, String> shareNoteControllerProvider = StateNotifierProvider.autoDispose
-    .family<ShareNoteController, AsyncValue<void>, String>((ref, noteId) {
-      return ShareNoteController(
-        noteId: noteId,
-        repository: ref.read(sharesRepositoryProvider),
-      );
-    });
+final shareNoteControllerProvider = NotifierProvider.autoDispose
+    .family<ShareNoteController, AsyncValue<void>, String>(
+      ShareNoteController.new,
+    );
 
-class ShareNoteController extends StateNotifier<AsyncValue<void>> {
-  ShareNoteController({
-    required String noteId,
-    required SharesRepository repository,
-  }) : _noteId = noteId,
-       _repository = repository,
-       super(const AsyncValue.data(null));
+class ShareNoteController extends Notifier<AsyncValue<void>> {
+  ShareNoteController(this._noteId);
 
   final String _noteId;
-  final SharesRepository _repository;
+  late SharesRepository _repository;
   int _nextOperation = 0;
 
-  Future<void> share({
+  @override
+  AsyncValue<void> build() {
+    _repository = ref.read(sharesRepositoryProvider);
+    return const AsyncValue.data(null);
+  }
+
+  Future<bool> share({
     required String email,
     required SharePermission permission,
-  }) async {
-    final operationId = ++_nextOperation;
-    state = const AsyncValue.loading();
-    final result = await AsyncValue.guard(
+  }) {
+    return _runMutation(
       () => _repository.shareNote(
         noteId: _noteId,
         email: email,
         permission: permission,
       ),
     );
-    if (operationId == _nextOperation) {
-      state = result;
-    }
   }
 
-  Future<void> revoke({required String userId}) async {
-    final operationId = ++_nextOperation;
-    state = const AsyncValue.loading();
-    final result = await AsyncValue.guard(
+  Future<bool> revoke({required String userId}) {
+    return _runMutation(
       () => _repository.deleteShare(noteId: _noteId, userId: userId),
     );
-    if (operationId == _nextOperation) {
-      state = result;
-    }
+  }
+
+  Future<bool> _runMutation(Future<void> Function() mutation) async {
+    final operationId = ++_nextOperation;
+    state = const AsyncValue.loading();
+    final result = await AsyncValue.guard(mutation);
+    if (operationId != _nextOperation) return false;
+    state = result;
+    return result.hasValue;
   }
 }

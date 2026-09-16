@@ -39,6 +39,9 @@ func NewOAuthHandler(authSvc *internalauth.Service, pool *pgxpool.Pool, cfg *con
 }
 
 func (h *OAuthHandler) Authorize(c echo.Context) error {
+	if !h.configured() {
+		return c.NoContent(http.StatusNotFound)
+	}
 	q := c.QueryParams()
 	if q.Get("client_id") != h.cfg.AlexaClientID || q.Get("response_type") != "code" || q.Get("state") == "" {
 		return c.String(http.StatusBadRequest, "invalid OAuth authorization request")
@@ -51,6 +54,9 @@ func (h *OAuthHandler) Authorize(c echo.Context) error {
 }
 
 func (h *OAuthHandler) AuthorizeSubmit(c echo.Context) error {
+	if !h.configured() {
+		return c.NoContent(http.StatusNotFound)
+	}
 	if c.FormValue("client_id") != h.cfg.AlexaClientID {
 		return c.String(http.StatusBadRequest, "invalid client")
 	}
@@ -79,6 +85,9 @@ func (h *OAuthHandler) AuthorizeSubmit(c echo.Context) error {
 }
 
 func (h *OAuthHandler) Token(c echo.Context) error {
+	if !h.configured() {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "service_unavailable"})
+	}
 	clientID, clientSecret := c.FormValue("client_id"), c.FormValue("client_secret")
 	if basicID, basicSecret, ok := c.Request().BasicAuth(); ok {
 		clientID, clientSecret = basicID, basicSecret
@@ -119,6 +128,10 @@ func (h *OAuthHandler) Token(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, map[string]any{"access_token": access, "token_type": "Bearer", "expires_in": int(authpkg.AccessTokenTTL.Seconds()), "refresh_token": refreshToken})
+}
+
+func (h *OAuthHandler) configured() bool {
+	return h != nil && h.cfg != nil && h.cfg.AlexaConfigured()
 }
 
 func (h *OAuthHandler) refresh(c echo.Context) error {

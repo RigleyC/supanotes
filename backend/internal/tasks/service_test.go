@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -13,9 +14,9 @@ import (
 )
 
 type fakeRepo struct {
-	task           sqlcgen.Task
-	conflictTask   sqlcgen.Task
-	ops            map[pgtype.UUID]sqlcgen.TaskOperation
+	task           taskRow
+	conflictTask   taskRow
+	ops            map[pgtype.UUID]taskOperationRow
 	changes        int
 	readTx         bool
 	inserted       bool
@@ -29,42 +30,42 @@ func (f *fakeRepo) WithReadTx(_ context.Context, fn func(Repository) error) erro
 	return fn(f)
 }
 func (f *fakeRepo) WithQuerier(sqlcgen.Querier) Repository { return f }
-func (f *fakeRepo) ListTasks(context.Context, pgtype.UUID) ([]sqlcgen.Task, error) {
+func (f *fakeRepo) ListTasks(context.Context, pgtype.UUID) ([]taskRow, error) {
 	if !f.task.OwnerUserID.Valid {
 		return nil, nil
 	}
-	return []sqlcgen.Task{f.task}, nil
+	return []taskRow{f.task}, nil
 }
-func (f *fakeRepo) GetTask(_ context.Context, _ pgtype.UUID, u pgtype.UUID) (sqlcgen.Task, error) {
+func (f *fakeRepo) GetTask(_ context.Context, _ pgtype.UUID, u pgtype.UUID) (taskRow, error) {
 	if u != f.task.OwnerUserID {
-		return sqlcgen.Task{}, pgx.ErrNoRows
+		return taskRow{}, pgx.ErrNoRows
 	}
 	return f.task, nil
 }
-func (f *fakeRepo) LockTask(_ context.Context, _ pgtype.UUID, u pgtype.UUID) (sqlcgen.Task, error) {
+func (f *fakeRepo) LockTask(_ context.Context, _ pgtype.UUID, u pgtype.UUID) (taskRow, error) {
 	if f.lockMisses > 0 {
 		f.lockMisses--
-		return sqlcgen.Task{}, pgx.ErrNoRows
+		return taskRow{}, pgx.ErrNoRows
 	}
 	if !f.task.OwnerUserID.Valid || u != f.task.OwnerUserID {
-		return sqlcgen.Task{}, pgx.ErrNoRows
+		return taskRow{}, pgx.ErrNoRows
 	}
 	return f.task, nil
 }
-func (f *fakeRepo) GetOperation(_ context.Context, taskID, operationID pgtype.UUID) (sqlcgen.TaskOperation, error) {
+func (f *fakeRepo) GetOperation(_ context.Context, taskID, operationID pgtype.UUID) (taskOperationRow, error) {
 	v, ok := f.ops[operationID]
 	if !ok || v.TaskID != taskID {
-		return sqlcgen.TaskOperation{}, pgx.ErrNoRows
+		return taskOperationRow{}, pgx.ErrNoRows
 	}
 	return v, nil
 }
-func (f *fakeRepo) InsertTask(_ context.Context, a sqlcgen.InsertTaskParams) (sqlcgen.Task, error) {
+func (f *fakeRepo) InsertTask(_ context.Context, a taskInsert) (taskRow, error) {
 	f.inserted = true
 	if f.insertConflict {
 		f.task = f.conflictTask
-		return sqlcgen.Task{}, pgx.ErrNoRows
+		return taskRow{}, pgx.ErrNoRows
 	}
-	f.task = sqlcgen.Task{
+	f.task = taskRow{
 		ID: a.ID, OwnerUserID: a.OwnerUserID, Title: a.Title, DueDate: a.DueDate, HasTime: a.HasTime,
 		RecurrenceRule: a.RecurrenceRule, Reminder: a.Reminder, Completions: a.Completions,
 		IsCompleted: a.IsCompleted, LastCompletedAt: a.LastCompletedAt, Revision: 1,
@@ -72,7 +73,7 @@ func (f *fakeRepo) InsertTask(_ context.Context, a sqlcgen.InsertTaskParams) (sq
 	}
 	return f.task, nil
 }
-func (f *fakeRepo) UpdateTask(_ context.Context, a sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
+func (f *fakeRepo) UpdateTask(_ context.Context, a taskUpdate) (taskRow, error) {
 	f.task.Title = a.Title
 	f.task.DueDate = a.DueDate
 	f.task.HasTime = a.HasTime
@@ -86,14 +87,14 @@ func (f *fakeRepo) UpdateTask(_ context.Context, a sqlcgen.UpdateTaskParams) (sq
 	f.task.Revision++
 	return f.task, nil
 }
-func (f *fakeRepo) InsertOperation(_ context.Context, a sqlcgen.InsertTaskOperationParams) error {
+func (f *fakeRepo) InsertOperation(_ context.Context, a taskOperationInsert) error {
 	if f.ops == nil {
-		f.ops = map[pgtype.UUID]sqlcgen.TaskOperation{}
+		f.ops = map[pgtype.UUID]taskOperationRow{}
 	}
-	f.ops[a.OperationID] = sqlcgen.TaskOperation{TaskID: a.TaskID, OperationID: a.OperationID, PayloadHash: a.PayloadHash, ResponseJson: a.ResponseJson}
+	f.ops[a.OperationID] = taskOperationRow{TaskID: a.TaskID, OperationID: a.OperationID, PayloadHash: a.PayloadHash, ResponseJSON: a.ResponseJSON}
 	return nil
 }
-func (f *fakeRepo) InsertChange(context.Context, sqlcgen.InsertTaskSyncChangeParams) error {
+func (f *fakeRepo) InsertChange(context.Context, taskChange) error {
 	f.changes++
 	return nil
 }
@@ -107,7 +108,7 @@ func uuidWithByte(value byte) pgtype.UUID {
 
 func TestApplyMutationSameOperationReturnsOriginalResult(t *testing.T) {
 	id := uuidWithByte(1)
-	f := &fakeRepo{task: sqlcgen.Task{ID: id, OwnerUserID: id, Title: "old", Completions: []byte(`{}`)}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+	f := &fakeRepo{task: taskRow{ID: id, OwnerUserID: id, Title: "old", Completions: []byte(`{}`)}, ops: map[pgtype.UUID]taskOperationRow{}}
 	s := NewService(f)
 	m := Mutation{OperationID: "00000000-0000-4000-8000-000000000001", Kind: kindUpdate, Payload: []byte(`{"title":"A"}`)}
 	a, err := s.ApplyMutation(context.Background(), id, id, m)
@@ -128,7 +129,7 @@ func TestApplyMutationSameOperationReturnsOriginalResult(t *testing.T) {
 
 func TestApplyMutationHashIsStableAcrossJSONKeyOrder(t *testing.T) {
 	id := uuidWithByte(11)
-	f := &fakeRepo{task: sqlcgen.Task{ID: id, OwnerUserID: id, Title: "old", Completions: []byte(`{}`)}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+	f := &fakeRepo{task: taskRow{ID: id, OwnerUserID: id, Title: "old", Completions: []byte(`{}`)}, ops: map[pgtype.UUID]taskOperationRow{}}
 	m := Mutation{OperationID: "00000000-0000-4000-8000-000000000012", Kind: kindUpdate, Payload: []byte(`{"title":"A","isCompleted":false}`)}
 	s := NewService(f)
 	first, err := s.ApplyMutation(context.Background(), id, id, m)
@@ -154,9 +155,9 @@ func TestApplyMutationDoesNotReplayAnotherTaskOperation(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := &fakeRepo{
-		task: sqlcgen.Task{ID: id, OwnerUserID: id, Title: "mine", Completions: []byte(`{}`)},
-		ops: map[pgtype.UUID]sqlcgen.TaskOperation{
-			operationID: {TaskID: otherTask, OperationID: operationID, PayloadHash: "hash", ResponseJson: response},
+		task: taskRow{ID: id, OwnerUserID: id, Title: "mine", Completions: []byte(`{}`)},
+		ops: map[pgtype.UUID]taskOperationRow{
+			operationID: {TaskID: otherTask, OperationID: operationID, PayloadHash: "hash", ResponseJSON: response},
 		},
 	}
 	m := Mutation{OperationID: operationID.String(), Kind: kindUpdate, Payload: []byte(`{"title":"mine updated"}`)}
@@ -172,7 +173,7 @@ func TestApplyMutationDoesNotReplayAnotherTaskOperation(t *testing.T) {
 func TestCreatePersistsMetadataAndUsesSingleRevision(t *testing.T) {
 	id := uuidWithByte(5)
 	payload := []byte(`{"title":"A","dueDate":"2026-09-15T09:30:00.000","hasTime":true,"recurrenceRule":"weekly","reminder":"5m_before"}`)
-	f := &fakeRepo{ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+	f := &fakeRepo{ops: map[pgtype.UUID]taskOperationRow{}}
 	result, err := NewService(f).ApplyMutation(context.Background(), id, id, Mutation{
 		OperationID: "00000000-0000-4000-8000-000000000005", Kind: kindCreate, Payload: payload,
 	})
@@ -184,6 +185,23 @@ func TestCreatePersistsMetadataAndUsesSingleRevision(t *testing.T) {
 	}
 	if result.Task.DueDate == nil || *result.Task.DueDate != "2026-09-15T09:30:00.000" || !result.Task.HasTime || result.Task.RecurrenceRule == nil || result.Task.Reminder == nil {
 		t.Fatalf("metadata was not persisted: %#v", result.Task)
+	}
+}
+
+func TestCreateRejectsRecurrenceWithoutDueDate(t *testing.T) {
+	id := uuidWithByte(13)
+	f := &fakeRepo{ops: map[pgtype.UUID]taskOperationRow{}}
+
+	_, err := NewService(f).ApplyMutation(context.Background(), id, id, Mutation{
+		OperationID: "00000000-0000-4000-8000-000000000014",
+		Kind:        kindCreate,
+		Payload:     []byte(`{"title":"A","recurrenceRule":"daily"}`),
+	})
+	if !errors.Is(err, ErrInvalidMutation) {
+		t.Fatalf("recurrence without due date error = %v", err)
+	}
+	if f.inserted {
+		t.Fatal("invalid recurring task was persisted")
 	}
 }
 
@@ -203,7 +221,7 @@ func TestCreateConflictReloadsOwnerRowAndReplaysOperation(t *testing.T) {
 		t.Fatal(err)
 	}
 	operationID := pgtype.UUID{Bytes: parsedOperationID, Valid: true}
-	existing := sqlcgen.Task{ID: id, OwnerUserID: id, Title: "A", Completions: []byte(`{}`), Revision: 1}
+	existing := taskRow{ID: id, OwnerUserID: id, Title: "A", Completions: []byte(`{}`), Revision: 1}
 	response, err := json.Marshal(MutationResult{
 		OperationID: m.OperationID,
 		Revision:    existing.Revision,
@@ -216,8 +234,8 @@ func TestCreateConflictReloadsOwnerRowAndReplaysOperation(t *testing.T) {
 		conflictTask:   existing,
 		lockMisses:     1,
 		insertConflict: true,
-		ops: map[pgtype.UUID]sqlcgen.TaskOperation{
-			operationID: {TaskID: id, OperationID: operationID, PayloadHash: hash, ResponseJson: response},
+		ops: map[pgtype.UUID]taskOperationRow{
+			operationID: {TaskID: id, OperationID: operationID, PayloadHash: hash, ResponseJSON: response},
 		},
 	}
 	result, err := NewService(f).ApplyMutation(context.Background(), id, id, m)
@@ -235,10 +253,10 @@ func TestCreateConflictReloadsOwnerRowAndReplaysOperation(t *testing.T) {
 func TestScheduleChangeIncrementsGenerationAndClearsCompletions(t *testing.T) {
 	id := uuidWithByte(6)
 	due, _ := time.ParseInLocation("2006-01-02T15:04:05.000", "2026-09-15T09:30:00.000", time.UTC)
-	f := &fakeRepo{task: sqlcgen.Task{
+	f := &fakeRepo{task: taskRow{
 		ID: id, OwnerUserID: id, Title: "A", DueDate: pgtype.Timestamp{Time: due, Valid: true}, HasTime: true,
 		Completions: []byte(`{"2026-09-15T09:30:00.000":"2026-09-15T10:00:00.000Z"}`), Revision: 4, ScheduleGeneration: 7,
-	}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+	}, ops: map[pgtype.UUID]taskOperationRow{}}
 	result, err := NewService(f).ApplyMutation(context.Background(), id, id, Mutation{
 		OperationID: "00000000-0000-4000-8000-000000000006", Kind: kindUpdate,
 		Payload: []byte(`{"dueDate":"2026-09-16T09:30:00.000","hasTime":true}`),
@@ -254,11 +272,11 @@ func TestScheduleChangeIncrementsGenerationAndClearsCompletions(t *testing.T) {
 func TestReminderChangePreservesScheduleHistory(t *testing.T) {
 	id := uuidWithByte(14)
 	due, _ := time.ParseInLocation("2006-01-02T15:04:05.000", "2026-09-15T09:30:00.000", time.UTC)
-	f := &fakeRepo{task: sqlcgen.Task{
+	f := &fakeRepo{task: taskRow{
 		ID: id, OwnerUserID: id, Title: "A", DueDate: pgtype.Timestamp{Time: due, Valid: true}, HasTime: true,
 		RecurrenceRule: pgtype.Text{String: "weekly", Valid: true}, Reminder: pgtype.Text{String: "at_time", Valid: true},
 		Completions: []byte(`{"2026-09-15T09:30:00.000":"2026-09-15T10:00:00.000Z"}`), Revision: 4, ScheduleGeneration: 7,
-	}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+	}, ops: map[pgtype.UUID]taskOperationRow{}}
 	result, err := NewService(f).ApplyMutation(context.Background(), id, id, Mutation{
 		OperationID: "00000000-0000-4000-8000-000000000015", Kind: kindUpdate,
 		Payload: []byte(`{"reminder":"5m_before"}`),
@@ -274,10 +292,10 @@ func TestReminderChangePreservesScheduleHistory(t *testing.T) {
 func TestGenericCompletionPatchRespectsTaskScheduleShape(t *testing.T) {
 	t.Run("all-day recurring rejects timed occurrence", func(t *testing.T) {
 		id := uuidWithByte(15)
-		f := &fakeRepo{task: sqlcgen.Task{
+		f := &fakeRepo{task: taskRow{
 			ID: id, OwnerUserID: id, Title: "A", HasTime: false,
 			RecurrenceRule: pgtype.Text{String: "daily", Valid: true}, Completions: []byte(`{}`),
-		}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+		}, ops: map[pgtype.UUID]taskOperationRow{}}
 		_, err := NewService(f).ApplyMutation(context.Background(), id, id, Mutation{
 			OperationID: "00000000-0000-4000-8000-000000000016", Kind: kindUpdate,
 			Payload: []byte(`{"completions":{"2026-09-15T09:30:00.000":"2026-09-15T10:00:00.000Z"}}`),
@@ -289,9 +307,9 @@ func TestGenericCompletionPatchRespectsTaskScheduleShape(t *testing.T) {
 
 	t.Run("non-recurring rejects completion history", func(t *testing.T) {
 		id := uuidWithByte(16)
-		f := &fakeRepo{task: sqlcgen.Task{
+		f := &fakeRepo{task: taskRow{
 			ID: id, OwnerUserID: id, Title: "A", HasTime: true, Completions: []byte(`{}`),
-		}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+		}, ops: map[pgtype.UUID]taskOperationRow{}}
 		_, err := NewService(f).ApplyMutation(context.Background(), id, id, Mutation{
 			OperationID: "00000000-0000-4000-8000-000000000017", Kind: kindUpdate,
 			Payload: []byte(`{"completions":{"2026-09-15T09:30:00.000":"2026-09-15T10:00:00.000Z"}}`),
@@ -304,10 +322,11 @@ func TestGenericCompletionPatchRespectsTaskScheduleShape(t *testing.T) {
 
 func TestOccurrenceCompletionCanonicalizesAndReopens(t *testing.T) {
 	id := uuidWithByte(7)
-	f := &fakeRepo{task: sqlcgen.Task{
+	f := &fakeRepo{task: taskRow{
 		ID: id, OwnerUserID: id, Title: "A", HasTime: false,
+		DueDate:        pgtype.Timestamp{Time: time.Date(2026, time.September, 15, 0, 0, 0, 0, time.UTC), Valid: true},
 		RecurrenceRule: pgtype.Text{String: "daily", Valid: true}, Completions: []byte(`{}`), Revision: 1,
-	}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+	}, ops: map[pgtype.UUID]taskOperationRow{}}
 	s := NewService(f)
 	complete := Mutation{OperationID: "00000000-0000-4000-8000-000000000007", Kind: kindCompleteOccurrence, ScheduleGeneration: 0, Payload: []byte(`{"scheduledAt":"2026-09-15T00:00:00.000","completedAt":"2026-09-15T12:00:00.000Z"}`)}
 	result, err := s.ApplyMutation(context.Background(), id, id, complete)
@@ -336,10 +355,11 @@ func TestOccurrenceCompletionCanonicalizesAndReopens(t *testing.T) {
 
 func TestOccurrenceRejectsArbitraryTimestampAndNoop(t *testing.T) {
 	id := uuidWithByte(8)
-	f := &fakeRepo{task: sqlcgen.Task{
+	f := &fakeRepo{task: taskRow{
 		ID: id, OwnerUserID: id, Title: "A", HasTime: false,
+		DueDate:        pgtype.Timestamp{Time: time.Date(2026, time.September, 15, 0, 0, 0, 0, time.UTC), Valid: true},
 		RecurrenceRule: pgtype.Text{String: "daily", Valid: true}, Completions: []byte(`{"2026-09-15T00:00:00.000":"2026-09-15T12:00:00.000Z"}`),
-	}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+	}, ops: map[pgtype.UUID]taskOperationRow{}}
 	s := NewService(f)
 	bad := Mutation{OperationID: "00000000-0000-4000-8000-000000000009", Kind: kindCompleteOccurrence, Payload: []byte(`{"scheduledAt":"tomorrow"}`)}
 	if _, err := s.ApplyMutation(context.Background(), id, id, bad); err != ErrInvalidMutation {
@@ -353,7 +373,7 @@ func TestOccurrenceRejectsArbitraryTimestampAndNoop(t *testing.T) {
 
 func TestBootstrapUsesRepeatableReadTransaction(t *testing.T) {
 	id := uuidWithByte(9)
-	f := &fakeRepo{task: sqlcgen.Task{ID: id, OwnerUserID: id, Title: "A"}}
+	f := &fakeRepo{task: taskRow{ID: id, OwnerUserID: id, Title: "A"}}
 	if _, err := NewService(f).Bootstrap(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
@@ -364,7 +384,7 @@ func TestBootstrapUsesRepeatableReadTransaction(t *testing.T) {
 
 func TestApplyMutationRejectsHashMismatch(t *testing.T) {
 	id := uuidWithByte(10)
-	f := &fakeRepo{task: sqlcgen.Task{ID: id, OwnerUserID: id, Title: "old", Completions: []byte(`{}`)}, ops: map[pgtype.UUID]sqlcgen.TaskOperation{}}
+	f := &fakeRepo{task: taskRow{ID: id, OwnerUserID: id, Title: "old", Completions: []byte(`{}`)}, ops: map[pgtype.UUID]taskOperationRow{}}
 	s := NewService(f)
 	m := Mutation{OperationID: "00000000-0000-4000-8000-000000000010", Kind: kindUpdate, Payload: []byte(`{"title":"A"}`)}
 	if _, err := s.ApplyMutation(context.Background(), id, id, m); err != nil {

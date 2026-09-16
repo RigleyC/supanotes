@@ -13,7 +13,7 @@ type PrivateHandler struct {
 	delivery *DeliveryService
 }
 
-func NewPrivateHandler(repo Repository, storage StorageService) *PrivateHandler {
+func NewPrivateHandler(repo DeliveryRepository, storage StorageService) *PrivateHandler {
 	return &PrivateHandler{delivery: NewDeliveryService(repo, storage)}
 }
 

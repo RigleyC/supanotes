@@ -134,8 +134,54 @@ void main() {
       database.localNoteDocuments,
     )..where((row) => row.noteId.equals('task-note'))).getSingle();
     expect(jsonDecode(saved.documentJson), document);
-    expect(jsonDecode(saved.materializedDocumentJson!), document);
+    expect(jsonDecode(saved.materializedDocumentJson!), {
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': 'task-1',
+          'type': 'task',
+          'delta': [
+            {'insert': 'Review task'},
+          ],
+          'metadata': {
+            'isCompleted': false,
+            'dueDate': '2026-08-12T09:00:00.000',
+            'hasTime': true,
+            'reminder': 'at_time',
+            'blockType': 'task',
+          },
+        },
+      ],
+    });
     expect(saved.materializedUpdatedAt?.toUtc(), DateTime.utc(2026, 8, 10, 12));
+  });
+
+  test('fetches metadata without hydrating documents', () async {
+    final database = AppDatabase.test();
+    final client = _MockNoteSyncClient();
+    final sync = NoteCatalogSync(
+      syncClient: client,
+      database: database,
+      activityTracker: NoteSessionActivityTracker(),
+      updateNoteIcon: _noopNoteIconUpdate,
+    );
+    addTearDown(database.close);
+
+    when(client.listNotes).thenAnswer(
+      (_) async => [
+        {
+          'id': 'metadata-only-note',
+          'user_id': 'owner-user',
+          'created_at': '2026-08-10T11:00:00.000Z',
+          'updated_at': '2026-08-10T12:00:00.000Z',
+        },
+      ],
+    );
+
+    final catalog = await sync.fetchRemoteCatalog();
+
+    expect(catalog.map((note) => note.id), ['metadata-only-note']);
+    verifyNever(() => client.getDocument('metadata-only-note'));
   });
 
   test(

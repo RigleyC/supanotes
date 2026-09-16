@@ -13,7 +13,10 @@ import 'package:supanotes/core/api/api_exceptions.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/core/validators/input_validators.dart';
-import 'package:supanotes/features/auth/presentation/login_screen.dart' show LoginScreen;
+import 'package:supanotes/features/auth/presentation/login_screen.dart'
+    show LoginScreen;
+import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart'
+    show authActionProvider;
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
@@ -62,7 +65,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final isLoading = ref.watch(authControllerProvider).isLoading;
+    final isLoading = ref
+        .watch(authActionProvider)
+        .when(
+          data: (_) => false,
+          loading: () => true,
+          error: (_, _) => false,
+        );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Criar conta')),

@@ -191,3 +191,46 @@ Verification: `flutter test --no-pub` passed 733 tests and `git diff --check`
 passed. Analyzer output remains limited to the repository's existing
 warnings/infos. Go verification is pending because the Go toolchain is not
 installed on the current Windows host; see `HANDOFF.md`.
+
+## Code quality, auth and task-flow corrections (2026-09-16)
+
+The delegated review and implementation pass corrected the reported feature
+flows while preserving the repository's existing local changes and task
+ownership invariant. The adaptive shell remains an `AdaptiveScaffold`, as
+required by `AdaptiveBottomNavigationBar`, but the bar is shown only on the
+Tasks and Notes roots. Note details, completed tasks and the task editor use
+their own back/navigation affordances; the completed iOS route has an explicit
+back button.
+
+Standalone task creation and editing now use the shared global sheet titled
+`Criar/Editar nota`, with the shared input, existing metadata options, and
+Cancelar/Salvar actions. Note task navigation opens the note route directly.
+The notes empty state no longer owns an unnecessary scroll view, completed
+tasks stay above the navigation bar, and focus dismissal uses the shared icon
+button component.
+
+Auth transport now attaches the access token through Dio, serializes refreshes,
+stores the access/refresh pair together, retries the original request once,
+and avoids refresh loops on auth routes or non-401 errors. Session cleanup is
+centralized after an unrecoverable refresh failure.
+
+MCP confirmations use a fenced execution lease. Internal destructive mutations
+persist the mutation result in the same transaction; attachment deletion
+commits metadata with a retryable storage outbox; document and independent
+task mutations retain stable `operation_id` idempotency. A regression test
+covers an effect applied before lease expiry followed by a retry.
+
+Verification for this pass:
+
+- `go test ./...`: passed.
+- `go vet ./...`: passed.
+- Focused Flutter/auth/task/notes/editor/router/widget battery: 297 tests
+  passed.
+- `flutter analyze --no-pub --no-fatal-infos lib`: exit 0, no errors or
+  warnings; remaining diagnostics are repository infos only.
+- `git diff --check`: passed; Git reported only normal LF/CRLF conversion
+  warnings.
+- Sol low final review: approved with no concrete P0/P1/P2 findings.
+
+No real iOS device/simulator or opt-in PostgreSQL integration database was
+available in this environment, so those runtime checks remain pending.

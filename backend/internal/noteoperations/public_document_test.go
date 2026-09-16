@@ -41,3 +41,19 @@ func TestDecodeCanonicalDocumentMatchesSharedCorpus(t *testing.T) {
 		})
 	}
 }
+
+func TestDecodeCanonicalDocumentRejectsScheduleMetadataWithoutAnchor(t *testing.T) {
+	document := []byte(`{
+		"schemaVersion":1,
+		"blocks":[{
+			"id":"task-1",
+			"type":"task",
+			"delta":[{"insert":"Task"}],
+			"metadata":{"recurrenceRule":"daily"}
+		}]
+	}`)
+
+	if _, err := DecodeCanonicalDocument(document); err == nil {
+		t.Fatal("accepted recurrence metadata without dueDate anchor")
+	}
+}

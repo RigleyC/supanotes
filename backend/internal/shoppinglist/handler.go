@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/RigleyC/supanotes/internal/web"
 	"github.com/labstack/echo/v4"
 )
@@ -25,7 +27,7 @@ func (h *Handler) AddItem(c echo.Context) error {
 	if err := web.BindAndValidate(c, &req); err != nil {
 		return err
 	}
-	if err := h.svc.AddItem(c.Request().Context(), userID, req.Item); err != nil {
+	if err := h.svc.AddItem(c.Request().Context(), userID, req.Item, uuid.New()); err != nil {
 		status := http.StatusInternalServerError
 		code := "internal_error"
 		message := "não foi possível adicionar o item"

@@ -326,3 +326,34 @@ Scope includes the shared control defaults, the `GlobalSheetHeader`, all
 controls inside the task metadata sheet, all controls inside the emoji/icon
 picker sheets, and normalization of the existing editor haptic calls. The
 plan keeps native picker feedback and feature-owned scrolling unchanged.
+
+## Code quality and reliability corrections (2026-09-16)
+
+Status: complete after delegated Luna high implementation and independent Sol
+low validation.
+
+Design:
+`docs/superpowers/specs/2026-09-16-code-quality-reliability-corrections-design.md`.
+
+Execution plan:
+`docs/superpowers/plans/2026-09-16-code-quality-reliability-corrections.md`.
+
+This work applies the layered audit to concrete code: security/configuration,
+attachments, MCP/sharing, Go domain boundaries, Flutter auth/editor/tasks and
+the sync/database coordinator. The agents preserved the existing dirty
+worktree and the invariant that `TaskNode` and independent `Task` never become
+one persisted model. No visual-only tests were added. Focused Go/Flutter
+verification and the independent Sol review are complete.
+
+## Navigation, task creation and auth follow-up (2026-09-16)
+
+The follow-up scope covers the reported iOS navigation shell, completed-task
+back affordance, standalone-task creation modal, empty notes layout, focus
+dismiss control, note/task navigation stalls, and the Dio access/refresh-token
+contract. Implementation was delegated in disjoint Luna high scopes: shell and
+routing, task form/modal, notes/editor interaction, and auth transport. The
+`AdaptiveScaffold` is intentionally retained because it is the host required
+by `AdaptiveBottomNavigationBar`; route gating controls when that bar is shown.
+The implementation reuses shared components, keeps `AsyncValue.when` as the
+state boundary, and adds no visual-only tests. Focused Flutter tests/analyzer,
+auth interceptor coverage, `git diff --check`, and Sol low review are complete.

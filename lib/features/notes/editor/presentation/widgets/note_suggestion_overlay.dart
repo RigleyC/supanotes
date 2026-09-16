@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod/src/providers/provider.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_handler.dart';
 import 'package:super_editor/super_editor.dart';
 
-final ProviderFamily<List<NoteModel>, ({String currentNoteId, String query})> noteSuggestionsProvider = Provider.family
+final noteSuggestionsProvider = Provider.family
     .autoDispose<List<NoteModel>, ({String query, String currentNoteId})>((
       ref,
       params,
@@ -24,9 +23,12 @@ final ProviderFamily<List<NoteModel>, ({String currentNoteId, String query})> no
     });
 
 class NoteSuggestionOverlay extends ConsumerStatefulWidget {
-
   const NoteSuggestionOverlay({
-    required this.editor, required this.composer, required this.currentNoteId, required this.onPersist, super.key,
+    required this.editor,
+    required this.composer,
+    required this.currentNoteId,
+    required this.onPersist,
+    super.key,
   });
   final Editor editor;
   final DocumentComposer composer;

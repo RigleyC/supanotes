@@ -27,6 +27,44 @@ func (tv *testValidator) Validate(i any) error {
 	return tv.v.Struct(i)
 }
 
+func TestListOperationsRejectsNegativeCursor(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/notes/550e8400-e29b-41d4-a716-446655440001/operations?afterRevision=-1", nil)
+	recorder := httptest.NewRecorder()
+	c := e.NewContext(req, recorder)
+	c.SetPath("/notes/:noteId/operations")
+	c.SetParamNames("noteId")
+	c.SetParamValues("550e8400-e29b-41d4-a716-446655440001")
+	web.SetUserID(c, "550e8400-e29b-41d4-a716-446655440002")
+
+	handler := NewHandler(NewServiceWithTransactionRunner(&mockRepository{}, immediateTransactionRunner{}))
+	if err := handler.ListOperations(c); err != nil {
+		t.Fatalf("list operations: %v", err)
+	}
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+}
+
+func TestListOperationsRejectsEmptyCursor(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/notes/550e8400-e29b-41d4-a716-446655440001/operations?afterRevision=", nil)
+	recorder := httptest.NewRecorder()
+	c := e.NewContext(req, recorder)
+	c.SetPath("/notes/:noteId/operations")
+	c.SetParamNames("noteId")
+	c.SetParamValues("550e8400-e29b-41d4-a716-446655440001")
+	web.SetUserID(c, "550e8400-e29b-41d4-a716-446655440002")
+
+	handler := NewHandler(NewServiceWithTransactionRunner(&mockRepository{}, immediateTransactionRunner{}))
+	if err := handler.ListOperations(c); err != nil {
+		t.Fatalf("list operations: %v", err)
+	}
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+}
+
 func TestGoBackendRealHttpServerRoutes(t *testing.T) {
 	noteID := mustParseUUID("550e8400-e29b-41d4-a716-446655440001")
 	userEdit := mustParseUUID("550e8400-e29b-41d4-a716-446655440002")
@@ -151,12 +189,13 @@ func TestGoBackendRealHttpServerRoutes(t *testing.T) {
 
 	t.Run("POST /api/v1/notes/:noteId/operations:sync over HTTP", func(t *testing.T) {
 		blockID := "b1"
+		operationID := uuid.NewString()
 		syncReq := SyncRequest{
 			KnownRevision: 0,
 			ClientID:      "test-client",
 			Operations: []OperationRequest{
 				{
-					OperationID:  uuid.NewString(),
+					OperationID:  operationID,
 					BaseRevision: 0,
 					Kind:         string(KindCreateBlock),
 					BlockID:      &blockID,
@@ -182,6 +221,28 @@ func TestGoBackendRealHttpServerRoutes(t *testing.T) {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&syncRes))
 		assert.Len(t, syncRes.Accepted, 1)
 		assert.Equal(t, int64(1), syncRes.FinalRevision)
+
+		t.Run("rejects reused operation id with different payload", func(t *testing.T) {
+			conflictingReq := syncReq
+			conflictingReq.Operations = []OperationRequest{conflictingReq.Operations[0]}
+			conflictingReq.Operations[0].Payload = json.RawMessage(`{"id":"b1","type":"paragraph","delta":[{"insert":"different"}]}`)
+			bodyBytes, err := json.Marshal(conflictingReq)
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v1/notes/"+noteID.String()+"/operations:sync", bytes.NewReader(bodyBytes))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Test-User", "edit")
+
+			resp, err := client.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, http.StatusConflict, resp.StatusCode)
+
+			var body map[string]string
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "OPERATION_ID_CONFLICT", body["error"])
+		})
 	})
 
 	t.Run("POST /api/v1/notes/:noteId/operations:sync 403 Forbidden over HTTP", func(t *testing.T) {

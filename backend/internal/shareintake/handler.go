@@ -2,6 +2,7 @@ package shareintake
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -37,14 +38,14 @@ func (h *Handler) Append(c echo.Context) error {
 	result, err := h.svc.Append(c.Request().Context(), noteID, userID, req)
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrInvalidShareID), errors.Is(err, ErrInvalidURL):
+		case errors.Is(err, ErrInvalidShareID), errors.Is(err, ErrInvalidURL), errors.Is(err, ErrInvalidCreatedAt):
 			return web.JSONError(c, http.StatusBadRequest, err.Error())
 		case errors.Is(err, noteoperations.ErrNoteNotFound):
 			return web.JSONError(c, http.StatusNotFound, "NOTE_NOT_FOUND")
 		case errors.Is(err, noteoperations.ErrNoPermission):
 			return web.JSONError(c, http.StatusForbidden, "FORBIDDEN")
 		default:
-			slog.Error("shared link intake failed", "error", err, "note_id", noteID)
+			slog.Error("shared link intake failed", "error_type", fmt.Sprintf("%T", err))
 			return web.JSONError(c, http.StatusInternalServerError, "INTERNAL_ERROR")
 		}
 	}

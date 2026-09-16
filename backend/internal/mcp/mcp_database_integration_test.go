@@ -16,7 +16,7 @@ import (
 
 // This opt-in test exercises the production confirmation SQL against PostgreSQL.
 // Set SUPANOTES_MCP_TEST_DATABASE_URL to a disposable test database to run it.
-func TestDatabaseConfirmationLease_reservesCommitsAndReleases(t *testing.T) {
+func TestDatabaseConfirmationExecution_reclaimsExpiredLeaseReplaysAndFences(t *testing.T) {
 	databaseURL := os.Getenv("SUPANOTES_MCP_TEST_DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("SUPANOTES_MCP_TEST_DATABASE_URL is not configured")
@@ -44,6 +44,10 @@ func TestDatabaseConfirmationLease_reservesCommitsAndReleases(t *testing.T) {
 			expires_at TIMESTAMPTZ NOT NULL,
 			consumed_at TIMESTAMPTZ,
 			reserved_at TIMESTAMPTZ,
+			execution_status TEXT NOT NULL DEFAULT 'available',
+			result JSONB,
+			execution_owner_token TEXT,
+			execution_lease_until TIMESTAMPTZ,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`)
 	require.NoError(t, err)
@@ -58,9 +62,12 @@ func TestDatabaseConfirmationLease_reservesCommitsAndReleases(t *testing.T) {
 
 	lease, err := store.ReserveConfirmation(ctx, userID, confirmation.ID, toolDeleteNote, "note:note-1", arguments)
 	require.NoError(t, err)
-	require.NoError(t, lease.Commit(ctx))
-	_, err = store.ReserveConfirmation(ctx, userID, confirmation.ID, toolDeleteNote, "note:note-1", arguments)
-	assert.ErrorIs(t, err, ErrConfirmationDenied)
+	require.NoError(t, lease.Commit(ctx, json.RawMessage(`{"deleted":true}`)))
+	replay, err := store.ReserveConfirmation(ctx, userID, confirmation.ID, toolDeleteNote, "note:note-1", arguments)
+	require.NoError(t, err)
+	replayed, ok := replay.ReplayResult()
+	require.True(t, ok)
+	assert.JSONEq(t, `{"deleted":true}`, string(replayed))
 
 	second, err := store.CreateConfirmation(ctx, userID, toolDeleteNote, "note:note-1", arguments)
 	require.NoError(t, err)
@@ -69,5 +76,21 @@ func TestDatabaseConfirmationLease_reservesCommitsAndReleases(t *testing.T) {
 	require.NoError(t, released.Release(ctx))
 	reusable, err := store.ReserveConfirmation(ctx, userID, second.ID, toolDeleteNote, "note:note-1", arguments)
 	require.NoError(t, err)
-	require.NoError(t, reusable.Commit(ctx))
+	require.NoError(t, reusable.Commit(ctx, json.RawMessage(`"deleted"`)))
+
+	stale, err := store.CreateConfirmation(ctx, userID, toolDeleteNote, "note:note-1", arguments)
+	require.NoError(t, err)
+	first, err := store.ReserveConfirmation(ctx, userID, stale.ID, toolDeleteNote, "note:note-1", arguments)
+	require.NoError(t, err)
+	_, err = pool.Exec(ctx, `UPDATE mcp_confirmations SET execution_lease_until = NOW() - INTERVAL '10 minutes' WHERE id = $1`, stale.ID)
+	require.NoError(t, err)
+	secondLease, err := store.ReserveConfirmation(ctx, userID, stale.ID, toolDeleteNote, "note:note-1", arguments)
+	require.NoError(t, err)
+	assert.ErrorIs(t, first.Commit(ctx, json.RawMessage(`"stale"`)), ErrConfirmationDenied)
+	require.NoError(t, secondLease.Commit(ctx, json.RawMessage(`"deleted"`)))
+	replay, err = store.ReserveConfirmation(ctx, userID, stale.ID, toolDeleteNote, "note:note-1", arguments)
+	require.NoError(t, err)
+	replayed, ok = replay.ReplayResult()
+	require.True(t, ok)
+	assert.JSONEq(t, `"deleted"`, string(replayed))
 }

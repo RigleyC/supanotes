@@ -6,7 +6,7 @@
 ///
 /// **Error flow** — when a request comes back with HTTP 401 (and the path
 /// is not an auth endpoint like /login or /register), the interceptor:
-///   1. Calls [_onRefresh] with the current refresh token.
+///   1. Runs the session-owned refresh operation.
 ///   2. If the refresh succeeds, persists the new pair and replays the
 ///      original request via [_replay].
 ///   3. If the refresh fails, invokes [onAuthFailure] once and propagates
@@ -21,22 +21,18 @@ library;
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:supanotes/core/auth/auth_tokens.dart' as auth;
+
+export 'package:supanotes/core/auth/auth_tokens.dart'
+    show
+        AuthTokenPair,
+        RefreshHandler,
+        RefreshSessionHandler,
+        SessionRefreshHandler;
 
 /// Signature of the callback invoked when a token refresh has failed and
 /// the user must be considered signed out.
 typedef AuthFailureHandler = Future<void> Function();
-
-/// Signature for the refresh HTTP call. Receives the plain refresh token
-/// and returns a new token pair, or null on failure.
-typedef RefreshHandler = Future<AuthTokenPair?> Function(String refreshToken);
-
-typedef AuthTokenPair = ({String accessToken, String refreshToken});
-
-/// Runs a refresh as one session-owned operation, including persistence of
-/// the resulting pair. This prevents logout or expiry cleanup from being
-/// overtaken by a late refresh response.
-typedef RefreshSessionHandler =
-    Future<AuthTokenPair?> Function(RefreshHandler refresh);
 
 /// Signature for replaying a failed request after a successful refresh.
 typedef ReplayHandler =
@@ -46,21 +42,18 @@ class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required Future<String?> Function() getAccessToken,
     required this.onAuthFailure,
-    required RefreshHandler onRefresh,
-    required RefreshSessionHandler refreshSession,
+    required auth.SessionRefreshHandler refreshSession,
     required ReplayHandler replay,
   }) : _getAccessToken = getAccessToken,
-       _onRefresh = onRefresh,
        _refreshSession = refreshSession,
        _replay = replay;
 
   final Future<String?> Function() _getAccessToken;
   final AuthFailureHandler onAuthFailure;
-  final RefreshHandler _onRefresh;
-  final RefreshSessionHandler _refreshSession;
+  final auth.SessionRefreshHandler _refreshSession;
   final ReplayHandler _replay;
 
-  Future<AuthTokenPair?>? _refreshing;
+  Future<auth.AuthTokenPair?>? _refreshing;
   Future<void>? _notifyingFailure;
 
   @override
@@ -69,7 +62,7 @@ class AuthInterceptor extends Interceptor {
     RequestInterceptorHandler handler,
   ) async {
     final token = await _getAccessToken();
-    if (token != null) {
+    if (_hasValue(token)) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
@@ -95,37 +88,52 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    late final AuthTokenPair? refreshedTokens;
+    final failedAccessToken = _requestAccessToken(err.requestOptions);
     try {
-      refreshedTokens = await _refreshOnce();
+      final currentAccessToken = await _getAccessToken();
+      if (_isNewerAccessToken(currentAccessToken, failedAccessToken)) {
+        await _replayWithToken(err, currentAccessToken, handler);
+        return;
+      }
+
+      final refreshedTokens = await _refreshOnce();
+      if (refreshedTokens == null) {
+        // A refresh may have completed, or a new login may have installed a
+        // session, between the first token read and the refresh result.
+        final currentTokenAfterRefresh = await _getAccessToken();
+        if (_isNewerAccessToken(
+          currentTokenAfterRefresh,
+          failedAccessToken,
+        )) {
+          await _replayWithToken(err, currentTokenAfterRefresh, handler);
+          return;
+        }
+        try {
+          await _notifyFailureOnce();
+        } finally {
+          handler.next(err);
+        }
+        return;
+      }
+
+      await _replayWithToken(err, refreshedTokens.accessToken, handler);
     } on DioException {
       // A temporary refresh outage must not destroy a valid local session.
       handler.next(err);
       return;
-    }
-    if (refreshedTokens == null) {
-      await _notifyFailureOnce();
+    } on Object {
+      // Persistence/platform failures are not proof that the server rejected
+      // the session. Keep the original error and let the session survive.
       handler.next(err);
       return;
     }
-
-    err.requestOptions.headers['Authorization'] =
-        'Bearer ${refreshedTokens.accessToken}';
-    err.requestOptions.extra['retry'] = true;
-
-    try {
-      final response = await _replay(err.requestOptions);
-      handler.resolve(response);
-    } on DioException catch (e) {
-      handler.next(e);
-    }
   }
 
-  Future<AuthTokenPair?> _refreshOnce() {
+  Future<auth.AuthTokenPair?> _refreshOnce() {
     final cached = _refreshing;
     if (cached != null) return cached;
-    late Future<AuthTokenPair?> future;
-    future = _doRefresh().whenComplete(() {
+    late Future<auth.AuthTokenPair?> future;
+    future = _refreshSession().whenComplete(() {
       if (identical(_refreshing, future)) {
         _refreshing = null;
       }
@@ -147,10 +155,41 @@ class AuthInterceptor extends Interceptor {
     return future;
   }
 
-  Future<AuthTokenPair?> _doRefresh() async {
-    return _refreshSession(_onRefresh);
+  Future<void> _replayWithToken(
+    DioException error,
+    String? accessToken,
+    ErrorInterceptorHandler handler,
+  ) async {
+    if (accessToken == null || accessToken.isEmpty) {
+      handler.next(error);
+      return;
+    }
+
+    error.requestOptions.headers['Authorization'] = 'Bearer $accessToken';
+    error.requestOptions.extra['retry'] = true;
+
+    try {
+      final response = await _replay(error.requestOptions);
+      handler.resolve(response);
+    } on DioException catch (replayError) {
+      handler.next(replayError);
+    }
   }
 }
+
+String? _requestAccessToken(RequestOptions options) {
+  final authorization = options.headers['Authorization'];
+  if (authorization is! String || !authorization.startsWith('Bearer ')) {
+    return null;
+  }
+  return authorization.substring('Bearer '.length);
+}
+
+bool _isNewerAccessToken(String? current, String? failed) {
+  return _hasValue(current) && _hasValue(failed) && current != failed;
+}
+
+bool _hasValue(String? value) => value != null && value.isNotEmpty;
 
 bool _isUnauthenticatedAuthRoute(String path) {
   return switch (path) {

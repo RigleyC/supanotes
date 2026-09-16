@@ -36,7 +36,24 @@ func NewService(repo Repository) *Service {
 }
 
 func (s *Service) ShareNote(ctx context.Context, ownerID pgtype.UUID, noteID pgtype.UUID, email, permission string) (ShareResult, error) {
-	noteOwnerID, err := s.repo.GetNoteOwner(ctx, noteID)
+	return shareNote(ctx, s.repo, ownerID, noteID, email, permission)
+}
+
+// ShareNoteInTransaction keeps the share upsert in the same transaction as
+// the MCP confirmation result. The unique (note_id, user_id) key makes a
+// recovered execution an upsert of the same logical share, never a duplicate.
+func (s *Service) ShareNoteInTransaction(ctx context.Context, tx pgx.Tx, ownerID pgtype.UUID, noteID pgtype.UUID, email, permission string) (ShareResult, error) {
+	repo, ok := s.repo.(interface {
+		WithQuerier(sqlcgen.Querier) Repository
+	})
+	if !ok || tx == nil {
+		return ShareResult{}, errors.New("share transaction is not configured")
+	}
+	return shareNote(ctx, repo.WithQuerier(sqlcgen.New(tx)), ownerID, noteID, email, permission)
+}
+
+func shareNote(ctx context.Context, repo Repository, ownerID pgtype.UUID, noteID pgtype.UUID, email, permission string) (ShareResult, error) {
+	noteOwnerID, err := repo.GetNoteOwner(ctx, noteID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ShareResult{}, ErrNoteNotFound
@@ -47,7 +64,7 @@ func (s *Service) ShareNote(ctx context.Context, ownerID pgtype.UUID, noteID pgt
 		return ShareResult{}, ErrNotOwner
 	}
 
-	targetUser, err := s.repo.GetUserByEmail(ctx, email)
+	targetUser, err := repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ShareResult{}, ErrUserNotFound
@@ -58,7 +75,7 @@ func (s *Service) ShareNote(ctx context.Context, ownerID pgtype.UUID, noteID pgt
 		return ShareResult{}, ErrCannotShareWithSelf
 	}
 
-	share, err := s.repo.CreateNoteShare(ctx, sqlcgen.CreateNoteShareParams{
+	share, err := repo.CreateNoteShare(ctx, sqlcgen.CreateNoteShareParams{
 		NoteID:     noteID,
 		UserID:     targetUser.ID,
 		Permission: permission,
@@ -109,7 +126,24 @@ func (s *Service) ListNoteShares(ctx context.Context, ownerID pgtype.UUID, noteI
 }
 
 func (s *Service) DeleteNoteShare(ctx context.Context, ownerID pgtype.UUID, noteID pgtype.UUID, targetUserID pgtype.UUID) error {
-	noteOwnerID, err := s.repo.GetNoteOwner(ctx, noteID)
+	return deleteNoteShare(ctx, s.repo, ownerID, noteID, targetUserID)
+}
+
+// DeleteNoteShareInTransaction atomically removes the share and records the
+// confirmed result. DELETE is already a safe no-op when a recovered retry
+// reaches an already-removed row.
+func (s *Service) DeleteNoteShareInTransaction(ctx context.Context, tx pgx.Tx, ownerID pgtype.UUID, noteID pgtype.UUID, targetUserID pgtype.UUID) error {
+	repo, ok := s.repo.(interface {
+		WithQuerier(sqlcgen.Querier) Repository
+	})
+	if !ok || tx == nil {
+		return errors.New("share transaction is not configured")
+	}
+	return deleteNoteShare(ctx, repo.WithQuerier(sqlcgen.New(tx)), ownerID, noteID, targetUserID)
+}
+
+func deleteNoteShare(ctx context.Context, repo Repository, ownerID pgtype.UUID, noteID pgtype.UUID, targetUserID pgtype.UUID) error {
+	noteOwnerID, err := repo.GetNoteOwner(ctx, noteID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNoteNotFound
@@ -120,7 +154,7 @@ func (s *Service) DeleteNoteShare(ctx context.Context, ownerID pgtype.UUID, note
 		return ErrNotOwner
 	}
 
-	return s.repo.DeleteNoteShare(ctx, sqlcgen.DeleteNoteShareParams{
+	return repo.DeleteNoteShare(ctx, sqlcgen.DeleteNoteShareParams{
 		NoteID: noteID,
 		UserID: targetUserID,
 	})

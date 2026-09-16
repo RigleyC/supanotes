@@ -39,13 +39,13 @@ void main() {
     expect(container.read(noteBProvider).isLoading, isTrue);
 
     noteA.complete();
-    await futureA;
+    expect(await futureA, isTrue);
 
     expect(container.read(noteAProvider).hasValue, isTrue);
     expect(container.read(noteBProvider).isLoading, isTrue);
 
     noteB.completeError(StateError('note b failed'));
-    await futureB;
+    expect(await futureB, isFalse);
 
     expect(container.read(noteAProvider).hasValue, isTrue);
     expect(container.read(noteBProvider).hasError, isTrue);
@@ -83,7 +83,7 @@ void main() {
       expect(container.read(provider).hasValue, isTrue);
 
       first.completeError(StateError('old failed'));
-      await firstFuture;
+      expect(await firstFuture, isFalse);
 
       final state = container.read(provider);
       expect(state.hasValue, isTrue);

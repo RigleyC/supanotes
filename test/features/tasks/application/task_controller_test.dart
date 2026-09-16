@@ -19,6 +19,8 @@ Task _task() {
 }
 
 void main() {
+  setUpAll(() => registerFallbackValue(_task()));
+
   late _MockTaskRepository repository;
   late TaskController controller;
   final task = _task();
@@ -42,6 +44,7 @@ void main() {
       ),
     ).thenAnswer((_) async => task);
     when(() => repository.delete('task-1')).thenAnswer((_) async => task);
+    when(() => repository.get('task-1')).thenAnswer((_) async => task);
   });
 
   test('delegates create and update to the repository', () async {
@@ -77,5 +80,29 @@ void main() {
       ),
     ).called(1);
     verify(() => repository.delete('task-1')).called(1);
+  });
+
+  test('completes an unscheduled task as a whole task', () async {
+    final unscheduled = task.copyWith(dueDate: null);
+    when(() => repository.get('task-1')).thenAnswer((_) async => unscheduled);
+    when(() => repository.update(any())).thenAnswer((_) async => unscheduled);
+
+    await controller.complete('task-1');
+
+    final updated =
+        verify(
+              () => repository.update(captureAny()),
+            ).captured.single
+            as Task;
+    expect(updated.dueDate, isNull);
+    expect(updated.isCompleted, isTrue);
+    expect(updated.lastCompletedAt, isNotNull);
+    verifyNever(
+      () => repository.completeOccurrence(
+        taskId: any(named: 'taskId'),
+        scheduledAt: any(named: 'scheduledAt'),
+        completedAt: any(named: 'completedAt'),
+      ),
+    );
   });
 }

@@ -61,6 +61,12 @@ final noteRemoteSyncCoordinatorProvider =
         catalogSync: catalog,
         userId: userId,
       );
+      final taskApplier = taskSync == null
+          ? const DisabledNoteRemoteSyncTaskApplier()
+          : NoteRemoteSyncTaskCallbacks(
+              applyChanged: taskSync.applyTaskChanged,
+              applyDeleted: taskSync.applyTaskDeleted,
+            );
 
       Future<void> syncPending(String noteId) async {
         final result = await ref
@@ -110,23 +116,23 @@ final noteRemoteSyncCoordinatorProvider =
                   snapshot: snapshot,
                 ),
             applyTasksInTransaction: taskSnapshot == null
-                ? null
+                ? () async {}
                 : () => taskSync!.applyBootstrapInTransaction(taskSnapshot),
           );
         },
-        isNoteActive: activityTracker.isActive,
-        syncPending: syncPending,
-        confirmedRevision: (noteId) async =>
-            (await ref
-                    .read(noteOperationsSyncServiceProvider)
-                    .getConfirmedDocument(noteId))
-                ?.revision,
-        pollAndReconcile: pollAndReconcile,
-        hydrateRemote: hydrateRemote,
-        deleteLocal: database.deleteNoteData,
-        bootstrapTasksAvailable: taskSync != null,
-        applyTaskChanged: taskSync?.applyTaskChanged,
-        applyTaskDeleted: taskSync?.applyTaskDeleted,
+        noteApplier: NoteRemoteSyncNoteApplier(
+          isActive: activityTracker.isActive,
+          syncPending: syncPending,
+          confirmedRevision: (noteId) async =>
+              (await ref
+                      .read(noteOperationsSyncServiceProvider)
+                      .getConfirmedDocument(noteId))
+                  ?.revision,
+          pollAndReconcile: pollAndReconcile,
+          hydrateRemote: hydrateRemote,
+          deleteLocal: database.deleteNoteData,
+        ),
+        taskApplier: taskApplier,
       );
 
       ref.onDispose(() {

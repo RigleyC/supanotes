@@ -16,6 +16,7 @@ import 'package:supanotes/features/settings/presentation/controllers/preferences
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
+import 'package:supanotes/shared/widgets/empty_state.dart';
 import 'package:uuid/uuid.dart';
 
 class NotesListScreen extends ConsumerStatefulWidget {
@@ -60,6 +61,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final isGridView = ref.watch(isGridViewProvider);
     final notesAsync = ref.watch(activeNotesProvider);
     final trimmedSearchQuery = _searchQuery.trim();
+    final normalizedSearchQuery = trimmedSearchQuery.toLowerCase();
 
     return Scaffold(
       appBar: AppBar(
@@ -95,26 +97,45 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       ),
       body: SafeArea(
         minimum: const EdgeInsets.only(bottom: 32),
-        child: notesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => AppErrorView(
-            title: 'Erro ao carregar as notas',
-            subtitle: e.toString(),
-          ),
-          data: (notes) {
-            final filteredNotes = trimmedSearchQuery.isEmpty
-                ? notes
-                : notes.where((n) {
-                    final q = trimmedSearchQuery.toLowerCase();
-                    final bodyText = (n.excerpt ?? n.content).toLowerCase();
-                    return n.title.toLowerCase().contains(q) ||
-                        bodyText.contains(q);
-                  }).toList();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: isGridView
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: notesAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                error: (e, _) => AppErrorView(
+                  title: 'Erro ao carregar as notas',
+                  subtitle: e.toString(),
+                ),
+                data: (notes) {
+                  final filteredNotes = normalizedSearchQuery.isEmpty
+                      ? notes
+                      : notes.where((n) {
+                          final bodyText = (n.excerpt ?? n.content)
+                              .toLowerCase();
+                          return n.title.toLowerCase().contains(
+                                normalizedSearchQuery,
+                              ) ||
+                              bodyText.contains(normalizedSearchQuery);
+                        }).toList();
+
+                  if (filteredNotes.isEmpty) {
+                    return EmptyState(
+                      icon: normalizedSearchQuery.isEmpty
+                          ? Icons.note_outlined
+                          : Icons.search_off,
+                      title: normalizedSearchQuery.isEmpty
+                          ? 'Nenhuma nota ainda'
+                          : 'Nenhuma nota encontrada',
+                      subtitle: normalizedSearchQuery.isEmpty
+                          ? 'Crie uma nota para começar.'
+                          : 'Tente buscar por outro termo.',
+                    );
+                  }
+
+                  return isGridView
                       ? NotesGridView(
                           key: const ValueKey('grid'),
                           notes: filteredNotes,
@@ -130,11 +151,21 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                           onDelete: _deleteNote,
                           onToggleFavorite: _toggleFavorite,
                           onEditIcon: _editNoteIcon,
-                        ),
-                ),
-              ],
-            );
-          },
+                        );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: AppButton(
+                key: const ValueKey('completed-notes-entry'),
+                text: 'Concluídas',
+                icon: const Icon(Icons.history_rounded),
+                variant: AppButtonVariant.tonal,
+                onPressed: () => context.push(AppRoutes.completedTasks),
+              ),
+            ),
+          ],
         ),
       ),
 
@@ -152,17 +183,17 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final id = const Uuid().v4();
     await ref.read(notesRepositoryProvider).createLocalNote(id: id);
     if (!context.mounted) return;
-    context.push(AppRoutes.note(id));
+    unawaited(context.push(AppRoutes.note(id)));
   }
 
   void _deleteNote(NoteModel note) {
-    ref.read(notesRepositoryProvider).softDelete(note.id);
+    unawaited(ref.read(notesRepositoryProvider).softDelete(note.id));
     if (!mounted) return;
     AppMessenger.showSuccess('Nota movida para a lixeira');
   }
 
   void _toggleFavorite(NoteModel note) {
-    ref.read(notesRepositoryProvider).toggleFavorite(note.id);
+    unawaited(ref.read(notesRepositoryProvider).toggleFavorite(note.id));
   }
 
   Future<void> _editNoteIcon(NoteModel note) async {
@@ -179,7 +210,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       await ref
           .read(preferencesControllerProvider.notifier)
           .toggleNotesViewMode();
-    } catch (_) {
+    } on Object catch (_) {
       if (!context.mounted) return;
       AppMessenger.showError('Erro ao salvar preferência de visualização');
     }

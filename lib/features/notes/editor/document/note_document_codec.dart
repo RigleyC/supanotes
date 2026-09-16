@@ -655,7 +655,8 @@ class NoteDocumentCodec {
     if (node.description != null) metadata['description'] = node.description;
     if (node.imageUrl != null) metadata['imageUrl'] = node.imageUrl;
     if (node.domain != null) metadata['domain'] = node.domain;
-    if (node.previewStatus != null) metadata['previewStatus'] = node.previewStatus;
+    if (node.previewStatus != null)
+      metadata['previewStatus'] = node.previewStatus;
     if (node.faviconUrl != null) metadata['faviconUrl'] = node.faviconUrl;
     if (node.siteName != null) metadata['siteName'] = node.siteName;
     return (type: 'rich_link', text: AttributedText(), metadata: metadata);
@@ -681,20 +682,15 @@ class NoteDocumentCodec {
     final plainText = text.toPlainText();
     final delta = Delta();
     if (plainText.isEmpty) return delta;
-
     for (final span in text.computeAttributionSpans()) {
       final start = span.start;
       final end = span.end + 1;
       if (start >= end || start >= plainText.length) continue;
-
       final attributes = <String, dynamic>{};
       for (final attribution in span.attributions) {
         final id = attributionToName(attribution);
-        if (id != 'composing') {
-          attributes[id] = true;
-        }
+        if (id != 'composing') attributes[id] = true;
       }
-
       delta.insert(
         plainText.substring(
           start,
@@ -706,16 +702,12 @@ class NoteDocumentCodec {
     return delta;
   }
 
-  DocumentNode decodeNode(Map<String, dynamic> blockData) {
-    return _decodeNode(blockData, allowMutationDeltaOperations: false);
-  }
+  DocumentNode decodeNode(Map<String, dynamic> blockData) =>
+      _decodeNode(blockData, allowMutationDeltaOperations: false);
 
-  /// Decodes a local persisted block and removes OT mutation operations that
-  /// can be present in a malformed cached snapshot. They are not document
-  /// content; the strict transport decoder remains unchanged.
-  DocumentNode decodePersistedNode(Map<String, dynamic> blockData) {
-    return _decodeNode(blockData, allowMutationDeltaOperations: true);
-  }
+  /// Decodes a local persisted block and removes leaked OT mutation ops.
+  DocumentNode decodePersistedNode(Map<String, dynamic> blockData) =>
+      _decodeNode(blockData, allowMutationDeltaOperations: true);
 
   DocumentNode _decodeNode(
     Map<String, dynamic> blockData, {
@@ -739,9 +731,7 @@ class NoteDocumentCodec {
     final blocks = <Map<String, dynamic>>[];
     for (var i = 0; i < document.nodeCount; i++) {
       final node = document.getNodeAt(i);
-      if (node != null) {
-        blocks.add(encodeNode(node));
-      }
+      if (node != null) blocks.add(encodeNode(node));
     }
     return blocks;
   }
@@ -757,9 +747,7 @@ class NoteDocumentCodec {
     Map<String, dynamic> paragraphMetadata(Attribution? blockType) {
       final normalized = Map<String, dynamic>.from(metadata ?? {});
       normalized.remove('blockType');
-      if (blockType != null) {
-        normalized['blockType'] = blockType;
-      }
+      if (blockType != null) normalized['blockType'] = blockType;
       return normalized;
     }
 
@@ -811,79 +799,45 @@ class NoteDocumentCodec {
         metadata: metadata ?? {},
       );
     }
-    if (type == 'header1') {
-      return ParagraphNode(
-        id: nodeId,
-        text: text,
-        metadata: paragraphMetadata(header1Attribution),
-      );
-    }
-    if (type == 'header2') {
-      return ParagraphNode(
-        id: nodeId,
-        text: text,
-        metadata: paragraphMetadata(header2Attribution),
-      );
-    }
-    if (type == 'header3') {
-      return ParagraphNode(
-        id: nodeId,
-        text: text,
-        metadata: paragraphMetadata(header3Attribution),
-      );
-    }
-    if (type == 'quote') {
-      return ParagraphNode(
-        id: nodeId,
-        text: text,
-        metadata: paragraphMetadata(blockquoteAttribution),
-      );
-    }
-    final blockTypeAttr = attributionFromName(type);
-    final ParagraphNode paragraph = ParagraphNode(
+    final blockType = switch (type) {
+      'header1' => header1Attribution,
+      'header2' => header2Attribution,
+      'header3' => header3Attribution,
+      'quote' => blockquoteAttribution,
+      _ => attributionFromName(type),
+    };
+    return ParagraphNode(
       id: nodeId,
       text: text,
-      metadata: paragraphMetadata(blockTypeAttr),
+      metadata: paragraphMetadata(blockType),
     );
-    return paragraph;
   }
 
   AttributedText attributedFromDelta(List<dynamic>? delta) {
     if (delta == null || delta.isEmpty) return AttributedText();
-
-    final documentOperations = delta
+    final operations = delta
         .where((operation) => operation is! Map || operation.isNotEmpty)
         .toList(growable: false);
-    if (documentOperations.isEmpty) return AttributedText();
-
-    return _attributedTextFromDelta(Delta.fromJson(documentOperations));
+    if (operations.isEmpty) return AttributedText();
+    return _attributedTextFromDelta(Delta.fromJson(operations));
   }
 
   AttributedText _attributedTextFromDelta(Delta documentDelta) {
     final span = AttributedSpans();
     final buffer = StringBuffer();
-    for (final op in documentDelta.operations) {
-      _appendOperation(op, buffer, span);
+    for (final operation in documentDelta.operations) {
+      final insert = operation.data;
+      if (!operation.isInsert || insert is! String || insert.isEmpty) continue;
+      final start = buffer.length;
+      buffer.write(insert);
+      _appendAttributions(
+        operation.attributes,
+        span: span,
+        start: start,
+        end: buffer.length - 1,
+      );
     }
     return AttributedText(buffer.toString(), span);
-  }
-
-  void _appendOperation(
-    Operation operation,
-    StringBuffer buffer,
-    AttributedSpans span,
-  ) {
-    final insert = operation.data;
-    if (!operation.isInsert || insert is! String || insert.isEmpty) return;
-
-    final start = buffer.length;
-    buffer.write(insert);
-    _appendAttributions(
-      operation.attributes,
-      span: span,
-      start: start,
-      end: buffer.length - 1,
-    );
   }
 
   void _appendAttributions(
@@ -893,11 +847,15 @@ class NoteDocumentCodec {
     required int end,
   }) {
     if (attributes == null) return;
-
     for (final entry in attributes.entries) {
       final attribution = _attributionFromDeltaEntry(entry);
-      if (attribution == null) continue;
-      span.addAttribution(newAttribution: attribution, start: start, end: end);
+      if (attribution != null) {
+        span.addAttribution(
+          newAttribution: attribution,
+          start: start,
+          end: end,
+        );
+      }
     }
   }
 
@@ -906,8 +864,7 @@ class NoteDocumentCodec {
       final uri = Uri.tryParse(entry.value as String);
       return uri == null ? null : LinkAttribution.fromUri(uri);
     }
-    if (entry.value == true) return attributionFromId(entry.key);
-    return null;
+    return entry.value == true ? attributionFromId(entry.key) : null;
   }
 
   AttributedText? applyDeltaToText(
@@ -917,48 +874,50 @@ class NoteDocumentCodec {
     if (ops.any((operation) => !_isValidTextChangeOperation(operation))) {
       return null;
     }
-
     final sourceDelta = _deltaFromAttributedText(source);
     final changeDelta = Delta.fromJson(ops);
     var consumedSourceLength = 0;
-
     for (final operation in changeDelta.operations) {
       if (operation.length == null || operation.length! < 0) return null;
       if (operation.isInsert && operation.data is! String) return null;
       if (operation.isRetain || operation.isDelete) {
         consumedSourceLength += operation.length!;
-        if (consumedSourceLength > source.toPlainText().length) {
-          return null;
-        }
+        if (consumedSourceLength > source.toPlainText().length) return null;
       }
     }
-
-    final resultDelta = sourceDelta.compose(changeDelta);
-    return _attributedTextFromDelta(resultDelta);
+    return _attributedTextFromDelta(sourceDelta.compose(changeDelta));
   }
 
   bool _isValidTextChangeOperation(Map<String, dynamic> operation) {
-    final operationKeys = const {
+    final keys = const [
       'insert',
       'retain',
       'delete',
-    }.where(operation.containsKey).toList(growable: false);
-    if (operationKeys.length != 1) return false;
-
-    final value = operation[operationKeys.single];
-    if (operationKeys.single == 'insert') {
+    ].where(operation.containsKey).toList(growable: false);
+    if (keys.length != 1) return false;
+    final value = operation[keys.single];
+    if (keys.single == 'insert') {
       if (value is! String) return false;
     } else if (value is! int || value < 0) {
       return false;
     }
-
     final attributes = operation['attributes'];
     return attributes == null || attributes is Map;
   }
 
   String? blockTypeName(DocumentNode node) {
     if (node is ParagraphNode) {
-      return _paragraphBlockTypeName(node);
+      final raw = node.getMetadataValue('blockType');
+      final blockType = raw is Attribution
+          ? raw
+          : raw is String
+          ? attributionFromName(raw)
+          : null;
+      if (blockType == header1Attribution || raw == 'header1') return 'header1';
+      if (blockType == header2Attribution || raw == 'header2') return 'header2';
+      if (blockType == header3Attribution || raw == 'header3') return 'header3';
+      if (blockType == blockquoteAttribution || raw == 'quote') return 'quote';
+      return 'paragraph';
     }
     if (node is ListItemNode) {
       return node.type == ListItemType.ordered ? 'orderedList' : 'bulletList';
@@ -968,18 +927,6 @@ class NoteDocumentCodec {
     if (node is DocumentAttachmentNode) return 'attachment';
     if (node is RichLinkNode) return 'rich_link';
     return null;
-  }
-
-  String _paragraphBlockTypeName(ParagraphNode node) {
-    final raw = node.getMetadataValue('blockType');
-    final blockType = raw is Attribution
-        ? raw
-        : (raw is String ? attributionFromName(raw) : null);
-    if (blockType == header1Attribution || raw == 'header1') return 'header1';
-    if (blockType == header2Attribution || raw == 'header2') return 'header2';
-    if (blockType == header3Attribution || raw == 'header3') return 'header3';
-    if (blockType == blockquoteAttribution || raw == 'quote') return 'quote';
-    return 'paragraph';
   }
 
   Attribution? attributionFromId(String id) {
@@ -994,14 +941,13 @@ class NoteDocumentCodec {
     return null;
   }
 
-  Attribution? attributionFromName(String? name) {
-    if (name == null) return null;
-    if (name == 'header1') return header1Attribution;
-    if (name == 'header2') return header2Attribution;
-    if (name == 'header3') return header3Attribution;
-    if (name == 'quote') return blockquoteAttribution;
-    return null;
-  }
+  Attribution? attributionFromName(String? name) => switch (name) {
+    'header1' => header1Attribution,
+    'header2' => header2Attribution,
+    'header3' => header3Attribution,
+    'quote' => blockquoteAttribution,
+    _ => null,
+  };
 
   ({String content, String? excerpt}) projectContent(List<dynamic> blocks) {
     final text = StringBuffer();

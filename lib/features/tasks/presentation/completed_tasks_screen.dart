@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task_history_entry.dart';
+import 'package:supanotes/features/tasks/presentation/task_editor_screen.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/completed_tasks_tile.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_source_filter_menu.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
@@ -28,30 +31,26 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
     final historyAsync = ref.watch(
       completedTaskHistoryProvider(includeNoteTasks: _includeNoteTasks),
     );
-    return AdaptiveScaffold(
-      appBar: AdaptiveAppBar(
-        useNativeToolbar: false,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            TaskSourceFilterMenu(
-              key: const ValueKey('task-source-filter-menu'),
-              includeNoteTasks: _includeNoteTasks,
-              onChanged: (value) => setState(() => _includeNoteTasks = value),
+    final sourceFilterMenu = TaskSourceFilterMenu(
+      key: const ValueKey('task-source-filter-menu'),
+      includeNoteTasks: _includeNoteTasks,
+      onChanged: (value) => setState(() => _includeNoteTasks = value),
+    );
+    return Scaffold(
+      appBar: PlatformInfo.isIOS
+          ? CupertinoNavigationBar(
+              leading: CupertinoNavigationBarBackButton(
+                onPressed: () => context.pop(),
+              ),
+              backgroundColor: CupertinoTheme.of(context).barBackgroundColor,
+              border: null,
+              trailing: sourceFilterMenu,
+            )
+          : AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              actions: [sourceFilterMenu],
             ),
-          ],
-        ),
-        cupertinoNavigationBar: CupertinoNavigationBar(
-          backgroundColor: CupertinoTheme.of(context).barBackgroundColor,
-          border: null,
-          trailing: TaskSourceFilterMenu(
-            key: const ValueKey('task-source-filter-menu'),
-            includeNoteTasks: _includeNoteTasks,
-            onChanged: (value) => setState(() => _includeNoteTasks = value),
-          ),
-        ),
-      ),
       body: CustomScrollView(
         slivers: [
           historyAsync.when(
@@ -113,13 +112,15 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
 
   void _openEntry(BuildContext context, TaskHistoryEntry entry) {
     if (entry.task.isStandalone) {
-      context.push('${AppRoutes.standaloneTask}/${entry.task.task!.id}');
+      unawaited(showTaskEditorSheet(context: context, task: entry.task.task));
       return;
     }
-    context.push(
-      AppRoutes.note(
-        entry.task.note!.noteId,
-        blockId: entry.task.note!.blockId,
+    unawaited(
+      context.push(
+        AppRoutes.note(
+          entry.task.note!.noteId,
+          blockId: entry.task.note!.blockId,
+        ),
       ),
     );
   }

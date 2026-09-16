@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as dev;
 
 import 'package:drift/drift.dart';
 import 'package:supanotes/core/async/keyed_async_queue.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
-import 'package:supanotes/features/notes/editor/document/effective_document_projector.dart';
+import 'package:supanotes/core/sync/note_sync_persistence.dart';
+import 'package:supanotes/core/sync/note_sync_reconciler.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:super_editor/super_editor.dart';
@@ -92,7 +92,10 @@ class NoteOperationsSyncService {
        _dao = dao,
        _clientId = clientId,
        _actorId = actorId {
-    _rebaser = NoteOperationRebaser(localActorId: actorId);
+    _reconciler = NoteSyncReconciler(
+      rebaser: NoteOperationRebaser(localActorId: actorId),
+    );
+    _persistence = NoteSyncPersistence(dao);
   }
 
   final NoteSyncClient _syncClient;
@@ -100,41 +103,38 @@ class NoteOperationsSyncService {
   final String _clientId;
   final String _actorId;
   final Uuid _uuid = const Uuid();
-  final _syncQueue = KeyedAsyncQueue();
-  final _outboxQueue = KeyedAsyncQueue();
-  final EffectiveDocumentProjector _projector = EffectiveDocumentProjector();
-  late final NoteOperationRebaser _rebaser;
+  final _noteQueue = KeyedAsyncQueue();
+  late final NoteSyncReconciler _reconciler;
+  late final NoteSyncPersistence _persistence;
 
   String get clientId => _clientId;
 
   Future<T> runSerialized<T>(String noteId, Future<T> Function() fn) {
-    return _syncQueue.run(noteId, fn);
+    return _noteQueue.run(noteId, fn);
   }
 
   Future<SyncResult> syncPending(
     String noteId, {
     Future<void> Function(SyncResult)? onReconcile,
-  }) {
-    return _syncQueue.run(noteId, () async {
-      final result = await _syncPendingInner(noteId);
-      if (onReconcile != null) {
-        await onReconcile(result);
-      }
-      return result;
-    });
+  }) async {
+    final result = await _noteQueue.run(
+      noteId,
+      () => _runWithSessionGate(noteId, _syncPendingWithoutSessionGate),
+    );
+    if (onReconcile != null) await onReconcile(result);
+    return result;
   }
 
   Future<SyncResult> pollAndReconcile(
     String noteId, {
     Future<void> Function(SyncResult)? onReconcile,
-  }) {
-    return _syncQueue.run(noteId, () async {
-      final result = await _pollAndReconcileInner(noteId);
-      if (onReconcile != null) {
-        await onReconcile(result);
-      }
-      return result;
-    });
+  }) async {
+    final result = await _noteQueue.run(
+      noteId,
+      () => _runWithSessionGate(noteId, _pollAndReconcileWithoutSessionGate),
+    );
+    if (onReconcile != null) await onReconcile(result);
+    return result;
   }
 
   Future<void> enqueueOperation(String noteId, OperationRequest request) {
@@ -143,8 +143,8 @@ class NoteOperationsSyncService {
 
   /// Persists one editor batch as one durable outbox transaction.
   ///
-  /// The outbox queue also serializes this write with sync rebases. The
-  /// service assigns the base revisions from the state that is current when
+  /// The per-note service queue serializes this write with sync and rebase.
+  /// The service assigns base revisions from the state that is current when
   /// the batch is persisted, so a batch that waited behind a rebase cannot
   /// retain a stale revision hint from the editor.
   Future<void> enqueueOperations(
@@ -153,7 +153,7 @@ class NoteOperationsSyncService {
     String? materializedDocumentJson,
   }) {
     if (requests.isEmpty) return Future.value();
-    return _outboxQueue.run(
+    return _noteQueue.run(
       noteId,
       () => _enqueueOperationsInner(
         noteId,
@@ -178,83 +178,61 @@ class NoteOperationsSyncService {
         ? (await getConfirmedDocument(noteId))?.revision ??
               requests.first.baseRevision
         : pending.last.baseRevision + 1;
-
-    await _dao.runInTransaction(() async {
-      for (final request in requests) {
-        final payloadJson = encodePayload(request.payload);
-        NoteSyncDebug.log(
-          'sync.enqueue',
+    final now = DateTime.now().toUtc();
+    final operations = <PendingNoteOperationsCompanion>[];
+    for (final request in requests) {
+      final payloadJson = encodePayload(request.payload);
+      NoteSyncDebug.log(
+        'sync.enqueue',
+        noteId: noteId,
+        fields: {
+          'operationId': request.operationId,
+          'baseRevision': baseRevision,
+          'ordinal': ordinal,
+          'kind': request.kind,
+          'blockId': request.blockId,
+          'payload': payloadJson,
+        },
+      );
+      operations.add(
+        PendingNoteOperationsCompanion.insert(
+          operationId: request.operationId,
           noteId: noteId,
-          fields: {
-            'operationId': request.operationId,
-            'baseRevision': baseRevision,
-            'ordinal': ordinal,
-            'kind': request.kind,
-            'blockId': request.blockId,
-            'payload': payloadJson,
-          },
-        );
-
-        await _dao.insertPendingOperation(
-          PendingNoteOperationsCompanion.insert(
-            operationId: request.operationId,
-            noteId: noteId,
-            ownerUserId: Value(_actorId),
-            baseRevision: baseRevision,
-            ordinal: ordinal,
-            kind: request.kind,
-            blockId: Value(request.blockId),
-            payloadJson: payloadJson,
-            createdAt: DateTime.now().toUtc(),
-          ),
-        );
-        ordinal++;
-        baseRevision++;
-      }
-      if (materializedDocumentJson != null) {
-        await _dao.updateMaterializedDocument(
-          noteId: noteId,
-          documentJson: materializedDocumentJson,
-          updatedAt: DateTime.now().toUtc(),
-        );
-      }
-    });
+          ownerUserId: Value(_actorId),
+          baseRevision: baseRevision,
+          ordinal: ordinal,
+          kind: request.kind,
+          blockId: Value(request.blockId),
+          payloadJson: payloadJson,
+          createdAt: now,
+        ),
+      );
+      ordinal++;
+      baseRevision++;
+    }
+    final projection = materializedDocumentJson == null
+        ? null
+        : _reconciler.projectMaterialized(materializedDocumentJson);
+    await _persistence.persistPendingAppend(
+      noteId: noteId,
+      operations: operations,
+      projection: projection,
+    );
   }
 
   Future<void> storeMaterializedDocument({
     required String noteId,
     required String documentJson,
   }) {
-    return _dao.updateMaterializedDocument(
-      noteId: noteId,
-      documentJson: documentJson,
-      updatedAt: DateTime.now().toUtc(),
-    );
-  }
-
-  Future<void> storeDocument(String noteId, NoteDocumentResponse doc) async {
-    await _dao.upsertNoteDocument(
-      LocalNoteDocumentsCompanion.insert(
-        noteId: doc.noteId,
-        revision: doc.revision,
-        documentJson: encodeDocument(doc.document),
-        updatedAt: doc.serverTime,
-        materializedDocumentJson: Value(encodeDocument(doc.document)),
-        materializedUpdatedAt: Value(doc.serverTime),
-      ),
-    );
-  }
-
-  Future<NoteDocumentResponse?> fetchDocument(String noteId) async {
-    try {
-      return await _syncClient.getDocument(noteId);
-    } on NoteOperationsException catch (e) {
-      dev.log(
-        '[NoteOperationsSyncService] fetchDocument failed for note=$noteId: $e',
-        name: 'NoteOperationsSync',
+    return _noteQueue.run(noteId, () async {
+      final now = DateTime.now().toUtc();
+      final projection = _reconciler.projectMaterialized(documentJson);
+      await _persistence.saveLocalMaterialization(
+        noteId: noteId,
+        updatedAt: now,
+        projection: projection,
       );
-      return null;
-    }
+    });
   }
 
   Future<LocalNoteDocumentData?> getConfirmedDocument(String noteId) {
@@ -265,12 +243,9 @@ class NoteOperationsSyncService {
     return _dao.getPendingOperations(noteId, ownerUserId: _actorId);
   }
 
+  /// Compatibility name retained for the integration sync harness.
   Future<List<PendingNoteOperationData>> loadPendingProjection(String noteId) {
-    return _dao.getPendingOperations(noteId, ownerUserId: _actorId);
-  }
-
-  Future<int> getProjectedOutboxOperationCount(String noteId) {
-    return _dao.getProjectedOutboxOperationCount(noteId, ownerUserId: _actorId);
+    return getPendingOperations(noteId);
   }
 
   Future<NoteSyncTelemetrySnapshot> telemetrySnapshot(String noteId) async {
@@ -305,7 +280,10 @@ class NoteOperationsSyncService {
     }
   }
 
-  Future<SyncResult> _syncPendingInner(String noteId) async {
+  Future<SyncResult> _runWithSessionGate(
+    String noteId,
+    Future<SyncResult> Function(String noteId) operation,
+  ) async {
     await _prepareAccountScope(noteId);
     final activeSession = await _dao.getSyncSession(
       noteId,
@@ -324,7 +302,10 @@ class NoteOperationsSyncService {
       );
       return SyncResult.blockedByForeignSession();
     }
+    return operation(noteId);
+  }
 
+  Future<SyncResult> _syncPendingWithoutSessionGate(String noteId) async {
     final ops = await _dao.getPendingOperations(
       noteId,
       status: 'pending',
@@ -339,18 +320,13 @@ class NoteOperationsSyncService {
     final doc = await _dao.watchNoteDocument(noteId).first;
     final knownRevision = doc?.revision ?? 0;
 
-    await _dao.runInTransaction(() async {
-      await _dao.markInFlight(noteId, inFlightIds);
-      await _dao.upsertSyncSession(
-        SyncSessionsCompanion.insert(
-          noteId: noteId,
-          ownerUserId: Value(_actorId),
-          knownRevision: knownRevision,
-          operationIds: jsonEncode(inFlightIds.toList()),
-          startedAt: DateTime.now().toUtc().toIso8601String(),
-        ),
-      );
-    });
+    await _persistence.startSession(
+      noteId: noteId,
+      ownerUserId: _actorId,
+      operationIds: inFlightIds,
+      knownRevision: knownRevision,
+      startedAt: DateTime.now().toUtc(),
+    );
 
     final request = SyncRequest(
       knownRevision: knownRevision,
@@ -395,7 +371,7 @@ class NoteOperationsSyncService {
       },
     );
 
-    return _processSyncResponse(noteId, response, inFlightIds, ops);
+    return _processSyncResponse(noteId, response, ops);
   }
 
   Future<SyncResult> _resumeSyncSession(
@@ -420,7 +396,7 @@ class NoteOperationsSyncService {
         ownerUserId: _actorId,
       );
       await _dao.deleteSyncSession(noteId, ownerUserId: _actorId);
-      return _syncPendingInner(noteId);
+      return _syncPendingWithoutSessionGate(noteId);
     }
 
     final request = SyncRequest(
@@ -440,141 +416,66 @@ class NoteOperationsSyncService {
     );
 
     final response = await _syncClient.syncOperations(noteId, request);
-    return _processSyncResponse(noteId, response, operationIds.toSet(), ops);
+    return _processSyncResponse(noteId, response, ops);
   }
 
   Future<SyncResult> _processSyncResponse(
     String noteId,
     SyncResponse response,
-    Set<String> expectedIds,
     List<PendingNoteOperationData> inFlight,
   ) async {
     NoteSyncDebug.log(
       'sync.process_response.begin',
       noteId: noteId,
       fields: {
-        'expectedOperationCount': expectedIds.length,
+        'expectedOperationCount': inFlight.length,
         'inFlightCount': inFlight.length,
         'remoteOperationCount': response.remoteOperations.length,
         'revision': response.finalRevision,
       },
     );
-    await _outboxQueue.run(noteId, () async {
-      await _dao.runInTransaction(() async {
-        final acceptedIds = response.accepted.map((a) => a.operationId).toSet();
-        if (!_setEquals(acceptedIds, expectedIds)) {
-          throw StateError(
-            'Protocol error: accepted ${acceptedIds.length}/'
-            '${expectedIds.length} ops. All-or-nothing required.',
-          );
-        }
-
-        await _dao.deleteAccepted(expectedIds);
-        final remaining = await _dao.getPendingOperations(
-          noteId,
-          status: 'pending',
-          ownerUserId: _actorId,
-        );
-
-        final canonical = response.canonicalDocument;
-        if (canonical == null) {
-          throw StateError(
-            'Successful sync response must include canonicalDocument',
-          );
-        }
-
-        final rebased = _rebaser.rebase(
-          inFlight: inFlight,
-          pending: remaining,
-          remote: response.remoteOperations,
-          finalRevision: response.finalRevision,
-          acceptedOps: response.accepted,
-        );
-        final materialized = _projector.project(
-          snapshot: canonical,
-          pendingOps: rebased,
-        );
-        NoteSyncDebug.log(
-          'sync.rebase',
-          noteId: noteId,
-          fields: {
-            'remainingPending': remaining.length,
-            'rebased': rebased
-                .map((op) => '${op.operationId}:${op.kind}:${op.blockId}')
-                .join('|'),
-          },
-        );
-        await _dao.upsertNoteDocument(
-          LocalNoteDocumentsCompanion.insert(
-            noteId: noteId,
-            revision: response.finalRevision,
-            documentJson: encodeDocument(canonical),
-            updatedAt: response.serverTime,
-            materializedDocumentJson: Value(encodeDocument(materialized)),
-            materializedUpdatedAt: Value(response.serverTime),
-          ),
-        );
-        await _dao.markNoteHasRemoteCopy(noteId);
-        await _dao.deletePendingOpsByStatus(
-          noteId,
-          'pending',
-          ownerUserId: _actorId,
-        );
-        for (var i = 0; i < rebased.length; i++) {
-          final op = rebased[i];
-          await _dao.insertPendingOperation(
-            PendingNoteOperationsCompanion(
-              operationId: Value(op.operationId),
-              noteId: Value(op.noteId),
-              ownerUserId: Value(_actorId),
-              baseRevision: Value(op.baseRevision),
-              ordinal: Value(i),
-              kind: Value(op.kind),
-              blockId: Value(op.blockId),
-              payloadJson: Value(op.payloadJson),
-              createdAt: Value(op.createdAt),
-              status: const Value('pending'),
-            ),
-          );
-        }
-        await _dao.deleteSyncSession(noteId, ownerUserId: _actorId);
-      });
-    });
+    final remaining = await _dao.getPendingOperations(
+      noteId,
+      status: 'pending',
+      ownerUserId: _actorId,
+    );
+    final reconciliation = _reconciler.reconcilePending(
+      noteId: noteId,
+      inFlight: inFlight,
+      pending: remaining,
+      response: response,
+    );
+    NoteSyncDebug.log(
+      'sync.rebase',
+      noteId: noteId,
+      fields: {
+        'remainingPending': remaining.length,
+        'rebased': reconciliation.rebasedOperations
+            .map((op) => '${op.operationId}:${op.kind}:${op.blockId}')
+            .join('|'),
+      },
+    );
+    await _persistence.persistPendingReconciliation(
+      noteId: noteId,
+      ownerUserId: _actorId,
+      reconciliation: reconciliation,
+    );
 
     return SyncResult(
       acceptedCount: response.accepted.length,
-      acceptedOperationIds: expectedIds.toList(),
+      acceptedOperationIds: reconciliation.expectedOperationIds.toList(),
       finalRevision: response.finalRevision,
       remoteOperations: response.remoteOperations,
       canonicalDocument: NoteDocumentResponse(
         noteId: noteId,
         revision: response.finalRevision,
-        document: response.canonicalDocument!,
+        document: reconciliation.response.canonicalDocument,
         serverTime: response.serverTime,
       ),
     );
   }
 
-  Future<SyncResult> _pollAndReconcileInner(String noteId) async {
-    await _prepareAccountScope(noteId);
-    final activeSession = await _dao.getSyncSession(
-      noteId,
-      ownerUserId: _actorId,
-    );
-    if (activeSession != null) {
-      return _resumeSyncSession(noteId, activeSession);
-    }
-
-    final foreignSession = await _dao.getAnySyncSession(noteId);
-    if (foreignSession != null) {
-      NoteSyncDebug.log(
-        'sync.poll.blocked_foreign_session',
-        noteId: noteId,
-        fields: {'sessionOwner': foreignSession.ownerUserId},
-      );
-      return SyncResult.blockedByForeignSession();
-    }
-
+  Future<SyncResult> _pollAndReconcileWithoutSessionGate(String noteId) async {
     final confirmed = await _dao.watchNoteDocument(noteId).first;
     if (confirmed == null) {
       return SyncResult.empty();
@@ -598,56 +499,37 @@ class NoteOperationsSyncService {
       return SyncResult.empty();
     }
 
-    final document = response.document;
-    final revision = response.revision;
-    if (document == null || revision == null) {
-      throw StateError('Polling response must include document and revision');
-    }
+    final pending = await _dao.getPendingOperations(
+      noteId,
+      status: 'pending',
+      ownerUserId: _actorId,
+    );
+    final reconciliation = _reconciler.reconcilePoll(
+      noteId: noteId,
+      fromRevision: confirmed.revision,
+      response: response,
+      pending: pending,
+    );
+    final now = DateTime.now().toUtc();
+    await _persistence.persistPollReconciliation(
+      noteId: noteId,
+      ownerUserId: _actorId,
+      reconciliation: reconciliation,
+      updatedAt: now,
+    );
 
-    return _outboxQueue.run(noteId, () async {
-      final pending = await _dao.getPendingOperations(
-        noteId,
-        status: 'pending',
-        ownerUserId: _actorId,
-      );
-      final rebased = _rebaser.rebase(
-        pending: pending,
-        remote: response.operations,
-        finalRevision: revision,
-      );
-      final materialized = _projector.project(
-        snapshot: document,
-        pendingOps: rebased,
-      );
-      final now = DateTime.now().toUtc();
-
-      await _dao.runInTransaction(() async {
-        await _dao.upsertNoteDocument(
-          LocalNoteDocumentsCompanion.insert(
-            noteId: noteId,
-            revision: revision,
-            documentJson: encodeDocument(document),
-            updatedAt: now,
-            materializedDocumentJson: Value(encodeDocument(materialized)),
-            materializedUpdatedAt: Value(now),
-          ),
-        );
-        await _dao.replacePendingOps(noteId, rebased, ownerUserId: _actorId);
-      });
-
-      return SyncResult(
-        acceptedCount: 0,
-        acceptedOperationIds: [],
-        finalRevision: revision,
-        remoteOperations: response.operations,
-        canonicalDocument: NoteDocumentResponse(
-          noteId: noteId,
-          revision: revision,
-          document: document,
-          serverTime: now,
-        ),
-      );
-    });
+    return SyncResult(
+      acceptedCount: 0,
+      acceptedOperationIds: [],
+      finalRevision: reconciliation.response.revision,
+      remoteOperations: reconciliation.response.operations,
+      canonicalDocument: NoteDocumentResponse(
+        noteId: noteId,
+        revision: reconciliation.response.revision,
+        document: reconciliation.response.document,
+        serverTime: now,
+      ),
+    );
   }
 
   static bool _setEquals(Set<String> a, Set<String> b) {
@@ -676,9 +558,5 @@ class NoteOperationsSyncService {
     }
     if (value is Iterable) return value.map(_toJsonValue).toList();
     return value;
-  }
-
-  static String encodeDocument(Map<String, dynamic> document) {
-    return jsonEncode(document);
   }
 }

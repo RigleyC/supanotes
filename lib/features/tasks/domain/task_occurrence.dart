@@ -30,7 +30,9 @@ class TaskOccurrence {
 class TaskOccurrenceTransition {
   const TaskOccurrenceTransition({
     required this.completed,
-    required this.completedAt, required this.previousHasTime, this.nextDue,
+    required this.completedAt,
+    required this.previousHasTime,
+    this.nextDue,
     this.previousDue,
     this.scheduledAt,
   });
@@ -188,7 +190,9 @@ class TaskOccurrencePolicy {
     final now = _now();
     final completedAt = now.toUtc();
 
-    if (recurrence == null) {
+    // A task without an anchor has no occurrence identity. This is also the
+    // safe fallback for malformed data that still carries a recurrence rule.
+    if (dueDate == null || recurrence == null) {
       return TaskOccurrenceTransition(
         completed: true,
         completedAt: completedAt,
@@ -200,21 +204,19 @@ class TaskOccurrencePolicy {
 
     final occurrenceDate =
         scheduledAt ??
-        (dueDate == null
-            ? DateTime(now.year, now.month, now.day)
-            : resolveCurrent(
-                taskId: '',
-                anchor: dueDate,
-                recurrence: recurrence,
-                hasTime: hasTime,
-                completedAtByScheduledAt: completedAtByScheduledAt,
-              )!.scheduledAt);
+        resolveCurrent(
+          taskId: '',
+          anchor: dueDate,
+          recurrence: recurrence,
+          hasTime: hasTime,
+          completedAtByScheduledAt: completedAtByScheduledAt,
+        )!.scheduledAt;
     return TaskOccurrenceTransition(
       completed: false,
       nextDue: nextDueDate(
         from: occurrenceDate,
         recurrence: recurrence,
-        anchorDay: dueDate?.day ?? occurrenceDate.day,
+        anchorDay: dueDate.day,
       ),
       completedAt: completedAt,
       previousDue: dueDate,

@@ -56,13 +56,7 @@ void main() {
       () => mockSyncService.getPendingOperations(any()),
     ).thenAnswer((_) async => []);
     when(
-      () => mockSyncService.getProjectedOutboxOperationCount(any()),
-    ).thenAnswer((_) async => 0);
-    when(
-      () => mockSyncService.fetchDocument(any()),
-    ).thenAnswer((_) async => null);
-    when(
-      () => mockSyncService.loadPendingProjection(any()),
+      () => mockSyncService.getPendingOperations(any()),
     ).thenAnswer((_) async => []);
   });
 
@@ -484,7 +478,7 @@ void main() {
     test(
       'rebuilds the effective document when local operations remain pending',
       () async {
-        when(() => mockSyncService.loadPendingProjection('note-1')).thenAnswer(
+        when(() => mockSyncService.getPendingOperations('note-1')).thenAnswer(
           (_) async => [
             PendingNoteOperationData(
               operationId: 'pending-1',
@@ -493,7 +487,7 @@ void main() {
               ordinal: 0,
               kind: 'text_delta',
               blockId: 'block-1',
-            payloadJson: '{"ops":[{"retain":11},{"insert":" pending"}]}',
+              payloadJson: '{"ops":[{"retain":11},{"insert":" pending"}]}',
               createdAt: DateTime.utc(2026, 7, 22),
               status: 'pending',
               attemptCount: 0,
@@ -539,7 +533,7 @@ void main() {
       () async {
         final persistedOperations = <PendingNoteOperationData>[];
         when(
-          () => mockSyncService.loadPendingProjection('note-1'),
+          () => mockSyncService.getPendingOperations('note-1'),
         ).thenAnswer((_) async => persistedOperations);
         when(
           () => mockSyncService.enqueueOperations(

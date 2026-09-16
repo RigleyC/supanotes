@@ -55,7 +55,7 @@ void main() {
         );
 
         final confirmed = await service.getConfirmedDocument('note-open');
-        final pending = await service.loadPendingProjection('note-open');
+        final pending = await service.getPendingOperations('note-open');
 
         expect(confirmed, isNotNull);
         expect(confirmed!.revision, 7);
@@ -384,6 +384,65 @@ void main() {
       expect(secondResult.acceptedCount, 0);
       expect(client.syncOperationCalls, 1);
     });
+
+    test(
+      'serializes local appends with sync so the first request owns ordering',
+      () async {
+        await seedConfirmedDocument(db, 'note-order', revision: 1);
+        await seedPendingOperation(db, 'note-order', 'op-one', baseRevision: 1);
+        final requestStarted = Completer<void>();
+        final releaseRequest = Completer<void>();
+        client.onSync = (noteId, request) async {
+          requestStarted.complete();
+          await releaseRequest.future;
+          return syncResponseFor(
+            request.operations.single.operationId,
+            request.operations.single.baseRevision + 1,
+          );
+        };
+
+        final sync = service.syncPending('note-order');
+        await requestStarted.future;
+
+        var appendCompleted = false;
+        final append = service
+            .enqueueOperation(
+              'note-order',
+              OperationRequest(
+                operationId: 'op-two',
+                baseRevision: 2,
+                kind: 'text_delta',
+                blockId: 'b1',
+                payload: const {'delta': []},
+              ),
+            )
+            .then((_) => appendCompleted = true);
+
+        await pumpEventQueue();
+        expect(appendCompleted, isFalse);
+        expect(
+          (await db.noteOperationsDao.getPendingOperations(
+            'note-order',
+            ownerUserId: 'user-1',
+          )).map((operation) => operation.operationId),
+          ['op-one'],
+        );
+
+        releaseRequest.complete();
+        await sync;
+        await append;
+
+        expect(appendCompleted, isTrue);
+        expect(client.syncOperationCalls, 1);
+        final pending = await db.noteOperationsDao.getPendingOperations(
+          'note-order',
+          ownerUserId: 'user-1',
+        );
+        expect(pending.map((operation) => operation.operationId), ['op-two']);
+        expect(pending.single.ordinal, 0);
+        expect(pending.single.baseRevision, 2);
+      },
+    );
 
     test(
       'telemetry snapshot exposes outbox, persisted session and failures',
@@ -750,11 +809,6 @@ class CharacterizationNoteSyncClient implements NoteSyncClient {
   }
 
   @override
-  Future<NoteDocumentResponse?> fetchDocument(String noteId) {
-    throw UnimplementedError('fetchDocument is not used by these tests');
-  }
-
-  @override
   Future<List<Map<String, dynamic>>> listNotes({
     int limit = 100,
     DateTime? cursorUpdatedAt,
@@ -910,11 +964,6 @@ class SharedBackendNoteSyncClient implements NoteSyncClient {
   @override
   Future<NoteDocumentResponse> getDocument(String noteId) {
     throw UnimplementedError('getDocument is not used by these tests');
-  }
-
-  @override
-  Future<NoteDocumentResponse?> fetchDocument(String noteId) {
-    throw UnimplementedError('fetchDocument is not used by these tests');
   }
 
   @override

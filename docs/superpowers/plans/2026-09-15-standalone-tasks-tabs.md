@@ -270,7 +270,7 @@ Expected: FAIL until fields, query filtering and storage columns exist.
 
 - [ ] **Step 2: Add the feed fields without changing the schema version yet.**
 
-Add `taskId` to `SyncInbox` and `bootstrapVersion` to `SyncFeedCursors` in the Drift declarations and generated types. Leave the physical migration and `schemaVersion` bump to Task 5, where the new task tables and all version-32 changes are applied atomically.
+Add `taskId` to `SyncInbox` and `bootstrapVersion` to `SyncFeedCursors` in the Drift declarations and generated types. Task 4 publishes the feed-only physical schema at version 32; Task 5 must therefore use a single `32 -> 33` migration for the new task tables, local quarantine and task persistence.
 
 - [ ] **Step 3: Add server-side scope filtering.**
 
@@ -324,9 +324,9 @@ Expected: FAIL because the Drift tables and DAO are not registered.
 
 Store `completions` as canonical JSON text locally, use indexes `(ownerUserId, deletedAt, dueDate)` and `(ownerUserId, updatedAt)`, and keep `operationId` as the outbox primary key with task ordering.
 
-- [ ] **Step 3: Add schema 32 migration, feed-column migration and local quarantine.**
+- [ ] **Step 3: Add schema 33 migration, task tables and local quarantine.**
 
-Set `schemaVersion` to `32`, rebuild `SyncInbox`/`SyncFeedCursors` with their new columns, then rename physical `tasks`, `task_completions` and `local_task_completions` leftovers to versioned quarantine names before creating the new Drift task tables. Never drop non-empty remnants, never clear note operations, and expose a diagnostic state so task-independent UI can remain unavailable without hiding note errors.
+Task 4 already sets `schemaVersion` to `32` and adds the feed columns. Set `schemaVersion` to `33` and migrate `32 -> 33`: rename physical `tasks`, `task_completions` and `local_task_completions` leftovers to versioned quarantine names before creating the new Drift task tables. Never drop non-empty remnants, never clear note operations, and expose a diagnostic state so task-independent UI can remain unavailable without hiding note errors.
 
 - [ ] **Step 4: Implement DAO queries and repository transactions.**
 
@@ -336,7 +336,7 @@ Generate operation IDs and payload hashes at the repository boundary; update loc
 
 Run: `dart run build_runner build --delete-conflicting-outputs`; `flutter test test/core/database/daos/tasks_dao_test.dart test/features/tasks/data/task_repository_test.dart`.
 
-Expected: PASS with schema 32 and no visual assertions.
+Expected: PASS with schema 33 and no visual assertions.
 
 - [ ] **Step 6: Commit local task persistence.**
 

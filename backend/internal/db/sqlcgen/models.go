@@ -22,6 +22,19 @@ type AlexaAuthorizationCode struct {
 	RefreshRevokedAt         pgtype.Timestamptz `json:"refresh_revoked_at"`
 }
 
+type AlexaRequestIdempotency struct {
+	ApplicationID string             `json:"application_id"`
+	RequestID     string             `json:"request_id"`
+	Fingerprint   string             `json:"fingerprint"`
+	Status        string             `json:"status"`
+	ResponseJson  []byte             `json:"response_json"`
+	OwnerToken    string             `json:"owner_token"`
+	LeaseUntil    pgtype.Timestamptz `json:"lease_until"`
+	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Attachment struct {
 	ID         pgtype.UUID        `json:"id"`
 	NoteID     pgtype.UUID        `json:"note_id"`

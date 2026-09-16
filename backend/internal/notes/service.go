@@ -94,6 +94,16 @@ func (s *Service) DeleteNote(ctx context.Context, userID pgtype.UUID, id pgtype.
 	return s.repo.DeleteNote(ctx, id, userID)
 }
 
+// DeleteNoteInTransaction is used by MCP confirmations so the soft delete and
+// the confirmation result commit atomically. Replaying the same confirmation
+// therefore cannot apply a second delete timestamp.
+func (s *Service) DeleteNoteInTransaction(ctx context.Context, tx pgx.Tx, userID pgtype.UUID, id pgtype.UUID) error {
+	if tx == nil {
+		return errors.New("note deletion transaction is missing")
+	}
+	return s.repo.WithQuerier(sqlcgen.New(tx)).DeleteNote(ctx, id, userID)
+}
+
 func (s *Service) GetNotes(ctx context.Context, userID pgtype.UUID, favorite *bool, limit int32, cursorUpdatedAt *time.Time, cursorID *pgtype.UUID) ([]sqlcgen.GetNotesRow, error) {
 	arg := sqlcgen.GetNotesParams{
 		UserID: userID,

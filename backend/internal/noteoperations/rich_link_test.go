@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/fmpwizard/go-quilljs-delta/delta"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -20,7 +21,7 @@ func TestAppendRichLinkAppendsToLatestDocumentAndDeduplicatesRetry(t *testing.T)
 	document, err := json.Marshal(Document{
 		SchemaVersion: 1,
 		Blocks: []Block{
-			{ID: "paragraph-1", Type: string(BlockParagraph), Metadata: map[string]any{}},
+			{ID: "paragraph-1", Type: string(BlockParagraph), Delta: []delta.Op{}, Metadata: map[string]any{}},
 		},
 	})
 	require.NoError(t, err)
@@ -131,7 +132,8 @@ func TestAppendRichLinkRejectsShareAssignedToAnotherNote(t *testing.T) {
 func TestAppendRichLinkAppendsToEmptyDocument(t *testing.T) {
 	noteID := mustParseUUID("550e8400-e29b-41d4-a716-446655440001")
 	userID := mustParseUUID("550e8400-e29b-41d4-a716-446655440002")
-	storedDocument := []byte(`{"schemaVersion":1,"blocks":[]}`)
+	storedDocument, err := json.Marshal(NewEmptyDocument())
+	require.NoError(t, err)
 	storedRevision := int64(0)
 	repo := &mockRepository{
 		lockNoteFn: func(context.Context, pgtype.UUID) (LockNoteResult, error) {

@@ -6,7 +6,10 @@ import 'package:supanotes/shared/widgets/global_sheet.dart';
 
 class TaskMetadataTimePage extends StatefulWidget {
   const TaskMetadataTimePage({
-    required this.currentDueDate, required this.hasTime, required this.onSelected, super.key,
+    required this.currentDueDate,
+    required this.hasTime,
+    required this.onSelected,
+    super.key,
   });
 
   final DateTime currentDueDate;

@@ -11,6 +11,12 @@ import (
 )
 
 type Querier interface {
+	CompleteAlexaRequestIdempotency(ctx context.Context, arg CompleteAlexaRequestIdempotencyParams) (int64, error)
+	DeleteExpiredAlexaRequestIdempotency(ctx context.Context) error
+	GetAlexaRequestIdempotencyForUpdate(ctx context.Context, arg GetAlexaRequestIdempotencyForUpdateParams) (AlexaRequestIdempotency, error)
+	InsertAlexaRequestIdempotency(ctx context.Context, arg InsertAlexaRequestIdempotencyParams) (AlexaRequestIdempotency, error)
+	ReuseExpiredAlexaRequestIdempotency(ctx context.Context, arg ReuseExpiredAlexaRequestIdempotencyParams) (AlexaRequestIdempotency, error)
+	TakeOverAlexaRequestIdempotency(ctx context.Context, arg TakeOverAlexaRequestIdempotencyParams) (AlexaRequestIdempotency, error)
 	CheckNotePermission(ctx context.Context, arg CheckNotePermissionParams) (interface{}, error)
 	ConsumeRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
 	CountNotes(ctx context.Context, userID pgtype.UUID) (int64, error)
@@ -22,6 +28,10 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserSettings(ctx context.Context, arg CreateUserSettingsParams) (UserSetting, error)
 	DeleteAttachment(ctx context.Context, id pgtype.UUID) error
+	EnqueueAttachmentDeletion(ctx context.Context, storageKey string) error
+	ClaimAttachmentDeletion(ctx context.Context, arg ClaimAttachmentDeletionParams) (ClaimAttachmentDeletionRow, error)
+	CompleteAttachmentDeletion(ctx context.Context, id pgtype.UUID) error
+	RetryAttachmentDeletion(ctx context.Context, arg RetryAttachmentDeletionParams) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeleteNoteShare(ctx context.Context, arg DeleteNoteShareParams) error
 	DisableNoteShareLink(ctx context.Context, noteID pgtype.UUID) error

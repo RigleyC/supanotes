@@ -50,6 +50,33 @@ func TestMapToNoteResponseKeepsClearedIconInContract(t *testing.T) {
 	}
 }
 
+func TestListRejectsInvalidPaginationQuery(t *testing.T) {
+	for _, query := range []string{
+		"?limit=0",
+		"?limit=101",
+		"?limit=not-a-number",
+		"?cursor_updated_at=not-a-timestamp&cursor_id=00000000-0000-0000-0000-000000000001",
+		"?cursor_updated_at=2026-09-16T12:00:00Z",
+		"?cursor_id=not-a-uuid",
+	} {
+		t.Run(query, func(t *testing.T) {
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, "/notes"+query, nil)
+			recorder := httptest.NewRecorder()
+			c := e.NewContext(req, recorder)
+			web.SetUserID(c, "00000000-0000-0000-0000-000000000002")
+
+			err := NewHandler(NewService(&mockRepo{}, nil)).List(c)
+			if err != nil {
+				t.Fatalf("list: %v", err)
+			}
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+			}
+		})
+	}
+}
+
 func TestUpdateRejectsInvalidIconPayload(t *testing.T) {
 	repo := &mockRepo{
 		updateNoteFn: func(_ context.Context, _ sqlcgen.UpdateNoteParams) (sqlcgen.Note, error) {

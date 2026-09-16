@@ -1,8 +1,12 @@
 package sharelinks
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -23,6 +27,26 @@ func NewHandler(svc *Service) *Handler {
 
 type activateRequest struct {
 	Replace bool `json:"replace"`
+}
+
+func (r *activateRequest) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return errors.New("share link request must be a JSON object")
+	}
+	type requestAlias activateRequest
+	var value requestAlias
+	decoder := json.NewDecoder(bytes.NewReader(trimmed))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&value); err != nil {
+		return fmt.Errorf("invalid share link request: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return errors.New("invalid share link request")
+	}
+	*r = activateRequest(value)
+	return nil
 }
 
 type PublicDocumentResponse struct {
@@ -97,7 +121,7 @@ func (h *Handler) PublicDocument(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-store")
 	document, err := json.Marshal(snapshot.Document)
 	if err != nil {
-		c.Logger().Error(err)
+		slog.Error("failed to encode public note", "error_type", fmt.Sprintf("%T", err))
 		return web.JSONError(c, http.StatusInternalServerError, "failed to encode public note")
 	}
 	return c.JSON(http.StatusOK, PublicDocumentResponse{
@@ -135,7 +159,7 @@ func (h *Handler) mapError(c echo.Context, err error) error {
 	case errors.Is(err, pgx.ErrNoRows):
 		return web.JSONError(c, http.StatusNotFound, "note not found")
 	default:
-		c.Logger().Error(err)
+		slog.Error("failed to manage share link", "error_type", fmt.Sprintf("%T", err))
 		return web.JSONError(c, http.StatusInternalServerError, "failed to manage share link")
 	}
 }
@@ -148,7 +172,7 @@ func (h *Handler) mapPublicError(c echo.Context, err error) error {
 		message = "share link not found"
 	}
 	if status == http.StatusInternalServerError {
-		c.Logger().Error(err)
+		slog.Error("failed to load public note", "error_type", fmt.Sprintf("%T", err))
 	}
 	if strings.HasPrefix(c.Request().URL.Path, "/api/v1/") {
 		return web.JSONError(c, status, message)

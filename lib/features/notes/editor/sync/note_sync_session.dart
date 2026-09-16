@@ -14,7 +14,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     required this.syncService,
     required this.document,
     required Editor editor,
-    this.userId = '',
     bool captureLocalOperations = true,
     this.networkCoalescingWindow = const Duration(milliseconds: 350),
     this.onTransientError,
@@ -32,7 +31,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   final NoteOperationsSyncService syncService;
   final NoteOperationAdapter adapter;
   final MutableDocument document;
-  final String userId;
   final Duration networkCoalescingWindow;
   bool _captureLocalOperations;
   final void Function(Object error)? onTransientError;
@@ -85,7 +83,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     _statusController.add(newStatus);
   }
 
-  Object? get lastError => _lastError;
   @override
   bool get captureLocalOperations => _captureLocalOperations;
 

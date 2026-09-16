@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
-import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_controller.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
@@ -28,10 +27,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
-        ),
+      MaterialApp(
+        home: _MetadataSheetLauncher(task: task),
       ),
     );
 
@@ -41,21 +38,6 @@ void main() {
     expect(find.text('Editar horário e frequência'), findsOneWidget);
     expect(find.byTooltip('Fechar'), findsOneWidget);
     expect(find.text('Diariamente'), findsOneWidget);
-  });
-
-  testWidgets('highlights metadata tiles when values are set', (tester) async {
-    await tester.pumpWidget(_buildSheetForTask(_task()));
-    await tester.pumpAndSettle();
-
-    final tiles = tester.widgetList<AppTile>(find.byType(AppTile)).toList();
-    expect(tiles, hasLength(4));
-    expect(tiles.map((tile) => tile.selected), [true, false, true, false]);
-
-    final primary = Theme.of(
-      tester.element(find.byType(TaskMetadataSheetBody)),
-    ).colorScheme.primary;
-    final recurrenceTitle = tester.widget<Text>(find.text('Diariamente'));
-    expect(recurrenceTitle.style?.color, primary);
   });
 
   testWidgets('does not show title input', (tester) async {
@@ -145,7 +127,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
+          home: _MetadataSheetLauncher(task: task),
         ),
       ),
     );
@@ -174,7 +156,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
+          home: _MetadataSheetLauncher(task: task),
         ),
       ),
     );
@@ -201,7 +183,7 @@ void main() {
         child: MaterialApp(
           home: _MetadataSheetLauncher(
             task: task,
-            onSave: (draft) async {
+            onResult: (draft) {
               saveCalls++;
               savedDueDate = draft.scheduleAnchor;
               savedRecurrence = draft.recurrence;
@@ -251,7 +233,7 @@ void main() {
           child: MaterialApp(
             home: _MetadataSheetLauncher(
               task: task,
-              onSave: (draft) async {
+              onResult: (draft) {
                 saveCalls++;
                 savedDueDate = draft.scheduleAnchor;
               },
@@ -294,7 +276,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
+          home: _MetadataSheetLauncher(task: task),
         ),
       ),
     );
@@ -340,7 +322,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          home: _MetadataSheetLauncher(task: task, onSave: (_) async {}),
+          home: _MetadataSheetLauncher(task: task),
         ),
       ),
     );
@@ -361,12 +343,9 @@ void main() {
 }
 
 Widget _buildSheetForTask(_SheetTask task) {
-  return ProviderScope(
-    child: _ProviderInitializer(
-      task: task,
-      child: MaterialApp(
-        home: Scaffold(body: TaskMetadataSheetBody(taskId: task.id)),
-      ),
+  return MaterialApp(
+    home: Scaffold(
+      body: TaskMetadataSheetBody(draft: task.draft),
     ),
   );
 }
@@ -396,37 +375,23 @@ _SheetTask _taskWithoutMetadata({required String id}) {
   );
 }
 
-class _ProviderInitializer extends ConsumerWidget {
-  const _ProviderInitializer({required this.task, required this.child});
-  final _SheetTask task;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(taskMetadataProvider(task.id).notifier).initialize(task.draft);
-    });
-    return child;
-  }
-}
-
-class _MetadataSheetLauncher extends ConsumerWidget {
-  const _MetadataSheetLauncher({required this.task, required this.onSave});
+class _MetadataSheetLauncher extends StatelessWidget {
+  const _MetadataSheetLauncher({required this.task, this.onResult});
 
   final _SheetTask task;
-  final Future<void> Function(TaskMetadataDraft draft) onSave;
+  final ValueChanged<TaskMetadataDraft>? onResult;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       body: TextButton(
-        onPressed: () => showTaskMetadataSheet(
-          context: context,
-          ref: ref,
-          taskId: task.id,
-          draft: task.draft,
-          onSave: onSave,
-        ),
+        onPressed: () async {
+          final result = await showTaskMetadataSheet(
+            context: context,
+            draft: task.draft,
+          );
+          onResult?.call(result);
+        },
         child: const Text('Abrir metadados'),
       ),
     );

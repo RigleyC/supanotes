@@ -295,7 +295,9 @@ func (s *Service) loadSessionData(ctx context.Context, session *SessionData) err
 	}
 	var prefs map[string]any
 	if len(settings.Preferences) > 0 {
-		_ = json.Unmarshal(settings.Preferences, &prefs)
+		if err := json.Unmarshal(settings.Preferences, &prefs); err != nil {
+			return fmt.Errorf("decode settings preferences: %w", err)
+		}
 	}
 	if prefs == nil {
 		prefs = make(map[string]any)

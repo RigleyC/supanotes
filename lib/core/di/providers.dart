@@ -12,7 +12,6 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart' show Dio;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/api/api_client.dart';
 import 'package:supanotes/core/api/auth_interceptor.dart' show AuthInterceptor;
@@ -70,7 +69,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 // ---------------------------------------------------------------------------
 
 /// Single [AuthRepository] wired to the shared [apiClientProvider].
-final authRepositoryProvider = Provider<IAuthRepository>((ref) {
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
     apiClient: ref.watch(apiClientProvider),
     storage: ref.watch(authLocalStorageProvider),
@@ -86,12 +85,10 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
 /// and any other widget that needs to know the current session.
 ///
 /// State is [AsyncValue<User?>]: loading, data(user) → authenticated,
-/// data(null) → unauthenticated, error → unauthenticated with feedback.
+/// data(null) → unauthenticated, error → bootstrap/cleanup failure.
 final authControllerProvider = AsyncNotifierProvider<AuthController, User?>(
   AuthController.new,
 );
-
-final sessionResetProvider = StateProvider<int>((ref) => 0);
 
 final nativeShareBridgeProvider = Provider<NativeShareBridge>((ref) {
   return MethodChannelNativeShareBridge();
@@ -102,7 +99,8 @@ final sharedLinkDeliveryProvider = Provider<SharedLinkDelivery>((ref) {
 });
 
 /// App-lifetime coordinator for native share intake (index publishing,
-/// credential sync and pending-share delivery). Kept alive like [syncService]
+/// credential sync and pending-share delivery). Kept alive like the app-wide
+/// sync service
 /// because it serializes side effects across the whole app lifecycle.
 final shareIntakeCoordinatorProvider = Provider<ShareIntakeCoordinator>((ref) {
   return ShareIntakeCoordinator(ref);

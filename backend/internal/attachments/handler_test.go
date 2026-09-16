@@ -3,6 +3,7 @@ package attachments
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -38,10 +39,28 @@ func TestUploadHandlerPassesAuthenticatedUserToService(t *testing.T) {
 	rec := runUploadRequest(t, svc, "00000000-0000-0000-0000-000000000002", "hello")
 
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	require.Equal(t, "/api/v1/attachments/00000000-0000-0000-0000-000000000003/content", response["download_url"])
+	_, hasLegacyURL := response["url"]
+	require.False(t, hasLegacyURL)
+	_, hasStorageKey := response["storage_key"]
+	require.False(t, hasStorageKey)
 	require.Equal(t, testUUID(1), svc.noteID)
 	require.Equal(t, testUUID(2), svc.userID)
 	require.Equal(t, "file.txt", svc.filename)
 	require.Equal(t, int64(5), svc.size)
+}
+
+func TestUploadHandlerRejectsInvalidServiceResponse(t *testing.T) {
+	t.Parallel()
+
+	rec := runUploadRequest(t, &fakeUploadService{
+		attachment: sqlcgen.Attachment{NoteID: testUUID(1)},
+	}, "00000000-0000-0000-0000-000000000002", "hello")
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.JSONEq(t, `{"error":"Internal server error"}`, rec.Body.String())
 }
 
 func TestUploadHandlerMapsPermissionAndNotFoundErrors(t *testing.T) {
@@ -119,6 +138,10 @@ func (s *fakeUploadService) ListByNote(context.Context, pgtype.UUID) ([]sqlcgen.
 }
 
 func (s *fakeUploadService) Delete(context.Context, pgtype.UUID, pgtype.UUID) error {
+	return nil
+}
+
+func (s *fakeUploadService) CleanupPending(context.Context) error {
 	return nil
 }
 

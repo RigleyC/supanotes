@@ -55,6 +55,16 @@ final class RemoteNoteMetadata {
 
   bool get isOwner => access == RemoteNoteAccess.owner;
 
+  String? get sharePermission => switch (access) {
+    RemoteNoteAccess.owner => null,
+    RemoteNoteAccess.edit => 'edit',
+    RemoteNoteAccess.view => 'view',
+  };
+
+  String? get effectiveSharedByEmail => isOwner ? null : sharedByEmail;
+
+  String? get effectiveSharedByName => isOwner ? null : sharedByName;
+
   String? get noteIconJson =>
       noteIcon == null ? null : jsonEncode(noteIcon!.toJson());
 }

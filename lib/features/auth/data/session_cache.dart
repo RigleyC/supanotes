@@ -9,7 +9,6 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/features/auth/data/auth_local_storage.dart';
-import 'package:supanotes/features/auth/presentation/controllers/auth_controller.dart' show AuthController;
 
 /// The cached subset of the session payload that is small enough to keep
 /// in memory and on secure storage.
@@ -25,12 +24,6 @@ class SessionCache {
   }
 
   final Map<String, dynamic> settings;
-
-  bool get isEmpty => settings.isEmpty;
-
-  Map<String, dynamic> toJson() => {
-    'settings': settings,
-  };
 }
 
 class SessionCacheNotifier extends Notifier<SessionCache> {

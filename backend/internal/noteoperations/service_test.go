@@ -3,25 +3,29 @@ package noteoperations
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 
+	"github.com/fmpwizard/go-quilljs-delta/delta"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/RigleyC/supanotes/internal/db/sqlcgen"
 )
 
 type mockRepository struct {
-	ensureNoteFn             func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) error
-	lockNoteFn               func(ctx context.Context, noteID pgtype.UUID) (LockNoteResult, error)
-	getOperationsSinceFn     func(ctx context.Context, noteID pgtype.UUID, afterRevision int64) ([]Operation, error)
-	getOperationsRangeFn     func(ctx context.Context, noteID pgtype.UUID, afterRevision int64, upToRevision int64) ([]Operation, error)
-	updateNoteDocumentFn     func(ctx context.Context, arg UpdateNoteDocumentParams) error
-	insertOperationFn        func(ctx context.Context, arg InsertOperationParams) (Operation, error)
-	getNoteOperationByOpIDFn func(ctx context.Context, noteID pgtype.UUID, operationID pgtype.UUID) (Operation, error)
-	checkNotePermissionFn    func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (string, error)
-	getNoteDocumentFn        func(ctx context.Context, noteID pgtype.UUID) (GetNoteDocumentResult, error)
+	ensureNoteFn                 func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) error
+	lockNoteFn                   func(ctx context.Context, noteID pgtype.UUID) (LockNoteResult, error)
+	getOperationsSinceFn         func(ctx context.Context, noteID pgtype.UUID, afterRevision int64) ([]Operation, error)
+	getOperationsRangeFn         func(ctx context.Context, noteID pgtype.UUID, afterRevision int64, upToRevision int64) ([]Operation, error)
+	updateNoteDocumentFn         func(ctx context.Context, arg UpdateNoteDocumentParams) error
+	insertOperationFn            func(ctx context.Context, arg InsertOperationParams) (Operation, error)
+	getNoteOperationByOpIDFn     func(ctx context.Context, noteID pgtype.UUID, operationID pgtype.UUID) (Operation, error)
+	checkNotePermissionFn        func(ctx context.Context, noteID pgtype.UUID, userID pgtype.UUID) (string, error)
+	getNoteDocumentFn            func(ctx context.Context, noteID pgtype.UUID) (GetNoteDocumentResult, error)
 	reserveSharedLinkIngestionFn func(ctx context.Context, userID, shareID, noteID, operationID pgtype.UUID) (sqlcgen.SharedLinkIngestion, error)
 }
 
@@ -218,6 +222,123 @@ func TestValidateAndTransformNoConcurrentOps(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSyncOperationsReplaysSameOperationIdentityIdempotently(t *testing.T) {
+	blockID := "b1"
+	payload := json.RawMessage(`{"ops":[{"insert":"hello"}]}`)
+	existing := Operation{
+		Revision:     4,
+		BaseRevision: 2,
+		Kind:         string(KindTextDelta),
+		BlockID:      pgtype.Text{String: blockID, Valid: true},
+		Payload:      payload,
+	}
+	inserted := false
+	repo := &mockRepository{
+		lockNoteFn: func(context.Context, pgtype.UUID) (LockNoteResult, error) {
+			document, err := json.Marshal(NewEmptyDocument())
+			return LockNoteResult{Revision: 4, Document: document}, err
+		},
+		getNoteOperationByOpIDFn: func(context.Context, pgtype.UUID, pgtype.UUID) (Operation, error) {
+			return existing, nil
+		},
+		insertOperationFn: func(context.Context, InsertOperationParams) (Operation, error) {
+			inserted = true
+			return Operation{}, nil
+		},
+	}
+
+	response, err := syncOperationsInRepository(context.Background(), repo, pgtype.UUID{}, pgtype.UUID{}, SyncRequest{
+		Operations: []OperationRequest{{
+			OperationID:  "550e8400-e29b-41d4-a716-446655440000",
+			BaseRevision: existing.BaseRevision,
+			Kind:         existing.Kind,
+			BlockID:      &blockID,
+			Payload:      payload,
+		}},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, inserted)
+	require.Len(t, response.Accepted, 1)
+	assert.Equal(t, existing.Revision, response.Accepted[0].Revision)
+}
+
+func TestSyncOperationsRejectsOperationIDReuseWithDifferentIdentity(t *testing.T) {
+	blockID := "b1"
+	payload := json.RawMessage(`{"ops":[{"insert":"hello"}]}`)
+	existing := Operation{
+		Revision:     4,
+		BaseRevision: 2,
+		Kind:         string(KindTextDelta),
+		BlockID:      pgtype.Text{String: blockID, Valid: true},
+		Payload:      payload,
+	}
+	repo := &mockRepository{
+		lockNoteFn: func(context.Context, pgtype.UUID) (LockNoteResult, error) {
+			document, err := json.Marshal(NewEmptyDocument())
+			return LockNoteResult{Revision: 4, Document: document}, err
+		},
+		getNoteOperationByOpIDFn: func(context.Context, pgtype.UUID, pgtype.UUID) (Operation, error) {
+			return existing, nil
+		},
+	}
+
+	tests := map[string]func(*OperationRequest){
+		"payload": func(request *OperationRequest) {
+			request.Payload = json.RawMessage(`{"ops":[{"insert":"different"}]}`)
+		},
+		"kind": func(request *OperationRequest) {
+			request.Kind = string(KindSetBlockType)
+		},
+		"block id": func(request *OperationRequest) {
+			otherBlockID := "b2"
+			request.BlockID = &otherBlockID
+		},
+		"base revision": func(request *OperationRequest) {
+			request.BaseRevision++
+		},
+	}
+
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			request := OperationRequest{
+				OperationID:  "550e8400-e29b-41d4-a716-446655440000",
+				BaseRevision: existing.BaseRevision,
+				Kind:         existing.Kind,
+				BlockID:      &blockID,
+				Payload:      payload,
+			}
+			mutate(&request)
+
+			_, err := syncOperationsInRepository(context.Background(), repo, pgtype.UUID{}, pgtype.UUID{}, SyncRequest{Operations: []OperationRequest{request}})
+			var conflict *OperationIDConflictError
+			require.ErrorAs(t, err, &conflict)
+			assert.Equal(t, request.OperationID, conflict.OperationID)
+		})
+	}
+}
+
+func TestSyncOperationsRejectsInvalidSnapshotWithoutRepairingIt(t *testing.T) {
+	updated := false
+	repo := &mockRepository{
+		lockNoteFn: func(context.Context, pgtype.UUID) (LockNoteResult, error) {
+			return LockNoteResult{Revision: 2, Document: []byte(`{
+				"schemaVersion":1,
+				"blocks":[{"id":"b1","type":"paragraph","delta":[{"insert":"kept"},{"delete":4}],"metadata":{}}]
+			}`)}, nil
+		},
+		updateNoteDocumentFn: func(context.Context, UpdateNoteDocumentParams) error {
+			updated = true
+			return nil
+		},
+	}
+
+	_, err := syncOperationsInRepository(context.Background(), repo, pgtype.UUID{}, pgtype.UUID{}, SyncRequest{})
+	require.Error(t, err)
+	assert.False(t, updated)
+	assert.Contains(t, err.Error(), "non-text delta")
+}
+
 func TestValidateAndTransformDetectsInvalidKind(t *testing.T) {
 	doc := NewEmptyDocument()
 	opReq := OperationRequest{
@@ -258,4 +379,111 @@ func TestPgtypeUUIDToString(t *testing.T) {
 	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", s)
 
 	assert.Equal(t, "", pgtypeUUIDToString(pgtype.UUID{Valid: false}))
+}
+
+type serializedOperationRepository struct {
+	*mockRepository
+	mu         sync.Mutex
+	document   []byte
+	revision   int64
+	operations map[uuid.UUID]Operation
+	insertions int
+}
+
+func (r *serializedOperationRepository) LockNote(context.Context, pgtype.UUID) (LockNoteResult, error) {
+	return LockNoteResult{Revision: r.revision, Document: r.document}, nil
+}
+
+func (r *serializedOperationRepository) GetNoteOperationByOpID(_ context.Context, _ pgtype.UUID, operationID pgtype.UUID) (Operation, error) {
+	operation, ok := r.operations[uuid.UUID(operationID.Bytes)]
+	if !ok {
+		return Operation{}, pgx.ErrNoRows
+	}
+	return operation, nil
+}
+
+func (r *serializedOperationRepository) InsertOperation(_ context.Context, arg InsertOperationParams) (Operation, error) {
+	operation := Operation{
+		NoteID:       arg.NoteID,
+		Revision:     arg.Revision,
+		OperationID:  arg.OperationID,
+		ActorID:      arg.ActorID,
+		BaseRevision: arg.BaseRevision,
+		Kind:         arg.Kind,
+		BlockID:      arg.BlockID,
+		Payload:      arg.Payload,
+	}
+	r.operations[uuid.UUID(arg.OperationID.Bytes)] = operation
+	r.insertions++
+	return operation, nil
+}
+
+func (r *serializedOperationRepository) UpdateNoteDocument(_ context.Context, arg UpdateNoteDocumentParams) error {
+	r.document = arg.Document
+	r.revision = arg.Revision
+	return nil
+}
+
+func (r *serializedOperationRepository) WithTx(_ pgx.Tx) Repository { return r }
+
+type serializedOperationRunner struct {
+	repo *serializedOperationRepository
+}
+
+func (r serializedOperationRunner) InTx(ctx context.Context, repo Repository, fn func(Repository) error) error {
+	r.repo.mu.Lock()
+	defer r.repo.mu.Unlock()
+	return fn(repo)
+}
+
+func TestSyncOperationsConcurrentReplayPersistsOneMutation(t *testing.T) {
+	document, err := json.Marshal(NewEmptyDocument())
+	require.NoError(t, err)
+	repo := &serializedOperationRepository{
+		mockRepository: &mockRepository{},
+		document:       document,
+		operations:     make(map[uuid.UUID]Operation),
+	}
+	service := NewServiceWithTransactionRunner(repo, serializedOperationRunner{repo: repo})
+	noteID := mustParseUUID("550e8400-e29b-41d4-a716-446655440001")
+	userID := mustParseUUID("550e8400-e29b-41d4-a716-446655440002")
+	operationID := "550e8400-e29b-41d4-a716-446655440003"
+	blockID := "shopping-list-item-" + operationID
+	payload, err := json.Marshal(CreateBlockPayload{
+		ID: blockID, Type: string(BlockTask), Delta: []delta.Op{{Insert: []rune("café")}},
+	})
+	require.NoError(t, err)
+	request := SyncRequest{Operations: []OperationRequest{{
+		OperationID: operationID,
+		Kind:        string(KindCreateBlock),
+		BlockID:     &blockID,
+		Payload:     payload,
+	}}}
+
+	responses := make(chan SyncResponse, 2)
+	errors := make(chan error, 2)
+	var waitGroup sync.WaitGroup
+	for range 2 {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			response, syncErr := service.SyncOperations(context.Background(), noteID, userID, request)
+			responses <- response
+			errors <- syncErr
+		}()
+	}
+	waitGroup.Wait()
+	close(responses)
+	close(errors)
+
+	for syncErr := range errors {
+		require.NoError(t, syncErr)
+	}
+	for response := range responses {
+		require.Len(t, response.Accepted, 1)
+		assert.Equal(t, int64(1), response.Accepted[0].Revision)
+	}
+	assert.Equal(t, 1, repo.insertions)
+	assert.Equal(t, int64(1), repo.revision)
+	assert.Len(t, repo.operations, 1)
 }

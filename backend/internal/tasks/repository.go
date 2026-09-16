@@ -13,15 +13,86 @@ type Repository interface {
 	WithTx(context.Context, func(Repository) error) error
 	WithReadTx(context.Context, func(Repository) error) error
 	WithQuerier(sqlcgen.Querier) Repository
-	ListTasks(context.Context, pgtype.UUID) ([]sqlcgen.Task, error)
-	GetTask(context.Context, pgtype.UUID, pgtype.UUID) (sqlcgen.Task, error)
-	LockTask(context.Context, pgtype.UUID, pgtype.UUID) (sqlcgen.Task, error)
-	GetOperation(context.Context, pgtype.UUID, pgtype.UUID) (sqlcgen.TaskOperation, error)
-	InsertTask(context.Context, sqlcgen.InsertTaskParams) (sqlcgen.Task, error)
-	UpdateTask(context.Context, sqlcgen.UpdateTaskParams) (sqlcgen.Task, error)
-	InsertOperation(context.Context, sqlcgen.InsertTaskOperationParams) error
-	InsertChange(context.Context, sqlcgen.InsertTaskSyncChangeParams) error
+	ListTasks(context.Context, pgtype.UUID) ([]taskRow, error)
+	GetTask(context.Context, pgtype.UUID, pgtype.UUID) (taskRow, error)
+	LockTask(context.Context, pgtype.UUID, pgtype.UUID) (taskRow, error)
+	GetOperation(context.Context, pgtype.UUID, pgtype.UUID) (taskOperationRow, error)
+	InsertTask(context.Context, taskInsert) (taskRow, error)
+	UpdateTask(context.Context, taskUpdate) (taskRow, error)
+	InsertOperation(context.Context, taskOperationInsert) error
+	InsertChange(context.Context, taskChange) error
 	Watermark(context.Context, pgtype.UUID) (int64, error)
+}
+
+// These types are the persistence boundary for the task domain. SQLC rows and
+// arguments are translated here so mutation/domain code does not depend on
+// generated database details.
+type taskRow struct {
+	ID                 pgtype.UUID
+	OwnerUserID        pgtype.UUID
+	Title              string
+	DueDate            pgtype.Timestamp
+	HasTime            bool
+	RecurrenceRule     pgtype.Text
+	Reminder           pgtype.Text
+	Completions        []byte
+	IsCompleted        bool
+	LastCompletedAt    pgtype.Timestamptz
+	Revision           int64
+	ScheduleGeneration int64
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+	DeletedAt          pgtype.Timestamptz
+}
+
+type taskOperationRow struct {
+	TaskID       pgtype.UUID
+	OperationID  pgtype.UUID
+	PayloadHash  string
+	ResponseJSON []byte
+}
+
+type taskInsert struct {
+	ID                 pgtype.UUID
+	OwnerUserID        pgtype.UUID
+	Title              string
+	DueDate            pgtype.Timestamp
+	HasTime            bool
+	RecurrenceRule     pgtype.Text
+	Reminder           pgtype.Text
+	Completions        []byte
+	IsCompleted        bool
+	LastCompletedAt    pgtype.Timestamptz
+	ScheduleGeneration int64
+}
+
+type taskUpdate struct {
+	ID                 pgtype.UUID
+	OwnerUserID        pgtype.UUID
+	Title              string
+	DueDate            pgtype.Timestamp
+	HasTime            bool
+	RecurrenceRule     pgtype.Text
+	Reminder           pgtype.Text
+	Completions        []byte
+	IsCompleted        bool
+	LastCompletedAt    pgtype.Timestamptz
+	ScheduleGeneration int64
+	DeletedAt          pgtype.Timestamptz
+}
+
+type taskOperationInsert struct {
+	TaskID       pgtype.UUID
+	OperationID  pgtype.UUID
+	PayloadHash  string
+	ResponseJSON []byte
+}
+
+type taskChange struct {
+	TargetUserID pgtype.UUID
+	Kind         string
+	TaskID       pgtype.UUID
+	Revision     int64
 }
 
 type repository struct {
@@ -57,30 +128,70 @@ func (r *repository) withTx(ctx context.Context, options pgx.TxOptions, fn func(
 func (r *repository) WithQuerier(q sqlcgen.Querier) Repository {
 	return &repository{q: q, pool: r.pool}
 }
-func (r *repository) ListTasks(c context.Context, id pgtype.UUID) ([]sqlcgen.Task, error) {
-	return r.q.ListTasksForBootstrap(c, id)
+func (r *repository) ListTasks(c context.Context, id pgtype.UUID) ([]taskRow, error) {
+	rows, err := r.q.ListTasksForBootstrap(c, id)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]taskRow, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, taskRowFromSQL(row))
+	}
+	return result, nil
 }
-func (r *repository) GetTask(c context.Context, id, user pgtype.UUID) (sqlcgen.Task, error) {
-	return r.q.GetTaskForOwner(c, sqlcgen.GetTaskForOwnerParams{ID: id, OwnerUserID: user})
+func (r *repository) GetTask(c context.Context, id, user pgtype.UUID) (taskRow, error) {
+	row, err := r.q.GetTaskForOwner(c, sqlcgen.GetTaskForOwnerParams{ID: id, OwnerUserID: user})
+	return taskRowFromSQL(row), err
 }
-func (r *repository) LockTask(c context.Context, id, user pgtype.UUID) (sqlcgen.Task, error) {
-	return r.q.LockTaskForOwner(c, sqlcgen.LockTaskForOwnerParams{ID: id, OwnerUserID: user})
+func (r *repository) LockTask(c context.Context, id, user pgtype.UUID) (taskRow, error) {
+	row, err := r.q.LockTaskForOwner(c, sqlcgen.LockTaskForOwnerParams{ID: id, OwnerUserID: user})
+	return taskRowFromSQL(row), err
 }
-func (r *repository) GetOperation(c context.Context, taskID, operationID pgtype.UUID) (sqlcgen.TaskOperation, error) {
-	return r.q.GetTaskOperation(c, sqlcgen.GetTaskOperationParams{TaskID: taskID, OperationID: operationID})
+func (r *repository) GetOperation(c context.Context, taskID, operationID pgtype.UUID) (taskOperationRow, error) {
+	row, err := r.q.GetTaskOperation(c, sqlcgen.GetTaskOperationParams{TaskID: taskID, OperationID: operationID})
+	return taskOperationRow{TaskID: row.TaskID, OperationID: row.OperationID, PayloadHash: row.PayloadHash, ResponseJSON: row.ResponseJson}, err
 }
-func (r *repository) InsertTask(c context.Context, a sqlcgen.InsertTaskParams) (sqlcgen.Task, error) {
-	return r.q.InsertTask(c, a)
+func (r *repository) InsertTask(c context.Context, a taskInsert) (taskRow, error) {
+	row, err := r.q.InsertTask(c, sqlcgen.InsertTaskParams{
+		ID: a.ID, OwnerUserID: a.OwnerUserID, Title: a.Title, DueDate: a.DueDate,
+		HasTime: a.HasTime, RecurrenceRule: a.RecurrenceRule, Reminder: a.Reminder,
+		Completions: a.Completions, IsCompleted: a.IsCompleted,
+		LastCompletedAt: a.LastCompletedAt, ScheduleGeneration: a.ScheduleGeneration,
+	})
+	return taskRowFromSQL(row), err
 }
-func (r *repository) UpdateTask(c context.Context, a sqlcgen.UpdateTaskParams) (sqlcgen.Task, error) {
-	return r.q.UpdateTask(c, a)
+func (r *repository) UpdateTask(c context.Context, a taskUpdate) (taskRow, error) {
+	row, err := r.q.UpdateTask(c, sqlcgen.UpdateTaskParams{
+		ID: a.ID, OwnerUserID: a.OwnerUserID, Title: a.Title, DueDate: a.DueDate,
+		HasTime: a.HasTime, RecurrenceRule: a.RecurrenceRule, Reminder: a.Reminder,
+		Completions: a.Completions, IsCompleted: a.IsCompleted,
+		LastCompletedAt: a.LastCompletedAt, ScheduleGeneration: a.ScheduleGeneration,
+		DeletedAt: a.DeletedAt,
+	})
+	return taskRowFromSQL(row), err
 }
-func (r *repository) InsertOperation(c context.Context, a sqlcgen.InsertTaskOperationParams) error {
-	return r.q.InsertTaskOperation(c, a)
+func (r *repository) InsertOperation(c context.Context, a taskOperationInsert) error {
+	return r.q.InsertTaskOperation(c, sqlcgen.InsertTaskOperationParams{
+		TaskID: a.TaskID, OperationID: a.OperationID, PayloadHash: a.PayloadHash, ResponseJson: a.ResponseJSON,
+	})
 }
-func (r *repository) InsertChange(c context.Context, a sqlcgen.InsertTaskSyncChangeParams) error {
-	return r.q.InsertTaskSyncChange(c, a)
+func (r *repository) InsertChange(c context.Context, a taskChange) error {
+	return r.q.InsertTaskSyncChange(c, sqlcgen.InsertTaskSyncChangeParams{
+		TargetUserID: a.TargetUserID, Kind: a.Kind, TaskID: a.TaskID,
+		Revision: pgtype.Int8{Int64: a.Revision, Valid: true},
+	})
 }
 func (r *repository) Watermark(c context.Context, id pgtype.UUID) (int64, error) {
 	return r.q.GetTaskWatermark(c, id)
+}
+
+func taskRowFromSQL(row sqlcgen.Task) taskRow {
+	return taskRow{
+		ID: row.ID, OwnerUserID: row.OwnerUserID, Title: row.Title, DueDate: row.DueDate,
+		HasTime: row.HasTime, RecurrenceRule: row.RecurrenceRule, Reminder: row.Reminder,
+		Completions: row.Completions, IsCompleted: row.IsCompleted,
+		LastCompletedAt: row.LastCompletedAt, Revision: row.Revision,
+		ScheduleGeneration: row.ScheduleGeneration, CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt, DeletedAt: row.DeletedAt,
+	}
 }

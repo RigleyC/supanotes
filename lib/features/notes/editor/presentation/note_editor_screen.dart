@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
+import 'package:supanotes/features/notes/attachments/domain/attachment_upload.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
@@ -22,6 +24,7 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_shee
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:super_editor/super_editor.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -85,7 +88,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               return const Center(child: Text(NoteStrings.errorNotFound));
             }
             return sessionAsync.when(
-              loading: () => const SizedBox.shrink(),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, _) =>
                   const AppErrorView(title: NoteStrings.editorErrorTitle),
               data: (session) => _NoteEditorWithSession(
@@ -93,13 +96,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 blockId: widget.blockId,
                 note: note,
                 attachmentDelivery: widget.attachmentDelivery,
+                attachmentUploader: ref.read(attachmentsRepositoryProvider),
                 session: session,
                 taskForMetadata: _taskForMetadata,
                 readSession: _readSession,
               ),
             );
           },
-          loading: () => const SizedBox.shrink(),
+          loading: () => const Center(child: CircularProgressIndicator()),
           error: (_, _) =>
               const AppErrorView(title: NoteStrings.editorErrorTitle),
         ),
@@ -192,62 +196,44 @@ class _NoteEditorMenuButton extends ConsumerWidget {
     }
   }
 
-  List<AdaptivePopupMenuItem<String>> _buildItems(bool isIos) {
-    return [
-      if (note.isOwner) _shareItem(isIos),
-      _completedTasksItem(isIos),
-      if (note.isOwner) _collapseImagesItem(isIos),
-    ];
-  }
-
-  AdaptivePopupMenuItem<String> _shareItem(bool isIos) {
-    return AdaptivePopupMenuItem<String>(
-      label: NoteStrings.shareLabel,
-      icon: isIos ? 'square.and.arrow.up' : Icons.share_outlined,
-      value: 'share',
-    );
-  }
-
-  AdaptivePopupMenuItem<String> _completedTasksItem(bool isIos) {
-    return AdaptivePopupMenuItem<String>(
-      label: note.hideCompleted
-          ? NoteStrings.showCompleted
-          : NoteStrings.hideCompleted,
-      icon: isIos
-          ? (note.hideCompleted ? 'eye' : 'eye.slash')
-          : (note.hideCompleted
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined),
-      value: 'hide_completed',
-    );
-  }
-
-  AdaptivePopupMenuItem<String> _collapseImagesItem(bool isIos) {
-    return AdaptivePopupMenuItem<String>(
-      label: note.collapseImages ? 'Expandir imagens' : 'Colapsar imagens',
-      icon: isIos ? 'photo' : Icons.image_outlined,
-      value: 'collapse_images',
-    );
-  }
-
-  void _onSelected(
-    BuildContext context,
-    WidgetRef ref,
-    AdaptivePopupMenuItem<String> entry,
-  ) {
-    final value = entry.value;
-    if (value != null) {
-      _handleSelection(context, ref, value);
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isIos = PlatformInfo.isIOS26OrHigher();
     return AdaptivePopupMenuButton.icon<String>(
       icon: isIos ? 'ellipsis' : Icons.more_vert,
-      items: _buildItems(isIos),
-      onSelected: (_, entry) => _onSelected(context, ref, entry),
+      items: [
+        if (note.isOwner)
+          AdaptivePopupMenuItem<String>(
+            label: NoteStrings.shareLabel,
+            icon: isIos ? 'square.and.arrow.up' : Icons.share_outlined,
+            value: 'share',
+          ),
+        AdaptivePopupMenuItem<String>(
+          label: note.hideCompleted
+              ? NoteStrings.showCompleted
+              : NoteStrings.hideCompleted,
+          icon: isIos
+              ? (note.hideCompleted ? 'eye' : 'eye.slash')
+              : (note.hideCompleted
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined),
+          value: 'hide_completed',
+        ),
+        if (note.isOwner)
+          AdaptivePopupMenuItem<String>(
+            label: note.collapseImages
+                ? 'Expandir imagens'
+                : 'Colapsar imagens',
+            icon: isIos ? 'photo' : Icons.image_outlined,
+            value: 'collapse_images',
+          ),
+      ],
+      onSelected: (_, entry) {
+        final value = entry.value;
+        if (value != null) {
+          unawaited(_handleSelection(context, ref, value));
+        }
+      },
     );
   }
 }
@@ -293,11 +279,14 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
           if (!session.controller.focusNode.hasFocus) {
             return const SizedBox.shrink();
           }
-          return IconButton(
+          return AppIconButton(
             icon: const Icon(Icons.check),
+            tooltip: 'Remover foco',
             onPressed: () {
               session.controller.focusNode.unfocus();
-              SystemChannels.textInput.invokeMethod('TextInput.hide');
+              unawaited(
+                SystemChannels.textInput.invokeMethod<void>('TextInput.hide'),
+              );
             },
           );
         },
@@ -308,12 +297,13 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
   }
 }
 
-class _NoteEditorWithSession extends ConsumerStatefulWidget {
+class _NoteEditorWithSession extends StatefulWidget {
   const _NoteEditorWithSession({
     required this.noteId,
     required this.blockId,
     required this.note,
     required this.attachmentDelivery,
+    required this.attachmentUploader,
     required this.session,
     required this.taskForMetadata,
     required this.readSession,
@@ -323,19 +313,17 @@ class _NoteEditorWithSession extends ConsumerStatefulWidget {
   final String? blockId;
   final NoteModel note;
   final AttachmentDelivery? attachmentDelivery;
+  final AttachmentUploader attachmentUploader;
   final NoteEditorSession session;
   final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
 
   @override
-  ConsumerState<_NoteEditorWithSession> createState() =>
-      _NoteEditorWithSessionState();
+  State<_NoteEditorWithSession> createState() => _NoteEditorWithSessionState();
 }
 
-class _NoteEditorWithSessionState
-    extends ConsumerState<_NoteEditorWithSession> {
+class _NoteEditorWithSessionState extends State<_NoteEditorWithSession> {
   bool _targetMissing = false;
-  bool _targetSelected = false;
 
   @override
   void initState() {
@@ -349,7 +337,6 @@ class _NoteEditorWithSessionState
     if (oldWidget.blockId != widget.blockId ||
         oldWidget.session != widget.session) {
       _targetMissing = false;
-      _targetSelected = false;
       _resolveBlockTarget();
     }
   }
@@ -365,20 +352,28 @@ class _NoteEditorWithSessionState
       return;
     }
 
-    controller.composer.setSelectionWithReason(
-      DocumentSelection.collapsed(
-        position: DocumentPosition(
-          nodeId: blockId,
-          nodePosition: const TextNodePosition(offset: 0),
-        ),
-      ),
-    );
-    _targetSelected = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !identical(widget.session.controller, controller) ||
+          widget.blockId != blockId) {
+        return;
+      }
+      final currentNode = controller.document.getNodeById(blockId);
+      if (currentNode is TaskNode) {
+        controller.composer.setSelectionWithReason(
+          DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: blockId,
+              nodePosition: const TextNodePosition(offset: 0),
+            ),
+          ),
+        );
+      }
+    });
   }
 
   void _retryBlockTarget() {
     _targetMissing = false;
-    _targetSelected = false;
     _resolveBlockTarget();
     if (mounted) setState(() {});
   }
@@ -387,8 +382,6 @@ class _NoteEditorWithSessionState
   Widget build(BuildContext context) {
     final taskDelegate = _NoteEditorTaskDelegate(
       context: context,
-      ref: ref,
-      note: widget.note,
       taskForMetadata: widget.taskForMetadata,
       readSession: widget.readSession,
       isReadOnly: !widget.session.captureLocalOperations,
@@ -396,10 +389,11 @@ class _NoteEditorWithSessionState
     final editor = NoteEditor(
       noteId: widget.noteId,
       session: widget.session,
-      requestInitialFocus: widget.note.shouldAutofocus || _targetSelected,
+      requestInitialFocus: widget.note.shouldAutofocus,
       hideCompleted: widget.note.hideCompleted,
       collapseImages: widget.note.collapseImages,
       attachmentDelivery: widget.attachmentDelivery,
+      attachmentUploader: widget.attachmentUploader,
       delegate: taskDelegate.create(),
     );
     if (!_targetMissing) return editor;
@@ -427,16 +421,12 @@ class _NoteEditorWithSessionState
 class _NoteEditorTaskDelegate {
   const _NoteEditorTaskDelegate({
     required this.context,
-    required this.ref,
-    required this.note,
     required this.taskForMetadata,
     required this.readSession,
     required this.isReadOnly,
   });
 
   final BuildContext context;
-  final WidgetRef ref;
-  final NoteModel note;
   final TaskMetadataDraft? Function(String taskId) taskForMetadata;
   final AsyncValue<NoteEditorSession> Function() readSession;
   final bool isReadOnly;
@@ -453,13 +443,13 @@ class _NoteEditorTaskDelegate {
   Future<void> _onTaskLongPress(String taskId) async {
     final task = taskForMetadata(taskId);
     if (!context.mounted || task == null) return;
-    await showTaskMetadataSheet(
+    final updatedTask = await showTaskMetadataSheet(
       context: context,
-      ref: ref,
-      taskId: taskId,
       draft: task,
-      onSave: (draft) => _saveTaskMetadata(taskId, draft),
     );
+    if (context.mounted) {
+      await _saveTaskMetadata(taskId, updatedTask);
+    }
   }
 
   Future<void> _saveTaskMetadata(String taskId, TaskMetadataDraft draft) async {

@@ -1,11 +1,16 @@
 package shareintake
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -15,14 +20,40 @@ import (
 )
 
 var (
-	ErrInvalidShareID = errors.New("invalid share id")
-	ErrInvalidURL     = errors.New("url must be an absolute http or https URL")
+	ErrInvalidShareID   = errors.New("invalid share id")
+	ErrInvalidURL       = errors.New("url must be an absolute http or https URL")
+	ErrInvalidCreatedAt = errors.New("createdAt must be RFC3339")
 )
 
 type Request struct {
 	ShareID   string `json:"shareId" validate:"required,uuid"`
 	URL       string `json:"url" validate:"required,url"`
 	CreatedAt string `json:"createdAt,omitempty"`
+}
+
+func (r *Request) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return errors.New("share intake request must be a JSON object")
+	}
+	type requestAlias Request
+	var value requestAlias
+	decoder := json.NewDecoder(bytes.NewReader(trimmed))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&value); err != nil {
+		return fmt.Errorf("invalid share intake request: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return errors.New("invalid share intake request")
+	}
+	if value.CreatedAt != "" {
+		if _, err := time.Parse(time.RFC3339, value.CreatedAt); err != nil {
+			return ErrInvalidCreatedAt
+		}
+	}
+	*r = Request(value)
+	return nil
 }
 
 type AppendService interface {
@@ -53,6 +84,11 @@ func (s *Service) Append(
 	if _, err := uuid.Parse(req.ShareID); err != nil {
 		return noteoperations.AppendRichLinkResponse{}, ErrInvalidShareID
 	}
+	if req.CreatedAt != "" {
+		if _, err := time.Parse(time.RFC3339, req.CreatedAt); err != nil {
+			return noteoperations.AppendRichLinkResponse{}, ErrInvalidCreatedAt
+		}
+	}
 	parsed, err := validateURL(req.URL)
 	if err != nil {
 		return noteoperations.AppendRichLinkResponse{}, err
@@ -78,7 +114,7 @@ func (s *Service) Append(
 		metadata["previewStatus"] = "failed"
 		if ctx.Err() == nil {
 			slog.WarnContext(ctx, "link preview fetch failed; storing url metadata only",
-				"error", fetchErr, "url", parsed.String())
+				"error_type", fmt.Sprintf("%T", fetchErr))
 		}
 	}
 

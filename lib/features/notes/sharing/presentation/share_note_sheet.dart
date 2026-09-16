@@ -10,7 +10,6 @@ import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
 
 class ShareNoteSheet extends ConsumerStatefulWidget {
-
   const ShareNoteSheet({required this.noteId, super.key});
   final String noteId;
 
@@ -38,13 +37,10 @@ class _ShareNoteSheetState extends ConsumerState<ShareNoteSheet> {
 
     setState(() => _validationError = null);
 
-    await ref
+    final succeeded = await ref
         .read(shareNoteControllerProvider(widget.noteId).notifier)
         .share(email: email, permission: _permission);
 
-    final succeeded = ref
-        .read(shareNoteControllerProvider(widget.noteId))
-        .when(data: (_) => true, loading: () => false, error: (_, _) => false);
     if (succeeded && mounted) {
       ref.invalidate(shareListProvider(widget.noteId));
       _emailCtrl.clear();

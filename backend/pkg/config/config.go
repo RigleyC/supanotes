@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -23,6 +24,7 @@ type Config struct {
 	JWTAudience                   string
 	CORSOrigins                   []string
 	Environment                   string
+	EnableDebugEndpoints          bool
 	AlexaApplicationID            string
 	AlexaClientID                 string
 	AlexaClientSecret             string
@@ -46,7 +48,14 @@ func Load() (*Config, error) {
 
 	env := strings.ToLower(strings.TrimSpace(os.Getenv("ENVIRONMENT")))
 	if env == "" {
-		env = "dev"
+		return nil, fmt.Errorf("config: ENVIRONMENT is required; set ENVIRONMENT=dev for local development")
+	}
+	enableDebugEndpoints, err := parseBoolEnv("ENABLE_DEBUG_ENDPOINTS")
+	if err != nil {
+		return nil, err
+	}
+	if enableDebugEndpoints && env != "dev" {
+		return nil, fmt.Errorf("config: ENABLE_DEBUG_ENDPOINTS is only allowed with ENVIRONMENT=dev")
 	}
 
 	jwtSecret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
@@ -55,6 +64,9 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("config: JWT_SECRET is required outside dev")
 		}
 		jwtSecret = devJWTSecret
+	}
+	if len([]byte(jwtSecret)) < 32 {
+		return nil, fmt.Errorf("config: JWT_SECRET must contain at least 32 bytes")
 	}
 	jwtIssuer := firstNonEmpty(strings.TrimSpace(os.Getenv("JWT_ISSUER")), "supanotes-api")
 	jwtAudience := firstNonEmpty(strings.TrimSpace(os.Getenv("JWT_AUDIENCE")), "supanotes-client")
@@ -80,13 +92,22 @@ func Load() (*Config, error) {
 
 	corsOrigins := parseCORSOrigins(os.Getenv("CORS_ORIGINS"), env)
 
+	alexaApplicationID := strings.TrimSpace(os.Getenv("ALEXA_APPLICATION_ID"))
+	alexaClientID := strings.TrimSpace(os.Getenv("ALEXA_CLIENT_ID"))
+	alexaClientSecret := strings.TrimSpace(os.Getenv("ALEXA_CLIENT_SECRET"))
+	alexaRedirectURIs := parseList(os.Getenv("ALEXA_REDIRECT_URIS"))
+	if err := validateAlexaConfig(env, alexaApplicationID, alexaClientID, alexaClientSecret, alexaRedirectURIs); err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Port:                          port,
 		Environment:                   env,
-		AlexaApplicationID:            strings.TrimSpace(os.Getenv("ALEXA_APPLICATION_ID")),
-		AlexaClientID:                 strings.TrimSpace(os.Getenv("ALEXA_CLIENT_ID")),
-		AlexaClientSecret:             strings.TrimSpace(os.Getenv("ALEXA_CLIENT_SECRET")),
-		AlexaRedirectURIs:             parseList(os.Getenv("ALEXA_REDIRECT_URIS")),
+		EnableDebugEndpoints:          enableDebugEndpoints,
+		AlexaApplicationID:            alexaApplicationID,
+		AlexaClientID:                 alexaClientID,
+		AlexaClientSecret:             alexaClientSecret,
+		AlexaRedirectURIs:             alexaRedirectURIs,
 		DatabaseURL:                   os.Getenv("DATABASE_URL"),
 		JWTSecret:                     jwtSecret,
 		ShareLinkSecret:               shareLinkSecret,
@@ -106,6 +127,10 @@ func Load() (*Config, error) {
 
 func (c *Config) IsDev() bool {
 	return strings.EqualFold(c.Environment, "dev")
+}
+
+func (c *Config) AlexaConfigured() bool {
+	return c.AlexaApplicationID != "" && c.AlexaClientID != "" && c.AlexaClientSecret != "" && len(c.AlexaRedirectURIs) > 0
 }
 
 func defaultIfEmpty(s, def string) string {
@@ -133,6 +158,32 @@ func parseList(raw string) []string {
 		}
 	}
 	return result
+}
+
+func parseBoolEnv(name string) (bool, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return false, nil
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("config: %s must be a boolean", name)
+	}
+	return value, nil
+}
+
+func validateAlexaConfig(env, applicationID, clientID, clientSecret string, redirectURIs []string) error {
+	configured := applicationID != "" || clientID != "" || clientSecret != "" || len(redirectURIs) > 0
+	if !configured {
+		return nil
+	}
+	if applicationID == "" || clientID == "" || clientSecret == "" || len(redirectURIs) == 0 {
+		if env == "dev" {
+			return nil
+		}
+		return fmt.Errorf("config: Alexa configuration must include ALEXA_APPLICATION_ID, ALEXA_CLIENT_ID, ALEXA_CLIENT_SECRET and ALEXA_REDIRECT_URIS")
+	}
+	return nil
 }
 
 func (c *Config) Addr() string {

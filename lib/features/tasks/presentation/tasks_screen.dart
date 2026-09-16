@@ -14,9 +14,9 @@ import 'package:supanotes/features/tasks/presentation/task_editor_screen.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_list_tile.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_source_filter_menu.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
 
@@ -36,37 +36,30 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       taskListProvider(includeNoteTasks: _includeNoteTasks),
     );
     final bottomContentPadding =
-        MediaQuery.paddingOf(context).bottom +
-        (PlatformInfo.isIOS26OrHigher() ? AppSpacing.xxl : AppSpacing.lg);
+        MediaQuery.paddingOf(context).bottom + AppSpacing.lg;
+    final sourceFilterMenu = TaskSourceFilterMenu(
+      key: const ValueKey('task-source-filter-menu'),
+      includeNoteTasks: _includeNoteTasks,
+      onChanged: (value) => setState(() => _includeNoteTasks = value),
+    );
 
-    return AdaptiveScaffold(
-      appBar: AdaptiveAppBar(
-        useNativeToolbar: false,
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            TaskSourceFilterMenu(
-              key: const ValueKey('task-source-filter-menu'),
-              includeNoteTasks: _includeNoteTasks,
-              onChanged: (value) => setState(() => _includeNoteTasks = value),
+    return Scaffold(
+      appBar: PlatformInfo.isIOS
+          ? CupertinoNavigationBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: CupertinoTheme.of(context).barBackgroundColor,
+              border: null,
+              trailing: sourceFilterMenu,
+            )
+          : AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              actions: [sourceFilterMenu],
             ),
-          ],
-        ),
-        cupertinoNavigationBar: CupertinoNavigationBar(
-          backgroundColor: CupertinoTheme.of(context).barBackgroundColor,
-          border: null,
-          trailing: TaskSourceFilterMenu(
-            key: const ValueKey('task-source-filter-menu'),
-            includeNoteTasks: _includeNoteTasks,
-            onChanged: (value) => setState(() => _includeNoteTasks = value),
-          ),
-        ),
-      ),
       floatingActionButton: AppButton(
         variant: AppButtonVariant.fab,
-        onPressed: () => context.push(AppRoutes.standaloneTask),
+        onPressed: () => unawaited(showTaskEditorSheet(context: context)),
         icon: const Icon(Icons.add_rounded),
       ),
       body: CustomScrollView(
@@ -151,9 +144,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     if (item.isStandalone) {
       // Independent tasks use the standalone form in a modal from the list.
       // The route remains available for the primary action and deep links.
-      await showAppBottomSheet<void>(
+      await showTaskEditorSheet(
         context: context,
-        builder: (_) => TaskEditorScreen(taskId: item.task!.id),
+        taskId: item.task!.id,
       );
       return;
     }
@@ -182,9 +175,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       }
     } on Object catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Não foi possível concluir a task: $error')),
-      );
+      AppMessenger.showError('Não foi possível concluir a task: $error');
     }
   }
 }

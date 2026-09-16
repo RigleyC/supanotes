@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/preferences/application/note_preferences_mutation_controller.dart';
@@ -12,7 +14,9 @@ void main() {
     () async {
       final notes = _FakeNotesRepository(_note());
       final preferences = _FakePreferencesRepository(notes);
-      final controller = _controller(notes, preferences);
+      final harness = _controller(notes, preferences);
+      addTearDown(harness.container.dispose);
+      final controller = harness.controller;
       final firstWrite = Completer<void>();
 
       preferences.nextHideCompletedWrite = (_) async {
@@ -38,7 +42,10 @@ void main() {
       expect(notes.note.hideCompleted, isFalse);
 
       firstWrite.complete();
-      await first;
+      await expectLater(
+        first,
+        throwsA(isA<NotePreferenceMutationException>()),
+      );
 
       expect(notes.note.hideCompleted, isFalse);
       expect(controller.state.status, NotePreferenceMutationStatus.idle);
@@ -53,7 +60,9 @@ void main() {
         _note(),
       );
       final preferences = _FakePreferencesRepository(notes);
-      final controller = _controller(notes, preferences);
+      final harness = _controller(notes, preferences);
+      addTearDown(harness.container.dispose);
+      final controller = harness.controller;
 
       preferences.nextHideCompletedWrite = (_) async {
         notes.applyHideCompleted(true);
@@ -61,7 +70,10 @@ void main() {
       };
 
       await controller.setCollapseImages(current: notes.note, value: true);
-      await controller.setHideCompleted(current: notes.note, value: true);
+      await expectLater(
+        controller.setHideCompleted(current: notes.note, value: true),
+        throwsA(isA<NotePreferenceMutationException>()),
+      );
 
       expect(notes.note.hideCompleted, isFalse);
       expect(notes.note.collapseImages, isTrue);
@@ -74,14 +86,19 @@ void main() {
     () async {
       final notes = _FakeNotesRepository(_note());
       final preferences = _FakePreferencesRepository(notes);
-      final controller = _controller(notes, preferences);
+      final harness = _controller(notes, preferences);
+      addTearDown(harness.container.dispose);
+      final controller = harness.controller;
 
       preferences.nextHideCompletedWrite = (_) async {
         notes.applyHideCompleted(true);
         throw StateError('temporary failure');
       };
 
-      await controller.setHideCompleted(current: notes.note, value: true);
+      await expectLater(
+        controller.setHideCompleted(current: notes.note, value: true),
+        throwsA(isA<NotePreferenceMutationException>()),
+      );
       expect(controller.state.status, NotePreferenceMutationStatus.error);
       expect(notes.note.hideCompleted, isFalse);
 
@@ -100,7 +117,9 @@ void main() {
         _note(),
       );
       final preferences = _FakePreferencesRepository(notes);
-      final controller = _controller(notes, preferences);
+      final harness = _controller(notes, preferences);
+      addTearDown(harness.container.dispose);
+      final controller = harness.controller;
       final secondWrite = Completer<void>();
 
       preferences.nextHideCompletedWrite = (_) async {
@@ -116,29 +135,36 @@ void main() {
         value: true,
       );
 
-      await op1; // op1 fails immediately
+      await expectLater(op1, throwsA(isA<NotePreferenceMutationException>()));
       expect(controller.state.status, NotePreferenceMutationStatus.error);
-      expect(controller.state.inFlightCount, 1);
 
       secondWrite.complete();
       await op2; // op2 succeeds after op1 failed
 
       expect(controller.state.status, NotePreferenceMutationStatus.idle);
       expect(controller.state.error, isNull);
-      expect(controller.state.inFlightCount, 0);
     },
   );
 }
 
-NotePreferenceMutationController _controller(
+({
+  ProviderContainer container,
+  NotePreferenceMutationController controller,
+})
+_controller(
   _FakeNotesRepository notes,
   _FakePreferencesRepository preferences,
 ) {
-  return NotePreferenceMutationController(
-    userId: 'user-1',
-    notesRepository: notes,
-    preferencesRepository: preferences,
+  final container = ProviderContainer(
+    overrides: [
+      currentUserIdProvider.overrideWithValue('user-1'),
+      notesRepositoryProvider.overrideWithValue(notes),
+      userNotePreferencesRepositoryProvider.overrideWithValue(preferences),
+    ],
   );
+  final provider = notePreferenceMutationControllerProvider('note-1');
+  container.listen(provider, (_, _) {});
+  return (container: container, controller: container.read(provider.notifier));
 }
 
 NoteModel _note({bool hideCompleted = false, bool collapseImages = false}) {

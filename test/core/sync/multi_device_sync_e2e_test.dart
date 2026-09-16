@@ -93,24 +93,28 @@ NoteRemoteSyncCoordinator _buildCoordinator({
         revision: server.revision,
         document: server.document,
       ),
+      applyTasksInTransaction: () async {},
     ),
-    isNoteActive: (_) => false,
-    syncPending: (_) async {},
-    confirmedRevision: (_) async =>
-        (await database.noteOperationsDao
-                .watchNoteDocument('shared-note')
-                .first)
-            ?.revision,
-    pollAndReconcile: (_) async {
-      onPoll();
-      await _writeLocalSnapshot(
-        database,
-        revision: server.revision,
-        document: server.document,
-      );
-    },
-    hydrateRemote: (_) async {},
-    deleteLocal: database.deleteNoteData,
+    noteApplier: NoteRemoteSyncNoteApplier(
+      isActive: (_) => false,
+      syncPending: (_) async {},
+      confirmedRevision: (_) async =>
+          (await database.noteOperationsDao
+                  .watchNoteDocument('shared-note')
+                  .first)
+              ?.revision,
+      pollAndReconcile: (_) async {
+        onPoll();
+        await _writeLocalSnapshot(
+          database,
+          revision: server.revision,
+          document: server.document,
+        );
+      },
+      hydrateRemote: (_) async {},
+      deleteLocal: database.deleteNoteData,
+    ),
+    taskApplier: const DisabledNoteRemoteSyncTaskApplier(),
   );
 }
 

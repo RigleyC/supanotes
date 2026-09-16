@@ -1,6 +1,7 @@
 package noteoperations
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 	"unicode/utf16"
@@ -120,6 +121,20 @@ type OperationsListResponse struct {
 	Operations []Operation     `json:"operations"`
 	Document   json.RawMessage `json:"document,omitempty"`
 	Revision   int64           `json:"revision,omitempty"`
+}
+
+func operationIdentityMatches(request OperationRequest, stored Operation) bool {
+	if stored.Kind != request.Kind || stored.BaseRevision != request.BaseRevision {
+		return false
+	}
+	if request.BlockID == nil {
+		if stored.BlockID.Valid {
+			return false
+		}
+	} else if !stored.BlockID.Valid || stored.BlockID.String != *request.BlockID {
+		return false
+	}
+	return bytes.Equal(stored.Payload, request.Payload)
 }
 
 func parseDeltaFromPayload(payload json.RawMessage) (*delta.Delta, error) {

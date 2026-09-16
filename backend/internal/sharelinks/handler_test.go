@@ -1,7 +1,10 @@
 package sharelinks
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPublicRendersCurrentDocumentWithSecurityHeaders(t *testing.T) {
@@ -129,4 +133,44 @@ func TestPublicDocumentUsesJSONErrorsForAPIRequests(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"error":"share link not found"`) {
 		t.Fatalf("response is not a JSON API error: %s", rec.Body.String())
 	}
+}
+
+func TestActivateRequestRejectsUnknownFieldsAndInvalidTypes(t *testing.T) {
+	var req activateRequest
+	err := json.Unmarshal([]byte(`{"replace":"yes"}`), &req)
+	if err == nil {
+		t.Fatal("expected invalid boolean to be rejected")
+	}
+	err = json.Unmarshal([]byte(`{"replace":true,"token":"secret"}`), &req)
+	if err == nil {
+		t.Fatal("expected unknown field to be rejected")
+	}
+}
+
+func TestPublicFailureDoesNotLogTokenOrRepositoryDetails(t *testing.T) {
+	signer := NewTokenSigner("secret")
+	token, err := signer.Sign(uuid.New())
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	defer slog.SetDefault(previous)
+
+	secret := "https://example.test/s/" + token
+	h := NewHandler(NewService(&fakeRepository{publicErr: errors.New("database failed for " + secret)}, signer, "https://notes.example"))
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/s/"+token, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/s/:token")
+	c.SetParamNames("token")
+	c.SetParamValues(token)
+
+	if err := h.Public(c); err != nil {
+		t.Fatalf("public: %v", err)
+	}
+	assert.NotContains(t, logs.String(), token)
+	assert.NotContains(t, logs.String(), "database failed")
 }

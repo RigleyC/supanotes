@@ -1,19 +1,25 @@
 enum AttachmentDeliveryPreference { localFirst, externalFirst }
 
 final class AttachmentReference {
-  const AttachmentReference({required this.id, required this.fileName});
+  const AttachmentReference({
+    required this.id,
+    required this.fileName,
+    this.downloadUrl,
+  });
 
   final String id;
   final String fileName;
+  final String? downloadUrl;
 
   @override
   bool operator ==(Object other) =>
       other is AttachmentReference &&
       other.id == id &&
-      other.fileName == fileName;
+      other.fileName == fileName &&
+      other.downloadUrl == downloadUrl;
 
   @override
-  int get hashCode => Object.hash(id, fileName);
+  int get hashCode => Object.hash(id, fileName, downloadUrl);
 }
 
 /// Resolves a download URL for an attachment that is not present locally.

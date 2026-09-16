@@ -55,8 +55,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             ShareLinkAccessScreen(token: state.pathParameters['token']!),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (_, _, navigationShell) => AppNavigationShell(
+        builder: (_, state, navigationShell) => AppNavigationShell(
           navigationShell: navigationShell,
+          showNavigationBar:
+              state.uri.path == AppRoutes.tasks ||
+              state.uri.path == AppRoutes.notes,
         ),
         branches: [
           StatefulShellBranch(

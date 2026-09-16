@@ -137,22 +137,6 @@ func (d *Document) applyTextDelta(blockID string, payload json.RawMessage) error
 		}
 	}
 
-	if d.ensureMissingBlock(blockID) {
-		block := &d.Blocks[len(d.Blocks)-1]
-		currentOps, err := normalizeDocumentDelta(block.Delta, block.ID)
-		if err != nil {
-			return err
-		}
-		current := delta.New(opsToUTF16(currentOps))
-		result := current.Compose(*incoming)
-		normalized, err := normalizeDocumentDelta(result.Ops, block.ID)
-		if err != nil {
-			return err
-		}
-		block.Delta = opsFromUTF16(normalized)
-		return nil
-	}
-
 	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
 }
 
@@ -191,8 +175,7 @@ func (d *Document) applyCreateBlock(payload json.RawMessage) error {
 		}
 	}
 
-	d.Blocks = append(d.Blocks, newBlock)
-	return nil
+	return fmt.Errorf("%w: %s", ErrInvalidAnchor, p.AfterBlockID)
 }
 
 func (d *Document) applyDeleteBlock(blockID string) error {
@@ -202,7 +185,7 @@ func (d *Document) applyDeleteBlock(blockID string) error {
 			return nil
 		}
 	}
-	return nil
+	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
 }
 
 func (d *Document) applyMoveBlock(payload json.RawMessage) error {
@@ -211,20 +194,36 @@ func (d *Document) applyMoveBlock(payload json.RawMessage) error {
 		return fmt.Errorf("parse move block payload: %w", err)
 	}
 
-	var block Block
-	removed := false
+	if p.BlockID == p.AfterBlockID {
+		return fmt.Errorf("%w: block cannot be its own anchor", ErrInvalidAnchor)
+	}
+
+	sourceIndex := -1
 	for i, b := range d.Blocks {
 		if b.ID == p.BlockID {
-			block = b
-			d.Blocks = append(d.Blocks[:i], d.Blocks[i+1:]...)
-			removed = true
+			sourceIndex = i
 			break
 		}
 	}
-	if !removed {
-		return nil
+	if sourceIndex < 0 {
+		return fmt.Errorf("%w: %s", ErrBlockNotFound, p.BlockID)
 	}
 
+	if p.AfterBlockID != "" {
+		anchorFound := false
+		for _, b := range d.Blocks {
+			if b.ID == p.AfterBlockID {
+				anchorFound = true
+				break
+			}
+		}
+		if !anchorFound {
+			return fmt.Errorf("%w: %s", ErrInvalidAnchor, p.AfterBlockID)
+		}
+	}
+
+	block := d.Blocks[sourceIndex]
+	d.Blocks = append(d.Blocks[:sourceIndex], d.Blocks[sourceIndex+1:]...)
 	if p.AfterBlockID == "" {
 		d.Blocks = append([]Block{block}, d.Blocks...)
 		return nil
@@ -236,9 +235,7 @@ func (d *Document) applyMoveBlock(payload json.RawMessage) error {
 			return nil
 		}
 	}
-
-	d.Blocks = append(d.Blocks, block)
-	return nil
+	return fmt.Errorf("%w: %s", ErrInvalidAnchor, p.AfterBlockID)
 }
 
 type SetBlockMetadataPayload struct {
@@ -256,10 +253,6 @@ func (d *Document) applySetBlockType(blockID string, payload json.RawMessage) er
 			d.Blocks[i].Type = p.Type
 			return nil
 		}
-	}
-	if d.ensureMissingBlock(blockID) {
-		d.Blocks[len(d.Blocks)-1].Type = p.Type
-		return nil
 	}
 	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
 }
@@ -285,37 +278,7 @@ func (d *Document) applySetBlockMetadata(blockID string, payload json.RawMessage
 			return nil
 		}
 	}
-	if d.ensureMissingBlock(blockID) {
-		d.Blocks[len(d.Blocks)-1].Metadata = p.Metadata
-		return nil
-	}
 	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
-}
-
-// ensureMissingBlock recovers operations queued by clients that failed before
-// their create_block operation was persisted. It only supports mutations that
-// can safely initialize a blank block; delete and move remain strict.
-func (d *Document) ensureMissingBlock(blockID string) bool {
-	if blockID == "" {
-		return false
-	}
-	for _, block := range d.Blocks {
-		if block.ID == blockID {
-			return false
-		}
-	}
-	if len(d.Blocks) == 1 && d.Blocks[0].ID == InitialBlockID &&
-		deltaText(d.Blocks[0].Delta) == "" && len(d.Blocks[0].Metadata) == 0 {
-		d.Blocks[0].ID = blockID
-		return true
-	}
-	d.Blocks = append(d.Blocks, Block{
-		ID:       blockID,
-		Type:     string(BlockParagraph),
-		Delta:    plainTextDelta(""),
-		Metadata: make(map[string]any),
-	})
-	return true
 }
 
 func DeriveContentFromDocument(doc Document) (content, excerpt string) {
@@ -380,6 +343,44 @@ func formatBlockAsMarkdown(block Block, text string) string {
 }
 
 func UnmarshalDocument(data []byte) (Document, error) {
+	var envelope struct {
+		SchemaVersion *int              `json:"schemaVersion"`
+		Blocks        []json.RawMessage `json:"blocks"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return Document{}, err
+	}
+	if envelope.SchemaVersion == nil {
+		return Document{}, fmt.Errorf("missing schemaVersion")
+	}
+	if *envelope.SchemaVersion != 1 {
+		return Document{}, fmt.Errorf("unsupported schemaVersion %d", *envelope.SchemaVersion)
+	}
+	if len(envelope.Blocks) == 0 {
+		return Document{}, fmt.Errorf("document has no blocks")
+	}
+	if err := validateCanonicalBlocks(envelope.Blocks); err != nil {
+		return Document{}, err
+	}
+
+	var doc Document
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return Document{}, err
+	}
+	seen := make(map[string]struct{}, len(doc.Blocks))
+	for _, block := range doc.Blocks {
+		if _, exists := seen[block.ID]; exists {
+			return Document{}, fmt.Errorf("document contains duplicate block ids")
+		}
+		seen[block.ID] = struct{}{}
+	}
+	return doc, nil
+}
+
+// RepairDocument is reserved for explicit bootstrap or migration flows. REST/OT
+// mutation and delivery paths must use UnmarshalDocument and reject malformed
+// snapshots instead of repairing them implicitly.
+func RepairDocument(data []byte) (Document, error) {
 	var doc Document
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return Document{}, err

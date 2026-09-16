@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 
@@ -36,6 +37,36 @@ func TestUploadAllowsOwnerAndEditor(t *testing.T) {
 			require.Equal(t, 1, repo.insertCalls)
 		})
 	}
+}
+
+func TestUploadRejectsInvalidStorageResponseAndDoesNotPersistMetadata(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeAttachmentRepo{permission: "owner"}
+	storage := &fakeStorage{readUpload: true, invalidUploadResponse: true}
+	svc := NewService(repo, storage)
+
+	_, err := svc.Upload(context.Background(), testUUID(1), testUUID(2), "file.txt", bytes.NewReader([]byte("hello")), 5)
+
+	require.ErrorIs(t, err, ErrStorageInvalidObject)
+	require.Zero(t, repo.insertCalls)
+	require.Len(t, storage.deleteCalls, 1)
+}
+
+func TestUploadPropagatesReaderFailureAndCleansUpObject(t *testing.T) {
+	t.Parallel()
+
+	readErr := errors.New("source read failed")
+	repo := &fakeAttachmentRepo{permission: "owner"}
+	storage := &fakeStorage{readUpload: true}
+	svc := NewService(repo, storage)
+
+	_, err := svc.Upload(context.Background(), testUUID(1), testUUID(2), "file.txt", &errorReader{err: readErr}, 5)
+
+	require.ErrorIs(t, err, readErr)
+	require.ErrorIs(t, err, ErrUploadRead)
+	require.Zero(t, repo.insertCalls)
+	require.Len(t, storage.deleteCalls, 1)
 }
 
 func TestUploadRejectsViewNoAccessAndDeletedBeforeStorage(t *testing.T) {
@@ -124,6 +155,26 @@ func TestUploadDeletesObjectWhenMetadataInsertFails(t *testing.T) {
 	require.ErrorContains(t, err, "insert attachment metadata")
 	require.Equal(t, 1, storage.uploadCalls)
 	require.Equal(t, []string{"attachments/00000000-0000-0000-0000-000000000001"}, storage.deletedKeyPrefixes())
+	require.Empty(t, repo.pending, "successful immediate cleanup must acknowledge its durable intent")
+}
+
+func TestUploadKeepsOriginalFailureWhenCleanupAlsoFails(t *testing.T) {
+	t.Parallel()
+
+	insertErr := errors.New("insert failed")
+	repo := &fakeAttachmentRepo{permission: "owner", insertErr: insertErr}
+	storage := &fakeStorage{
+		readUpload: true,
+		deleteErrs: []error{errStorageDown, errStorageDown, errStorageDown},
+	}
+	svc := NewService(repo, storage)
+
+	_, err := svc.Upload(context.Background(), testUUID(1), testUUID(2), "file.txt", bytes.NewReader([]byte("hello")), 5)
+
+	require.ErrorIs(t, err, insertErr)
+	require.ErrorIs(t, err, ErrStorageDelete)
+	require.Len(t, storage.deleteCalls, storageDeleteAttempts)
+	require.Len(t, repo.pending, 1, "failed cleanup must remain retryable in the outbox")
 }
 
 func TestUploadRejectsDeclaredSizeMismatch(t *testing.T) {
@@ -156,11 +207,125 @@ func TestUploadRejectsContentLargerThanDeclaredSize(t *testing.T) {
 	require.Len(t, storage.deleteCalls, 1)
 }
 
+func TestDeleteDoesNotDeleteObjectStillReferencedByAnotherAttachment(t *testing.T) {
+	t.Parallel()
+
+	attachment := deliveryAttachment()
+	repo := &fakeAttachmentRepo{
+		attachment: attachment,
+		list: []sqlcgen.Attachment{
+			attachment,
+			{ID: testUUID(4), NoteID: attachment.NoteID, StorageKey: attachment.StorageKey},
+		},
+		permission: "owner",
+	}
+	storage := &fakeStorage{}
+	svc := NewService(repo, storage)
+
+	require.NoError(t, svc.Delete(context.Background(), testUUID(2), attachment.ID))
+	require.Empty(t, storage.deleteCalls)
+	require.Equal(t, 1, repo.deleteCalls)
+}
+
+func TestDeleteDoesNotTouchStorageWhenMetadataDeleteFails(t *testing.T) {
+	t.Parallel()
+
+	attachment := deliveryAttachment()
+	repo := &fakeAttachmentRepo{
+		attachment: attachment,
+		list:       []sqlcgen.Attachment{attachment},
+		permission: "owner",
+		deleteErr:  errors.New("database unavailable"),
+	}
+	storage := &fakeStorage{}
+	svc := NewService(repo, storage)
+
+	err := svc.Delete(context.Background(), testUUID(2), attachment.ID)
+
+	require.ErrorContains(t, err, "delete attachment metadata")
+	require.Empty(t, storage.deleteCalls)
+}
+
+func TestDeleteRetriesStorageFailure(t *testing.T) {
+	t.Parallel()
+
+	attachment := deliveryAttachment()
+	repo := &fakeAttachmentRepo{
+		attachment: attachment,
+		list:       []sqlcgen.Attachment{attachment},
+		permission: "edit",
+	}
+	storage := &fakeStorage{deleteErrs: []error{errStorageDown, nil}}
+	svc := NewService(repo, storage)
+
+	require.NoError(t, svc.Delete(context.Background(), testUUID(2), attachment.ID))
+	require.Len(t, storage.deleteCalls, 2)
+	require.Equal(t, 1, repo.deleteCalls)
+}
+
+func TestDeletePersistsIntentWhenStorageDeletionFails(t *testing.T) {
+	t.Parallel()
+
+	attachment := deliveryAttachment()
+	repo := &fakeAttachmentRepo{
+		attachment: attachment,
+		list:       []sqlcgen.Attachment{attachment},
+		permission: "owner",
+	}
+	storage := &fakeStorage{deleteErrs: []error{errStorageDown, errStorageDown, errStorageDown}}
+	svc := NewService(repo, storage)
+
+	err := svc.Delete(context.Background(), testUUID(2), attachment.ID)
+
+	require.ErrorIs(t, err, ErrStorageDelete)
+	require.Equal(t, 1, repo.deleteCalls)
+	require.Len(t, repo.pending, 1)
+
+	storage.deleteErrs = []error{nil}
+	require.NoError(t, svc.CleanupPending(context.Background()))
+	require.Empty(t, repo.pending)
+}
+
+func TestDeleteKeepsObjectWhenReferenceStillExists(t *testing.T) {
+	t.Parallel()
+
+	attachment := deliveryAttachment()
+	repo := &fakeAttachmentRepo{
+		attachment: attachment,
+		list:       nil,
+		permission: "owner",
+	}
+	repo.list = []sqlcgen.Attachment{attachment, {ID: testUUID(4), NoteID: attachment.NoteID, StorageKey: attachment.StorageKey}}
+	storage := &fakeStorage{}
+	svc := NewService(repo, storage)
+
+	require.NoError(t, svc.Delete(context.Background(), testUUID(2), attachment.ID))
+	require.Empty(t, storage.deleteCalls)
+	require.Empty(t, repo.pending)
+}
+
+func TestDeleteIsIdempotentAfterMetadataWasAlreadyRemoved(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeAttachmentRepo{getErr: pgx.ErrNoRows}
+	svc := NewService(repo, &fakeStorage{})
+
+	require.NoError(t, svc.Delete(context.Background(), testUUID(2), testUUID(3)))
+}
+
 type fakeAttachmentRepo struct {
 	permission  string
 	insertErr   error
 	insertCalls int
+	deleteErr   error
+	deleteCalls int
 	attachment  sqlcgen.Attachment
+	getErr      error
+	list        []sqlcgen.Attachment
+	listErr     error
+	enqueueErr  error
+	claimErr    error
+	pending     []sqlcgen.ClaimAttachmentDeletionRow
 }
 
 func (r *fakeAttachmentRepo) CheckNotePermission(_ context.Context, _ pgtype.UUID, _ pgtype.UUID) (string, error) {
@@ -187,22 +352,80 @@ func (r *fakeAttachmentRepo) Insert(_ context.Context, noteID pgtype.UUID, filen
 }
 
 func (r *fakeAttachmentRepo) ListByNote(context.Context, pgtype.UUID) ([]sqlcgen.Attachment, error) {
-	return nil, nil
+	return r.list, r.listErr
 }
 
 func (r *fakeAttachmentRepo) GetByID(context.Context, pgtype.UUID) (sqlcgen.Attachment, error) {
+	if r.getErr != nil {
+		return sqlcgen.Attachment{}, r.getErr
+	}
 	return r.attachment, nil
 }
 
-func (r *fakeAttachmentRepo) Delete(context.Context, pgtype.UUID) error {
+func (r *fakeAttachmentRepo) Delete(_ context.Context, id pgtype.UUID) error {
+	r.deleteCalls++
+	if r.deleteErr != nil {
+		return r.deleteErr
+	}
+	key := r.attachment.StorageKey
+	referenced := false
+	for _, candidate := range r.list {
+		if candidate.ID != id && candidate.StorageKey == key {
+			referenced = true
+		}
+	}
+	r.pending = append(r.pending, sqlcgen.ClaimAttachmentDeletionRow{
+		ID:         testUUID(byte(10 + len(r.pending))),
+		StorageKey: key,
+		Referenced: referenced,
+	})
+	return nil
+}
+
+func (r *fakeAttachmentRepo) EnqueueStorageDeletion(_ context.Context, key string) error {
+	if r.enqueueErr != nil {
+		return r.enqueueErr
+	}
+	r.pending = append(r.pending, sqlcgen.ClaimAttachmentDeletionRow{
+		ID:         testUUID(byte(10 + len(r.pending))),
+		StorageKey: key,
+	})
+	return nil
+}
+
+func (r *fakeAttachmentRepo) ClaimStorageDeletion(_ context.Context, key *string) (sqlcgen.ClaimAttachmentDeletionRow, error) {
+	if r.claimErr != nil {
+		return sqlcgen.ClaimAttachmentDeletionRow{}, r.claimErr
+	}
+	for _, deletion := range r.pending {
+		if key == nil || deletion.StorageKey == *key {
+			return deletion, nil
+		}
+	}
+	return sqlcgen.ClaimAttachmentDeletionRow{}, pgx.ErrNoRows
+}
+
+func (r *fakeAttachmentRepo) CompleteStorageDeletion(_ context.Context, id pgtype.UUID) error {
+	for i, deletion := range r.pending {
+		if deletion.ID == id {
+			r.pending = append(r.pending[:i], r.pending[i+1:]...)
+			return nil
+		}
+	}
+	return nil
+}
+
+func (r *fakeAttachmentRepo) RetryStorageDeletion(_ context.Context, _ pgtype.UUID, _ string) error {
 	return nil
 }
 
 type fakeStorage struct {
-	uploadCalls int
-	deleteCalls []string
-	readUpload  bool
-	openErr     error
+	uploadCalls           int
+	deleteCalls           []string
+	readUpload            bool
+	openErr               error
+	deleteErrs            []error
+	invalidUploadResponse bool
 }
 
 func (s *fakeStorage) Upload(_ context.Context, key string, r io.Reader, _ string, _ int64) (StoredObject, error) {
@@ -219,12 +442,20 @@ func (s *fakeStorage) Upload(_ context.Context, key string, r io.Reader, _ strin
 			}
 		}
 	}
+	if s.invalidUploadResponse {
+		return StoredObject{}, nil
+	}
 	return StoredObject{Key: key}, nil
 }
 
 func (s *fakeStorage) Delete(_ context.Context, key string) error {
 	s.deleteCalls = append(s.deleteCalls, key)
-	return nil
+	if len(s.deleteErrs) == 0 {
+		return nil
+	}
+	err := s.deleteErrs[0]
+	s.deleteErrs = s.deleteErrs[1:]
+	return err
 }
 
 func (s *fakeStorage) Open(_ context.Context, _ string) (io.ReadCloser, error) {
@@ -255,6 +486,14 @@ func (r *overLimitReader) Read(p []byte) (int, error) {
 	n := len(p)
 	r.read += int64(n)
 	return n, nil
+}
+
+type errorReader struct {
+	err error
+}
+
+func (r *errorReader) Read([]byte) (int, error) {
+	return 0, r.err
 }
 
 func testUUID(lastByte byte) pgtype.UUID {

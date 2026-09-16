@@ -68,9 +68,10 @@ func (h *Handler) ListOperations(c echo.Context) error {
 	}
 
 	afterRevision := int64(0)
-	if afterStr := c.QueryParam("afterRevision"); afterStr != "" {
+	if c.QueryParams().Has("afterRevision") {
+		afterStr := c.QueryParam("afterRevision")
 		parsed, err := strconv.ParseInt(afterStr, 10, 64)
-		if err != nil {
+		if err != nil || parsed < 0 {
 			return web.JSONError(c, http.StatusBadRequest, "invalid after_revision")
 		}
 		afterRevision = parsed
@@ -114,6 +115,10 @@ func (h *Handler) SyncOperations(c echo.Context) error {
 		}
 		if errors.Is(err, ErrNoPermission) {
 			return web.JSONError(c, http.StatusForbidden, "FORBIDDEN")
+		}
+		var conflictErr *OperationIDConflictError
+		if errors.As(err, &conflictErr) {
+			return web.JSONError(c, http.StatusConflict, "OPERATION_ID_CONFLICT")
 		}
 		if valErr, ok := err.(*ValidationError); ok {
 			return web.JSONError(c, http.StatusBadRequest, valErr.Code)

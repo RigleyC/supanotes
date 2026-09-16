@@ -43,21 +43,6 @@ type BootstrapResult struct {
 	Tasks     []Task `json:"tasks"`
 }
 
-type taskState struct {
-	id                   pgtype.UUID
-	owner                pgtype.UUID
-	title                string
-	dueDate              pgtype.Timestamp
-	hasTime              bool
-	recurrence, reminder pgtype.Text
-	completions          []byte
-	completed            bool
-	lastCompleted        pgtype.Timestamptz
-	revision, generation int64
-	created, updated     pgtype.Timestamptz
-	deleted              pgtype.Timestamptz
-}
-
 func formatTimestamp(v pgtype.Timestamptz) *string {
 	if !v.Valid {
 		return nil

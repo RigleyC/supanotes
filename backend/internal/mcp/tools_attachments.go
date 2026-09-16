@@ -6,10 +6,13 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/RigleyC/supanotes/internal/attachments"
 	"github.com/RigleyC/supanotes/internal/noteoperations"
+	"github.com/RigleyC/supanotes/pkg/uid"
 )
 
 func addAttachmentTools(server *mcp.Server, security SecurityStore, service attachments.Service, reader noteoperations.DocumentReader) {
@@ -21,7 +24,7 @@ func addAttachmentTools(server *mcp.Server, security SecurityStore, service atta
 			if service == nil {
 				return asError(fmt.Errorf("attachment service is not configured"))
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[attachmentUploadToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -29,14 +32,21 @@ func addAttachmentTools(server *mcp.Server, security SecurityStore, service atta
 			if err != nil {
 				return asError(err)
 			}
-			noteID, err := getUUID(args, "note_id")
+			noteIDValue, err := toolUUID(args.NoteID, "note_id")
 			if err != nil {
 				return asError(err)
 			}
-			filename := getStr(args, "filename")
-			encoded := getStr(args, "content_base64")
-			if filename == "" || encoded == "" {
-				return asError(fmt.Errorf("filename and content_base64 are required"))
+			noteID, err := uid.UUIDFromString(noteIDValue)
+			if err != nil {
+				return asError(err)
+			}
+			filename, err := requiredToolString(args.Filename, "filename")
+			if err != nil {
+				return asError(err)
+			}
+			encoded, err := requiredToolString(args.ContentBase64, "content_base64")
+			if err != nil {
+				return asError(err)
 			}
 			content, err := base64.StdEncoding.DecodeString(encoded)
 			if err != nil {
@@ -57,7 +67,7 @@ func addAttachmentTools(server *mcp.Server, security SecurityStore, service atta
 			if service == nil {
 				return asError(fmt.Errorf("attachment service is not configured"))
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[idToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -65,7 +75,11 @@ func addAttachmentTools(server *mcp.Server, security SecurityStore, service atta
 			if err != nil {
 				return asError(err)
 			}
-			noteID, err := getUUID(args, "id")
+			noteIDValue, err := toolUUID(args.ID, "id")
+			if err != nil {
+				return asError(err)
+			}
+			noteID, err := uid.UUIDFromString(noteIDValue)
 			if err != nil {
 				return asError(err)
 			}
@@ -90,7 +104,7 @@ func addAttachmentTools(server *mcp.Server, security SecurityStore, service atta
 			if service == nil {
 				return asError(fmt.Errorf("attachment service is not configured"))
 			}
-			args, err := parseArgs(request)
+			args, err := decodeToolArgs[attachmentDeleteToolArgs](request)
 			if err != nil {
 				return asError(err)
 			}
@@ -98,7 +112,11 @@ func addAttachmentTools(server *mcp.Server, security SecurityStore, service atta
 			if err != nil {
 				return asError(err)
 			}
-			attachmentID, err := getUUID(args, "attachment_id")
+			attachmentIDValue, err := toolUUID(args.AttachmentID, "attachment_id")
+			if err != nil {
+				return asError(err)
+			}
+			attachmentID, err := uid.UUIDFromString(attachmentIDValue)
 			if err != nil {
 				return asError(err)
 			}
@@ -106,11 +124,27 @@ func addAttachmentTools(server *mcp.Server, security SecurityStore, service atta
 			if err != nil {
 				return asError(err)
 			}
-			if err := service.Delete(ctx, userID, attachmentID); err != nil {
-				return asError(finishConfirmation(ctx, confirmationLease, err))
+			if replay, ok, replayErr := replayConfirmation(confirmationLease); replayErr != nil {
+				return asError(replayErr)
+			} else if ok {
+				return replay, nil
 			}
-			confirmationErr := finishConfirmation(ctx, confirmationLease, nil)
-			return asTextResultWithWarning("deleted", confirmationErr)
+			transactionalService, ok := service.(interface {
+				DeleteInTransaction(context.Context, pgx.Tx, pgtype.UUID, pgtype.UUID) error
+			})
+			if !ok {
+				return asError(fmt.Errorf("attachment service does not support confirmed deletion"))
+			}
+			result, err := finishConfirmationMutation(ctx, confirmationLease, func(ctx context.Context, tx pgx.Tx) (any, error) {
+				if err := transactionalService.DeleteInTransaction(ctx, tx, userID, attachmentID); err != nil {
+					return nil, err
+				}
+				return "deleted", nil
+			})
+			if err != nil {
+				return asError(err)
+			}
+			return asTextResult(result)
 		},
 	)
 }

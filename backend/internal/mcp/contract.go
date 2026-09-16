@@ -4,7 +4,6 @@ const (
 	toolListNotes              = "list_notes"
 	toolGetNote                = "get_note"
 	toolCreateNote             = "create_note"
-	toolUpdateNote             = "update_note"
 	toolDeleteNote             = "delete_note"
 	toolGetNoteDocument        = "get_note_document"
 	toolListNoteOperations     = "list_note_operations"
@@ -31,7 +30,7 @@ const (
 // CurrentToolNames is the MCP contract inventory for the current note product.
 // Keep this list limited to capabilities that exist in the retained app.
 var CurrentToolNames = []string{
-	toolListNotes, toolGetNote, toolCreateNote, toolUpdateNote, toolDeleteNote,
+	toolListNotes, toolGetNote, toolCreateNote, toolDeleteNote,
 	toolGetNoteDocument, toolListNoteOperations,
 	toolCreateBlock, toolUpdateBlockText, toolMoveBlock, toolDeleteBlock,
 	toolSetBlockType, toolSetBlockMetadata, toolCreateTaskBlock, toolUpdateTaskMetadata,
@@ -42,6 +41,7 @@ var CurrentToolNames = []string{
 }
 
 var removedToolNames = []string{
+	"update_note",
 	"list_memories",
 	"create_memory",
 	"delete_memory",
@@ -51,4 +51,18 @@ var removedToolNames = []string{
 	"remove_tag_from_note",
 	"get_soul",
 	"update_soul",
+}
+
+func toolRequiresWrite(name string) bool {
+	switch name {
+	case toolCreateNote, toolDeleteNote,
+		toolCreateBlock, toolUpdateBlockText, toolMoveBlock, toolDeleteBlock,
+		toolSetBlockType, toolSetBlockMetadata, toolCreateTaskBlock, toolUpdateTaskMetadata,
+		toolCompleteTaskOccurrence, toolReopenTaskOccurrence,
+		toolUploadAttachment, toolDeleteAttachment,
+		toolShareNote, toolRemoveNoteShare, toolUpdateUserSettings:
+		return true
+	default:
+		return false
+	}
 }
