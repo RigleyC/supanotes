@@ -55,36 +55,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   AsyncValue<NoteEditorSession> _readSession() =>
       ref.read(noteEditorSessionProvider(widget.noteId));
 
-  Widget _editorContent({
-    required AttachmentDelivery? attachmentDelivery,
-    required AsyncValue<NoteModel?> noteAsync,
-    required AsyncValue<NoteEditorSession> sessionAsync,
-  }) {
-    return noteAsync.when(
-      data: (note) {
-        if (note == null) {
-          return const Center(child: Text(NoteStrings.errorNotFound));
-        }
-        return sessionAsync.when(
-          loading: () => const SizedBox.shrink(),
-          error: (_, _) =>
-              const AppErrorView(title: NoteStrings.editorErrorTitle),
-          data: (session) => _NoteEditorWithSession(
-            noteId: widget.noteId,
-            blockId: widget.blockId,
-            note: note,
-            attachmentDelivery: attachmentDelivery,
-            session: session,
-            taskForMetadata: _taskForMetadata,
-            readSession: _readSession,
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const AppErrorView(title: NoteStrings.editorErrorTitle),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final noteAsync = ref.watch(noteProvider(widget.noteId));
@@ -109,10 +79,29 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           screenIsReadOnly: screenIsReadOnly,
           sessionAsync: sessionAsync,
         ),
-        body: _editorContent(
-          attachmentDelivery: widget.attachmentDelivery,
-          noteAsync: noteAsync,
-          sessionAsync: sessionAsync,
+        body: noteAsync.when(
+          data: (note) {
+            if (note == null) {
+              return const Center(child: Text(NoteStrings.errorNotFound));
+            }
+            return sessionAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) =>
+                  const AppErrorView(title: NoteStrings.editorErrorTitle),
+              data: (session) => _NoteEditorWithSession(
+                noteId: widget.noteId,
+                blockId: widget.blockId,
+                note: note,
+                attachmentDelivery: widget.attachmentDelivery,
+                session: session,
+                taskForMetadata: _taskForMetadata,
+                readSession: _readSession,
+              ),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) =>
+              const AppErrorView(title: NoteStrings.editorErrorTitle),
         ),
       ),
     );
