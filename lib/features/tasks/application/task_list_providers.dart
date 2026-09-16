@@ -401,9 +401,7 @@ Stream<List<TaskListItem>> _watchWithTemporalInvalidation({
 }
 
 DateTime? _nextTaskListBoundary(Iterable<TaskListItem> items, DateTime now) {
-  var next = DateTime(now.year, now.month, now.day).add(
-    const Duration(days: 1),
-  );
+  var next = DateTime(now.year, now.month, now.day + 1);
   for (final item in items) {
     final boundary = item.dueDate;
     if (boundary != null && boundary.isAfter(now) && boundary.isBefore(next)) {
