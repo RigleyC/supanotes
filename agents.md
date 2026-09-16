@@ -180,11 +180,29 @@ See `backend/.env.example` for all required variables.
 
 ## System Invariants & Avoidance Rules
 
-### REST/OT Document Snapshot as Single Source of Truth
+### Task ownership and source of truth
 
-The REST/OT canonical document snapshot (`notes.document` JSONB) is the single source of truth for note content and task metadata (dueDate, dueTime, recurrence, checked state).
+There are two task resources. They share occurrence and metadata semantics, but
+they do not share storage or authority:
 
-- **Task Projections**: `TaskProjectionEngine` projects task blocks from the canonical REST/OT document snapshot into the local Drift SQLite `tasks` table.
-- **UI Editing**: The Flutter UI writes block operations strictly through `NoteSyncSession` / `EditorOperationCapture` / `NoteOperationAdapter`.
-- **Relational Isolation**: Direct, non-projection writes to SQLite `tasks` table are strictly prohibited for task content and metadata changes. All task updates flow through document block operations first.
+- **Note task (`TaskNode`)**: lives in the canonical REST/OT document snapshot
+  (`notes.document` JSONB) and in the effective local note snapshot. Its text,
+  schedule, recurrence, reminder and checked/completion metadata are changed
+  only through note document operations.
+- **Independent task (`Task`)**: lives in the backend `tasks` table and has a
+  local-first copy in the Drift `tasks` table. `TaskRepository`, its durable
+  outbox and the `/api/v1/tasks` service own its mutations and sync.
+- The backend and local `tasks` tables contain independent tasks only. They are
+  not projections of `TaskNode`, and note document operations never write a
+  note task into either table. Conversely, an independent task is never copied
+  into a note document.
+- The global Tasks list may combine read adapters for both sources, but that
+  DTO is not persisted as a third task model and does not change ownership.
+
+For note tasks, the Flutter UI writes block operations strictly through
+`NoteSyncSession` / `EditorOperationCapture` / `NoteOperationAdapter`. For
+independent tasks, it writes through `TaskRepository` and the task outbox.
+References to `TaskProjectionEngine`, relational task projections, or direct
+task-table writes in older migration plans are historical evidence only; do
+not reintroduce that architecture into runtime code.
 

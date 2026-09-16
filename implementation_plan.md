@@ -2,8 +2,8 @@
 
 ## Tasks independentes e navegação Tasks/Notas
 
-Status: design revisado após parecer do Astra; plano detalhado escrito,
-aguardando escolha de execução.
+Status: Tasks 1–10 implementadas; documentação normativa e runbook da Task 11
+alinhados. A verificação integrada e o rollout seguro permanecem na Task 12.
 
 Design:
 `docs/superpowers/specs/2026-09-03-standalone-tasks-tabs-design.md`.
@@ -17,14 +17,36 @@ inclusão opcional e local das tasks dos documentos de notas na mesma lista;
 histórico de concluídas; colaboração entre pessoas fica para uma fase futura.
 
 O design também exige verificação atual, backup e encerramento explícito da
-retenção antes de remover as tabelas relacionais legadas. Com inventário vazio,
-o nome `tasks` será reutilizado para o novo contrato independente; dados antigos
-nunca serão convertidos automaticamente.
+retenção antes de remover as tabelas relacionais legadas. A migração reutiliza
+o nome `tasks` para o contrato independente depois de mover a relação antiga
+para quarentena; dados antigos, vazios ou não, nunca são convertidos
+automaticamente. A remoção física continua condicionada ao gate de retenção.
 
 O design revisado também cobre rollout compatível do feed (`scope=notes` por
 default e `scope=all` opt-in), bootstrap versionado, confirmação idempotente,
 conflitos por `scheduleGeneration`, quarentena SQLite, visibilidade de notas,
 identidade de notificações e invalidação temporal da lista.
+
+### Contrato atual de ownership
+
+- `TaskNode` vive no snapshot REST/OT da nota (`notes.document`) e no snapshot
+  efetivo local. Texto, agenda, recorrência, reminder e conclusão de uma task
+  de nota entram pelo fluxo de operações do documento.
+- `Task` é a task independente e vive na tabela PostgreSQL `tasks`. A tabela
+  Drift `tasks` é sua cópia local-first e `pending_task_operations` é sua
+  outbox. O repositório/API de tasks é o caminho de mutação dessa entidade.
+- A tabela `tasks` independente não é projeção de `TaskNode`, e `TaskNode` não
+  é projetado ou copiado para ela. Também não existe conversão automática no
+  sentido inverso. A aba Tasks apenas combina adaptadores de leitura locais.
+- `tasks_legacy_quarantine_v31`, `task_completions_legacy_quarantine_v31` e
+  os nomes equivalentes da quarentena SQLite são evidência de migração, não
+  fontes de runtime. Dados legados nunca são promovidos sem decisão explícita.
+
+As migrações PostgreSQL exigem backup restaurável, export protegido e gate de
+retenção antes de qualquer limpeza. A migração Drift 32→33 preserva restos
+locais por quarentena e pode bloquear apenas tasks independentes quando há
+linhas antigas. O feed mantém `scope=notes` como default para clientes antigos;
+clientes novos usam `scope=all` somente depois do bootstrap versionado.
 
 ## Per-note preference synchronization
 
@@ -212,7 +234,7 @@ Status: complete.
 - [x] Avoid unnecessary native endpoint rendering work.
 - [x] Add focused regression tests and run the full verification suite.
 
-## Task document-native migration
+## Historical: Task document-native migration
 
 Status: implementation, local verification, production backfill, and backend
 deployment are complete. Physical cleanup remains a separately approved
@@ -222,12 +244,19 @@ The approved design is in
 `docs/superpowers/specs/2026-08-12-task-document-native-design.md`.
 The migration plan is in
 `plans/005-task-document-native-migration.md`.
-The older incremental relational projection design is superseded and must not
-be executed independently.
+The section below records the note-only migration that preceded the
+independent-task resource. It remains applicable to `TaskNode` blocks, but is
+not the ownership model for the current independent `Task`. The older
+incremental relational projection design is historical evidence and must not
+be executed independently or reintroduced as a bridge between the two task
+sources.
 
 ### Decisions
 
-- `TaskNode` in the canonical note document is the only task model.
+- At the time of this note-only migration, `TaskNode` in the canonical note
+  document was the only task model. It remains the only model for note blocks;
+  the current independent task is the separate `Task` entity documented at the
+  top of this plan.
 - REST/OT owns task content and metadata. SQLite stores the local effective
   document for offline reads and notifications.
 - `dueDate` is the recurrence anchor. A completion is stored as
@@ -256,10 +285,11 @@ be executed independently.
    callbacks.
 3. [x] Persist the effective local note document after local operations and
    remote rebase/hydration.
-4. [x] Move notification reads to `TaskNode` and remove relational task
-   providers and projection writers.
-5. [x] Remove relational task REST/MCP runtime paths and unused backend task
-   services and queries.
+4. [x] Historical note-only step: move notification reads to `TaskNode` and
+   remove the former relational task providers and projection writers.
+5. [x] Historical note-only step: remove the former relational task REST/MCP
+   runtime paths and unused backend task services and queries. The current
+   independent-task API is a separate resource under `internal/tasks`.
 6. [x] Add and execute the production backup, export, isolated restore,
    read-only preflight, canonical backfill, and retention runbook. No
    production data is deleted by this change.
@@ -271,7 +301,8 @@ be executed independently.
 ### Data safety gates
 
 - [x] Take a restorable PostgreSQL backup before production rollout.
-- [x] Export `tasks` and `task_completions` before any physical cleanup.
+- [x] Historical release gate: export the then-legacy `tasks` and
+      `task_completions` relations before any physical cleanup.
 - [x] Run a read-only comparison between relational rows and task blocks in
       `notes.document`.
 - [x] Classify rows as corresponding, orphaned, or conflicting. Production
@@ -279,8 +310,10 @@ be executed independently.
       canonical data, not as missing legacy rows.
 - [x] Keep the legacy export under controlled retention until the canonical
       document path is confirmed in production.
-- [x] No automatic `DROP TABLE` migration was added. Physical cleanup is a
-      separate, approved operation after the retention period.
+- [x] No automatic `DROP TABLE` migration was added. Physical cleanup of
+      legacy/quarantined relations is a separate, approved operation after the
+      retention period; it must not remove the current independent `Task`
+      table.
 
 ## Haptic feedback defaults
 
