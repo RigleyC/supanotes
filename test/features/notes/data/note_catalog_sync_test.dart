@@ -4,14 +4,18 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
+import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
+import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
@@ -533,6 +537,174 @@ void main() {
       await sync.pullRemoteNotes('user-a');
 
       expect(await database.notesDao.getNoteById('remote-note'), isNull);
+    },
+  );
+
+  test(
+    'removes a revoked shared note cache and its task projection',
+    () async {
+      final database = AppDatabase.test();
+      final client = _MockNoteSyncClient();
+      final sync = NoteCatalogSync(
+        syncClient: client,
+        database: database,
+        activityTracker: NoteSessionActivityTracker(),
+        updateNoteIcon: _noopNoteIconUpdate,
+      );
+      addTearDown(database.close);
+
+      final updatedAt = DateTime.utc(2026, 9, 15, 12);
+      const document = {
+        'schemaVersion': 1,
+        'blocks': [
+          {
+            'id': 'revoked-task-block',
+            'type': 'task',
+            'delta': [
+              {'insert': 'Revoked shared task'},
+            ],
+            'metadata': {'isCompleted': false},
+          },
+        ],
+      };
+      final documentJson = jsonEncode(document);
+      Future<void> insertCachedNote({
+        required String id,
+        required String userId,
+        String? permission,
+      }) async {
+        await database.notesDao.createNote(
+          NotesCompanion.insert(
+            id: id,
+            userId: userId,
+            content: 'Note $id',
+            createdAt: updatedAt,
+            updatedAt: updatedAt,
+            isDirty: const Value(false),
+            hasRemoteCopy: const Value(true),
+            lifecycleState: const Value(materializedLifecycleState),
+            permission: Value(permission),
+          ),
+        );
+        await database.noteOperationsDao.upsertNoteDocument(
+          LocalNoteDocumentsCompanion.insert(
+            noteId: id,
+            revision: 3,
+            documentJson: documentJson,
+            updatedAt: updatedAt,
+            materializedDocumentJson: Value(documentJson),
+            materializedUpdatedAt: Value(updatedAt),
+          ),
+        );
+      }
+
+      await insertCachedNote(
+        id: 'revoked-shared-note',
+        userId: 'user-a',
+        permission: 'view',
+      );
+      await database.userNotePreferencesDao.applyRemotePreference(
+        userId: 'user-b',
+        noteId: 'revoked-shared-note',
+        favorite: false,
+        archived: false,
+        hideCompleted: false,
+        collapseImages: false,
+        remoteUpdatedAt: updatedAt,
+      );
+      await insertCachedNote(
+        id: 'active-shared-note',
+        userId: 'user-a',
+        permission: 'view',
+      );
+      await database.userNotePreferencesDao.applyRemotePreference(
+        userId: 'user-b',
+        noteId: 'active-shared-note',
+        favorite: false,
+        archived: false,
+        hideCompleted: false,
+        collapseImages: false,
+        remoteUpdatedAt: updatedAt,
+      );
+      await insertCachedNote(id: 'own-note', userId: 'user-b');
+
+      // The current account no longer appears in the catalog for the revoked
+      // note, while its own note and an active share remain present.
+      when(client.listNotes).thenAnswer(
+        (_) async => [
+          {
+            'id': 'active-shared-note',
+            'user_id': 'user-a',
+            'permission': 'view',
+            'created_at': updatedAt.toIso8601String(),
+            'updated_at': updatedAt.toIso8601String(),
+          },
+          {
+            'id': 'own-note',
+            'user_id': 'user-b',
+            'created_at': updatedAt.toIso8601String(),
+            'updated_at': updatedAt.toIso8601String(),
+          },
+        ],
+      );
+
+      await sync.pullRemoteNotes('user-b');
+
+      expect(
+        await database.notesDao.getNoteById('revoked-shared-note'),
+        isNull,
+      );
+      expect(
+        await database.userNotePreferencesDao.getPreference(
+          'user-b',
+          'revoked-shared-note',
+        ),
+        isNull,
+      );
+      expect(
+        await (database.select(database.localNoteDocuments)
+              ..where((row) => row.noteId.equals('revoked-shared-note')))
+            .getSingleOrNull(),
+        isNull,
+      );
+      expect(
+        await database.notesDao.getNoteById('active-shared-note'),
+        isNotNull,
+      );
+      expect(await database.notesDao.getNoteById('own-note'), isNotNull);
+
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          currentUserIdProvider.overrideWithValue('user-b'),
+        ],
+      );
+      addTearDown(container.dispose);
+      final visibleNotesSubscription = container.listen(
+        taskNotesVisibilityProvider,
+        (_, _) {},
+      );
+      final taskListSubscription = container.listen(
+        taskListProvider(includeNoteTasks: true),
+        (_, _) {},
+      );
+      addTearDown(() {
+        visibleNotesSubscription.close();
+        taskListSubscription.close();
+      });
+
+      expect(
+        (await container.read(
+          taskNotesVisibilityProvider.future,
+        )).map((note) => note.noteId),
+        unorderedEquals(['active-shared-note', 'own-note']),
+      );
+      expect(
+        (await container.read(
+          taskListProvider(includeNoteTasks: true).future,
+        )).where((item) => item.isNote).map((item) => item.note!.noteId),
+        unorderedEquals(['active-shared-note', 'own-note']),
+      );
     },
   );
 

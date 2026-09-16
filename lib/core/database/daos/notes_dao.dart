@@ -131,7 +131,20 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   NoteQueryResult? _queryResultFromRow(QueryRow row) {
     final id = row.read<String>('id');
     if (id.isEmpty) return null;
-    final note = NoteData(
+    final note = _noteFromRow(row);
+    return (
+      note: note,
+      title: deriveNoteTitle(row.read<String>('content')),
+      favorite: row.read<bool>('favorite'),
+      archived: row.read<bool>('archived'),
+      hideCompleted: row.read<bool>('hide_completed'),
+      collapseImages: row.read<bool>('collapse_images'),
+    );
+  }
+
+  NoteData _noteFromRow(QueryRow row) {
+    final id = row.read<String>('id');
+    return NoteData(
       id: id,
       userId: row.read<String>('user_id'),
       content: row.read<String>('content'),
@@ -147,14 +160,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       sharedByEmail: row.read<String?>('shared_by_email'),
       sharedByName: row.read<String?>('shared_by_name'),
       noteIconJson: row.read<String?>('note_icon_json'),
-    );
-    return (
-      note: note,
-      title: deriveNoteTitle(row.read<String>('content')),
-      favorite: row.read<bool>('favorite'),
-      archived: row.read<bool>('archived'),
-      hideCompleted: row.read<bool>('hide_completed'),
-      collapseImages: row.read<bool>('collapse_images'),
     );
   }
 
@@ -344,13 +349,25 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
         .get();
   }
 
-  /// Returns local rows that represent notes known to exist on the server.
-  /// Used by catalog reconciliation to remove notes deleted on another device.
+  /// Returns local rows associated with [userId] that are known to exist on
+  /// the server. Shared rows retain their owner's [Notes.userId], so the
+  /// preference join is also part of the account boundary. Catalog
+  /// reconciliation uses this to remove a shared row when its membership is
+  /// revoked, not only when the owner deletes the note.
   Future<List<NoteData>> getRemoteNotes(String userId) {
-    return (select(
-          notes,
-        )..where((t) => t.userId.equals(userId) & t.hasRemoteCopy.equals(true)))
-        .get();
+    return customSelect(
+      'SELECT n.* '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp '
+      'ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE n.has_remote_copy = 1 '
+      'AND (n.user_id = ? OR unp.note_id IS NOT NULL)',
+      variables: [
+        Variable.withString(userId),
+        Variable.withString(userId),
+      ],
+      readsFrom: {notes, userNotePreferences},
+    ).get().then((rows) => rows.map(_noteFromRow).toList());
   }
 
   /// Flips the dirty flag off only if the row's [updatedAt] still matches
