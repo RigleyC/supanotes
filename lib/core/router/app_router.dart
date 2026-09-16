@@ -15,6 +15,9 @@ import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.
 import 'package:supanotes/features/notes/sharing/presentation/share_link_access_screen.dart';
 import 'package:supanotes/features/settings/presentation/mcp_screen.dart';
 import 'package:supanotes/features/settings/presentation/settings_screen.dart';
+import 'package:supanotes/features/tasks/presentation/completed_tasks_screen.dart';
+import 'package:supanotes/features/tasks/presentation/task_editor_screen.dart';
+import 'package:supanotes/features/tasks/presentation/tasks_screen.dart';
 import 'package:supanotes/shared/widgets/app_navigation_shell.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
@@ -60,19 +63,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.tasks,
-                builder: (_, _) => const _TasksRoutePlaceholder(),
+                builder: (_, _) => const TasksScreen(),
                 routes: [
                   GoRoute(
                     path: 'completed',
-                    builder: (_, _) => const _CompletedTasksRoutePlaceholder(),
+                    builder: (_, _) => const CompletedTasksScreen(),
                   ),
                   GoRoute(
                     path: 'standalone',
-                    builder: (_, _) => const _StandaloneTaskRoutePlaceholder(),
+                    builder: (_, _) => const TaskEditorScreen(),
                   ),
                   GoRoute(
                     path: 'standalone/:id',
-                    builder: (_, state) => _StandaloneTaskRoutePlaceholder(
+                    builder: (_, state) => TaskEditorScreen(
                       taskId: state.pathParameters['id'],
                     ),
                   ),
@@ -117,40 +120,3 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   return router;
 });
-
-class _TasksRoutePlaceholder extends StatelessWidget {
-  const _TasksRoutePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('Tasks')),
-    );
-  }
-}
-
-class _CompletedTasksRoutePlaceholder extends StatelessWidget {
-  const _CompletedTasksRoutePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('Concluídas')),
-    );
-  }
-}
-
-class _StandaloneTaskRoutePlaceholder extends StatelessWidget {
-  const _StandaloneTaskRoutePlaceholder({this.taskId});
-
-  final String? taskId;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text(taskId == null ? 'Nova task' : 'Task $taskId'),
-      ),
-    );
-  }
-}
