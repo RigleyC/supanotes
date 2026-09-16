@@ -93,7 +93,7 @@ class NoteTaskReader {
 
   final DateTime Function()? clock;
 
-  List<TaskNotificationEntry> read(String documentJson) {
+  List<TaskNotificationEntry> read(String documentJson, {String? noteId}) {
     final policy = TaskOccurrencePolicy(clock: clock);
     final entries = <TaskNotificationEntry>[];
     for (final task in parseNoteTaskBlocks(documentJson)) {
@@ -120,6 +120,8 @@ class NoteTaskReader {
           dueDate: occurrence.scheduledAt,
           hasTime: task.hasTime,
           reminder: task.reminder,
+          source: TaskNotificationEntrySource.note,
+          noteId: noteId,
         ),
       );
     }
