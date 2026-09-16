@@ -33,7 +33,10 @@ class NoteTaskListReader {
       final isCompleted = parsed.recurrence == null
           ? parsed.isCompleted || occurrence?.isCompleted == true
           : occurrence?.isCompleted == true;
-      if (hideCompleted && isCompleted) continue;
+      // The open list never includes completed tasks. Completion history is
+      // projected separately from the canonical task metadata, so the
+      // per-note preference must not turn completed tasks back into open ones.
+      if (isCompleted) continue;
 
       result.add(
         NoteTask(

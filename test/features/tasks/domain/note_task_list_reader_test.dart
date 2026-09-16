@@ -75,7 +75,7 @@ void main() {
     expect(tasks.single.dueDate, isNull);
   });
 
-  test('can include completed blocks when the note preference allows them', () {
+  test('excludes completed blocks when hideCompleted is false', () {
     final tasks =
         const NoteTaskListReader(
           clock: _fixedNow,
@@ -83,13 +83,13 @@ void main() {
           noteId: 'note-1',
           noteTitle: 'Agenda',
           documentJson: _document([
+            _taskBlock(id: 'open', title: 'Em aberto'),
             _taskBlock(id: 'done', title: 'Concluída', isCompleted: true),
           ]),
           hideCompleted: false,
         );
 
-    expect(tasks, hasLength(1));
-    expect(tasks.single.isCompleted, isTrue);
+    expect(tasks.map((task) => task.blockId), ['open']);
   });
 }
 
