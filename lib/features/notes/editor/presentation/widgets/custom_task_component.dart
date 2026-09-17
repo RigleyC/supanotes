@@ -10,6 +10,7 @@ import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:super_editor/super_editor.dart';
 
 const double _taskCheckboxSize = 20;
@@ -257,14 +258,24 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       } else {
         widget.viewModel.setComplete?.call(newComplete);
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
       if (mounted) {
         setState(() {
           _isComplete = previousValue;
           _isAnimating = false;
         });
       }
-      rethrow;
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'supanotes note editor',
+          context: ErrorDescription('while changing note task completion'),
+        ),
+      );
+      if (mounted) {
+        AppMessenger.showError('Não foi possível atualizar a tarefa');
+      }
     } finally {
       if (mounted) {
         setState(() => _isUpdatingCompletion = false);

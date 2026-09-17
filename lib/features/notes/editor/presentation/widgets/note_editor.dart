@@ -18,6 +18,7 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:super_editor/super_editor.dart';
 
 class NoteEditor extends StatefulWidget {
@@ -171,6 +172,27 @@ class _NoteEditorState extends State<NoteEditor> {
 
   bool _isHiddenTask(TaskNode node) =>
       widget.hideCompleted && node.isComplete && !isRecurringTaskNode(node);
+
+  Future<void> _attachFile({bool imageOnly = false}) async {
+    try {
+      await _controller!.pickAndAttachFile(
+        uploader: widget.attachmentUploader,
+        imageOnly: imageOnly,
+      );
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'supanotes note editor',
+          context: ErrorDescription('while attaching a file to a note'),
+        ),
+      );
+      if (mounted) {
+        AppMessenger.showError('Não foi possível anexar o arquivo');
+      }
+    }
+  }
 
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
@@ -357,7 +379,6 @@ class _NoteEditorState extends State<NoteEditor> {
                   editor: controller.editor,
                   composer: controller.composer,
                   currentNoteId: widget.noteId,
-                  onPersist: () async {},
                 ),
               ],
             ),
@@ -365,13 +386,8 @@ class _NoteEditorState extends State<NoteEditor> {
           toolbarBuilder: (context, _) => NoteToolbar(
             editor: controller.editor,
             composer: controller.composer,
-            onAttachFile: () => controller.pickAndAttachFile(
-              uploader: widget.attachmentUploader,
-            ),
-            onAttachImage: () => controller.pickAndAttachFile(
-              uploader: widget.attachmentUploader,
-              imageOnly: true,
-            ),
+            onAttachFile: () => _attachFile(),
+            onAttachImage: () => _attachFile(imageOnly: true),
           ),
           keyboardPanelBuilder: (_, _) => const SizedBox.shrink(),
         );

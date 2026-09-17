@@ -6,20 +6,21 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_sugges
 import 'package:super_editor/super_editor.dart';
 
 final noteSuggestionsProvider = Provider.family
-    .autoDispose<List<NoteModel>, ({String query, String currentNoteId})>((
+    .autoDispose<AsyncValue<List<NoteModel>>, ({String query, String currentNoteId})>((
       ref,
       params,
     ) {
-      final notes = ref.watch(activeNotesProvider).asData?.value ?? [];
-      final lowercaseQuery = params.query.toLowerCase();
-      return notes
-          .where(
-            (n) =>
-                n.id != params.currentNoteId &&
-                n.title.toLowerCase().contains(lowercaseQuery),
-          )
-          .toList()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return ref.watch(activeNotesProvider).whenData((notes) {
+        final lowercaseQuery = params.query.toLowerCase();
+        return notes
+            .where(
+              (n) =>
+                  n.id != params.currentNoteId &&
+                  n.title.toLowerCase().contains(lowercaseQuery),
+            )
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      });
     });
 
 class NoteSuggestionOverlay extends ConsumerStatefulWidget {
@@ -27,13 +28,11 @@ class NoteSuggestionOverlay extends ConsumerStatefulWidget {
     required this.editor,
     required this.composer,
     required this.currentNoteId,
-    required this.onPersist,
     super.key,
   });
   final Editor editor;
   final DocumentComposer composer;
   final String currentNoteId;
-  final Future<void> Function() onPersist;
 
   @override
   ConsumerState<NoteSuggestionOverlay> createState() =>
@@ -128,7 +127,6 @@ class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
       tagStartOffset: match.tagStart,
       tagEndOffset: match.tagEnd,
       note: note,
-      onPersist: widget.onPersist,
     );
   }
 
@@ -137,44 +135,56 @@ class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
     final match = _match;
     if (match == null) return const SizedBox.shrink();
 
-    final suggestions = ref.watch(
+    final suggestionsState = ref.watch(
       noteSuggestionsProvider((
         query: match.query,
         currentNoteId: widget.currentNoteId,
       )),
     );
-    if (suggestions.isEmpty) return const SizedBox.shrink();
+    return suggestionsState.when(
+      data: (suggestions) {
+        if (suggestions.isEmpty) return const SizedBox.shrink();
 
-    final chips = suggestions.take(10).map((note) {
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: Material(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          child: InkWell(
-            onTap: () => _onNoteSelected(note),
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Text(
-                note.title,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
+        final chips = suggestions.take(10).map((note) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Material(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: () => _onNoteSelected(note),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    note.title,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      );
-    }).toList();
+          );
+        }).toList();
 
-    return SizedBox(
-      height: 44,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: chips.length,
-        itemBuilder: (_, i) => chips[i],
+        return SizedBox(
+          height: 44,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: chips.length,
+            itemBuilder: (_, i) => chips[i],
+          ),
+        );
+      },
+      loading: () => const SizedBox(height: 44),
+      error: (error, stackTrace) => const SizedBox(
+        height: 44,
+        child: Center(child: Text('Não foi possível carregar sugestões')),
       ),
     );
   }

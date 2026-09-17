@@ -39,6 +39,7 @@ class NoteEditorController extends ChangeNotifier {
   void Function()? _assertCanMutate;
   late final HiddenTaskEditingGuard _hiddenTaskEditingGuard;
   final String _noteId;
+  var _disposed = false;
 
   void attachMutationGuard(void Function() assertCanMutate) {
     _assertCanMutate = assertCanMutate;
@@ -194,6 +195,7 @@ class NoteEditorController extends ChangeNotifier {
           mimeType: mimeType,
         )
         .then((result) {
+          if (_disposed) return result;
           final node = document.getNodeById(id);
           if (node is DocumentAttachmentNode) {
             editor.execute([
@@ -211,7 +213,7 @@ class NoteEditorController extends ChangeNotifier {
           return result;
         })
         .catchError((Object error, StackTrace stackTrace) {
-          if (document.getNodeById(id) != null) {
+          if (!_disposed && document.getNodeById(id) != null) {
             try {
               _assertCanMutate?.call();
               editor.execute([DeleteNodeRequest(nodeId: id)]);
@@ -225,6 +227,7 @@ class NoteEditorController extends ChangeNotifier {
 
   @override
   Future<void> dispose() async {
+    _disposed = true;
     onHasContentChanged = null;
     document.removeListener(_clearSelectionIfHidden);
     editor.dispose();

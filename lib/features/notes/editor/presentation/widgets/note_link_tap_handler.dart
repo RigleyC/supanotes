@@ -46,8 +46,30 @@ class NoteLinkTapHandler extends ContentTapDelegate {
     if (webOnly && !_isWebUri(uri)) {
       return TapHandlingInstruction.continueHandling;
     }
-    unawaited(launchUrl(uri));
+    unawaited(_launchExternalUri(uri));
     return TapHandlingInstruction.halt;
+  }
+
+  Future<void> _launchExternalUri(Uri uri) async {
+    try {
+      if (await launchUrl(uri)) return;
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: StateError('Could not launch linked URI: $uri'),
+          library: 'supanotes note editor',
+          context: ErrorDescription('while opening an external note link'),
+        ),
+      );
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'supanotes note editor',
+          context: ErrorDescription('while opening an external note link'),
+        ),
+      );
+    }
   }
 
   bool _isWebUri(Uri uri) => uri.scheme == 'http' || uri.scheme == 'https';

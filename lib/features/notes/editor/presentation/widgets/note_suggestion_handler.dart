@@ -7,7 +7,6 @@ void applyNoteSuggestion({
   required int tagStartOffset,
   required int tagEndOffset,
   required NoteModel note,
-  required void Function() onPersist,
 }) {
   editor.execute([
     DeleteContentRequest(
@@ -44,5 +43,4 @@ void applyNoteSuggestion({
     ),
   ]);
 
-  onPersist();
 }

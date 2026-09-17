@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/di/providers.dart';
@@ -15,7 +16,10 @@ final _notePermissionProvider = FutureProvider.autoDispose
     );
 
 Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
-  final userId = ref.watch(currentUserIdProvider)!;
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) {
+    throw StateError('Cannot open a note editor without an authenticated user');
+  }
   final sessionCoordinator = ref.read(noteSessionCoordinatorProvider);
   final notesRepository = ref.watch(notesRepositoryProvider);
   final lifecycleStore = ref.watch(noteLifecycleStoreProvider);
@@ -28,10 +32,25 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
     await lifecycleStore.discardLocalDraft(noteId);
   }
 
+  Future<void> closeSessionAndReportErrors() async {
+    try {
+      await closeSession();
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'supanotes note editor',
+          context: ErrorDescription('while closing a note editor session'),
+        ),
+      );
+    }
+  }
+
   ref.onDispose(() {
     isDisposed = true;
     unawaited(permissionSubscription?.cancel());
-    unawaited(closeSession());
+    unawaited(closeSessionAndReportErrors());
   });
 
   final note = await ref.watch(_notePermissionProvider(noteId).future);
@@ -63,7 +82,7 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
   });
 
   if (isDisposed) {
-    unawaited(closeSession());
+    unawaited(closeSessionAndReportErrors());
     throw StateError('Provider disposed during session opening');
   }
 
