@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +7,7 @@ import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task_history_entry.dart';
 import 'package:supanotes/features/tasks/presentation/task_editor_screen.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/completed_tasks_tile.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_list_tile.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_source_filter_menu.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
@@ -37,24 +35,13 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
       onChanged: (value) => setState(() => _includeNoteTasks = value),
     );
     return Scaffold(
-      appBar:
-          defaultTargetPlatform == TargetPlatform.iOS ||
-              defaultTargetPlatform == TargetPlatform.macOS
-          ? CupertinoNavigationBar(
-              leading: CupertinoNavigationBarBackButton(
-                onPressed: () => context.pop(),
-              ),
-              backgroundColor: CupertinoTheme.of(context).barBackgroundColor,
-              border: null,
-              trailing: sourceFilterMenu,
-            )
-          : AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              actions: [sourceFilterMenu],
-            ),
       body: CustomScrollView(
         slivers: [
+          SliverAppBar.medium(
+            title: const Text('Concluídas'),
+            leading: BackButton(onPressed: context.pop),
+            actions: [sourceFilterMenu],
+          ),
           historyAsync.when(
             loading: () => const SliverFillRemaining(
               hasScrollBody: false,
@@ -97,8 +84,10 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
                     final entry = entries[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: CompletedTasksTile(
-                        entry: entry,
+                      child: TaskListTile(
+                        item: entry.task,
+                        checked: true,
+                        completedAt: entry.completedAt,
                         onTap: () => _openEntry(context, entry),
                       ),
                     );

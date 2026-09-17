@@ -119,7 +119,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.add_rounded));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Cancelar'));
+    await tester.tap(find.byTooltip('Fechar'));
     await tester.pumpAndSettle();
     expect(router.routerDelegate.currentConfiguration.uri.path, '/tasks');
   });
@@ -197,7 +197,7 @@ void main() {
     await tester.tap(find.text('standalone'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Cancelar'));
+    await tester.tap(find.byTooltip('Fechar'));
     await tester.pumpAndSettle();
     expect(router.routerDelegate.currentConfiguration.uri.path, '/tasks');
 

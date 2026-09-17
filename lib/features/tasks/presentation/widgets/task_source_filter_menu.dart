@@ -24,7 +24,12 @@ class TaskSourceFilterMenu extends StatelessWidget {
       icon: Icons.more_horiz,
       onSelected: (_) => onChanged(!includeNoteTasks),
       items: [
-        AppPopupMenuItem(label: label, value: 'toggle-note-tasks'),
+        AppPopupMenuItem(
+          label: label,
+          value: 'toggle-note-tasks',
+          appleSymbol: 'eye.slash',
+          materialIcon: Icons.visibility_off_outlined,
+        ),
       ],
     );
   }

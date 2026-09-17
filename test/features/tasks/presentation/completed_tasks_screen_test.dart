@@ -119,7 +119,7 @@ void main() {
     await tester.ensureVisible(standaloneFinder);
     await tester.tap(standaloneFinder);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancelar'));
+    await tester.tap(find.byTooltip('Fechar'));
     await tester.pumpAndSettle();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,

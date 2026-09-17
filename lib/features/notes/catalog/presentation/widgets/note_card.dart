@@ -81,11 +81,15 @@ class NoteCard extends StatelessWidget {
                       label: note.favorite ? 'Remover favorito' : 'Favoritar',
                       value: 'favorite',
                       appleSymbol: note.favorite ? 'star.fill' : 'star',
+                      materialIcon: note.favorite
+                          ? Icons.star
+                          : Icons.star_border,
                     ),
                     const AppPopupMenuItem(
                       label: 'Apagar',
                       value: 'delete',
                       appleSymbol: 'trash',
+                      materialIcon: Icons.delete_outline,
                       dividerBefore: true,
                       isDestructive: true,
                     ),

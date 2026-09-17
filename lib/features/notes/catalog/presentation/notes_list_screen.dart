@@ -96,7 +96,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         ],
       ),
       body: SafeArea(
-        minimum: const EdgeInsets.only(bottom: 32),
+        minimum: const EdgeInsets.only(bottom: 112),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -165,6 +165,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         onPressed: () => _openNewNote(context),
         icon: const Icon(Icons.add),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 

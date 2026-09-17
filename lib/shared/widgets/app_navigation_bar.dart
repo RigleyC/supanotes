@@ -1,6 +1,7 @@
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// A platform-native navigation bar with a single shared API.
 class AppNavigationBar extends StatelessWidget {
@@ -17,6 +18,7 @@ class AppNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedIndex = currentIndex.clamp(0, destinations.length - 1);
     final isApple =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
@@ -25,30 +27,51 @@ class AppNavigationBar extends StatelessWidget {
         items: [
           for (final destination in destinations)
             CNTabBarItem(
-              label: destination.label,
-              icon: CNSymbol(destination.appleIcon),
-              activeIcon: CNSymbol(destination.appleActiveIcon),
+              label: '',
+              imageAsset: CNImageAsset(destination.assetIcon, size: 24),
+              activeImageAsset: CNImageAsset(destination.assetIcon, size: 24),
             ),
         ],
         iconSize: 24,
-        currentIndex: currentIndex,
+        currentIndex: selectedIndex,
         onTap: onDestinationSelected,
-        autoHideOnModal: true,
-        autoHideOnPageTransition: true,
+        autoHideOnModal: false,
+        autoHideOnPageTransition: false,
       );
     }
 
     return NavigationBar(
-      selectedIndex: currentIndex,
+      selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
       destinations: [
         for (final destination in destinations)
           NavigationDestination(
-            icon: Icon(destination.icon),
-            selectedIcon: Icon(destination.selectedIcon),
+            icon: _AssetIcon(asset: destination.assetIcon),
+            selectedIcon: _AssetIcon(asset: destination.assetIcon),
             label: destination.label,
           ),
       ],
+    );
+  }
+}
+
+class _AssetIcon extends StatelessWidget {
+  const _AssetIcon({required this.asset});
+
+  final String asset;
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      asset,
+      width: 24,
+      height: 24,
+      colorFilter: ColorFilter.mode(
+        IconTheme.of(context).color ??
+            Theme.of(context).colorScheme.onSurfaceVariant,
+        BlendMode.srcIn,
+      ),
     );
   }
 }
@@ -57,15 +80,9 @@ class AppNavigationBar extends StatelessWidget {
 class AppNavigationDestination {
   const AppNavigationDestination({
     required this.label,
-    required this.icon,
-    required this.selectedIcon,
-    required this.appleIcon,
-    required this.appleActiveIcon,
+    required this.assetIcon,
   });
 
   final String label;
-  final IconData icon;
-  final IconData selectedIcon;
-  final String appleIcon;
-  final String appleActiveIcon;
+  final String assetIcon;
 }

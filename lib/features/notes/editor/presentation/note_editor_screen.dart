@@ -237,6 +237,7 @@ class _NoteEditorMenuButton extends ConsumerWidget {
             label: entry.label,
             value: entry.value,
             appleSymbol: entry.symbol,
+            materialIcon: entry.icon,
           ),
       ],
     );

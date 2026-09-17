@@ -83,6 +83,7 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
       builder: (context, state, _) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: AppSpacing.md,
         children: [
           AppTile(
             contentPadding: EdgeInsets.zero,
@@ -225,7 +226,6 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
               );
             },
           ),
-          const SizedBox(height: AppSpacing.sm),
         ],
       ),
     );

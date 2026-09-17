@@ -1,6 +1,7 @@
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 
 /// A platform-native popup menu with one API for every platform.
 class AppPopupMenu<T> extends StatelessWidget {
@@ -38,7 +39,7 @@ class AppPopupMenu<T> extends StatelessWidget {
               label: item.label,
               icon: item.appleSymbol == null
                   ? null
-                  : CNSymbol(item.appleSymbol!),
+                  : CNSymbol(item.appleSymbol!, size: 18),
               isDestructive: item.isDestructive,
             ),
           ],
@@ -58,14 +59,22 @@ class AppPopupMenu<T> extends StatelessWidget {
     }
 
     return PopupMenuButton<T>(
-      icon: Icon(icon, color: iconColor),
+      icon: Icon(icon, color: iconColor, size: 18),
       onSelected: onSelected,
       itemBuilder: (_) => [
         for (final item in items) ...[
           if (item.dividerBefore) const PopupMenuDivider(),
           PopupMenuItem<T>(
             value: item.value,
-            child: Text(item.label),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: AppSpacing.sm,
+              children: [
+                if (item.materialIcon != null)
+                  Icon(item.materialIcon, size: AppSpacing.iconSm),
+                Flexible(child: Text(item.label)),
+              ],
+            ),
           ),
         ],
       ],
@@ -79,6 +88,7 @@ class AppPopupMenuItem<T> {
     required this.label,
     required this.value,
     this.appleSymbol,
+    this.materialIcon,
     this.dividerBefore = false,
     this.isDestructive = false,
   });
@@ -86,6 +96,7 @@ class AppPopupMenuItem<T> {
   final String label;
   final T value;
   final String? appleSymbol;
+  final IconData? materialIcon;
   final bool dividerBefore;
   final bool isDestructive;
 }

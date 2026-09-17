@@ -12,8 +12,8 @@ import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_editor_form.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_editor_sheet.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
-import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 import 'package:uuid/uuid.dart';
 
@@ -78,31 +78,30 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
 
     if (widget.task != null) {
       _synchronizeTask(widget.task!);
-      return GlobalSheetPage(
-        title: 'Criar/Editar nota',
+      return TaskEditorSheet(
+        onCancel: context.pop,
+        onSave: () => _save(widget.task),
+        onDelete: () => _delete(widget.task!),
+        isSaving: saveView.isSaving,
         child: TaskEditorForm(
           titleController: _titleController,
           metadata: _metadata,
           onMetadataChanged: _onMetadataChanged,
-          onCancel: context.pop,
-          onSave: () => _save(widget.task),
-          onDelete: () => _delete(widget.task!),
-          isSaving: saveView.isSaving,
+          onSubmitted: () => unawaited(_save(widget.task)),
           errorText: saveView.errorText,
         ),
       );
     }
 
     if (_isNew) {
-      return GlobalSheetPage(
-        title: 'Criar/Editar nota',
+      return TaskEditorSheet(
+        onCancel: context.pop,
+        onSave: () => _save(null),
         child: TaskEditorForm(
           titleController: _titleController,
           metadata: _metadata,
           onMetadataChanged: _onMetadataChanged,
-          onCancel: context.pop,
-          onSave: () => _save(null),
-          isSaving: saveView.isSaving,
+          onSubmitted: () => unawaited(_save(null)),
           errorText: saveView.errorText,
         ),
       );
@@ -110,32 +109,45 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
 
     final taskId = widget.taskId!;
     final taskAsync = ref.watch(standaloneTaskProvider(taskId));
-    return GlobalSheetPage(
-      title: 'Criar/Editar nota',
-      child: taskAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => AppErrorView(
+    return taskAsync.when(
+      loading: () => TaskEditorSheet(
+        onCancel: context.pop,
+        onSave: () async {},
+        isSaving: true,
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, _) => TaskEditorSheet(
+        onCancel: context.pop,
+        onSave: () async {},
+        child: AppErrorView(
           title: 'Erro ao carregar a task',
           subtitle: error.toString(),
           onRetry: () => ref.invalidate(standaloneTaskProvider(taskId)),
         ),
-        data: (task) {
-          if (task == null) {
-            return const AppErrorView(title: 'Task não encontrada');
-          }
-          _synchronizeTask(task);
-          return TaskEditorForm(
+      ),
+      data: (task) {
+        if (task == null) {
+          return TaskEditorSheet(
+            onCancel: context.pop,
+            onSave: () async {},
+            child: const AppErrorView(title: 'Task não encontrada'),
+          );
+        }
+        _synchronizeTask(task);
+        return TaskEditorSheet(
+          onCancel: context.pop,
+          onSave: () => _save(task),
+          onDelete: () => _delete(task),
+          isSaving: saveView.isSaving,
+          child: TaskEditorForm(
             titleController: _titleController,
             metadata: _metadata,
             onMetadataChanged: _onMetadataChanged,
-            onCancel: context.pop,
-            onSave: () => _save(task),
-            onDelete: () => _delete(task),
-            isSaving: saveView.isSaving,
+            onSubmitted: () => unawaited(_save(task)),
             errorText: saveView.errorText,
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -223,14 +235,6 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   }
 
   Future<void> _delete(Task task) async {
-    final confirmed = await showConfirmDialog(
-      context: context,
-      title: 'Excluir task?',
-      message: 'Essa task será removida da sua lista.',
-      confirmLabel: 'Excluir',
-      destructive: true,
-    );
-    if (!confirmed || !mounted) return;
     setState(() => _saveState = const AsyncLoading());
     try {
       await ref.read(taskControllerProvider).delete(task.id);

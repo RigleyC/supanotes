@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
@@ -14,12 +15,16 @@ class TaskListTile extends StatefulWidget {
     required this.item,
     required this.onTap,
     this.onToggle,
+    this.checked = false,
+    this.completedAt,
     super.key,
   });
 
   final TaskListItem item;
   final VoidCallback onTap;
   final Future<void> Function()? onToggle;
+  final bool checked;
+  final DateTime? completedAt;
 
   @override
   State<TaskListTile> createState() => _TaskListTileState();
@@ -85,7 +90,7 @@ class _TaskListTileState extends State<TaskListTile> {
                   child: Center(
                     child: AppTaskCheckbox(
                       size: 20,
-                      value: _isCompleting,
+                      value: widget.checked || _isCompleting,
                       shape: AppTaskCheckboxShape.rounded,
                     ),
                   ),
@@ -115,6 +120,13 @@ class _TaskListTileState extends State<TaskListTile> {
                         hasReminder: reminder,
                         hasTime: item.hasTime,
                         now: DateTime.now(),
+                      ),
+                    if (widget.completedAt != null)
+                      Text(
+                        'Concluída em ${DateFormat('dd/MM/yyyy HH:mm').format(widget.completedAt!.toLocal())}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                   ],
                 ),

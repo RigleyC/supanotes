@@ -36,16 +36,21 @@ class NotesMoreMenu extends StatelessWidget {
           label: isListView ? 'Ver como galeria' : 'Ver como lista',
           value: 'toggleView',
           appleSymbol: isListView ? 'square.grid.2x2' : 'list.bullet',
+          materialIcon: isListView
+              ? Icons.grid_view_rounded
+              : Icons.list_rounded,
         ),
         const AppPopupMenuItem(
           label: 'Configurações',
           value: 'settings',
           appleSymbol: 'gear',
+          materialIcon: Icons.settings_outlined,
         ),
         const AppPopupMenuItem(
           label: 'Sair',
           value: 'logout',
           appleSymbol: 'rectangle.portrait.and.arrow.right',
+          materialIcon: Icons.logout,
           isDestructive: true,
         ),
       ],

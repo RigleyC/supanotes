@@ -41,7 +41,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField), 'Comprar café');
-    await tester.tap(find.text('Salvar'));
+    await tester.tap(find.byTooltip('Salvar'));
     await tester.pumpAndSettle();
 
     final created = verify(
@@ -79,7 +79,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField), 'Título atualizado');
-    await tester.tap(find.text('Salvar'));
+    await tester.tap(find.byTooltip('Salvar'));
     await tester.pumpAndSettle();
 
     final updated =
@@ -128,6 +128,34 @@ void main() {
     await tester.pump(const Duration(milliseconds: 20));
 
     expect(attempts, 2);
+  });
+
+  testWidgets('deletes an existing task through the dismiss gesture', (
+    tester,
+  ) async {
+    final controller = _MockTaskController();
+    when(() => controller.delete(any())).thenAnswer((_) async {});
+    final task = _task();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [taskControllerProvider.overrideWithValue(controller)],
+        child: MaterialApp(home: TaskEditorScreen(task: task)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.fling(
+      find.byKey(const ValueKey('task-editor-dismissible')),
+      const Offset(-500, 0),
+      1000,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Excluir task?'), findsOneWidget);
+    await tester.tap(find.text('Excluir'));
+    await tester.pumpAndSettle();
+
+    verify(() => controller.delete(task.id)).called(1);
   });
 }
 

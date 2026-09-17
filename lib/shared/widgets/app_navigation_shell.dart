@@ -27,17 +27,11 @@ class AppNavigationShell extends StatelessWidget {
         destinations: const [
           AppNavigationDestination(
             label: 'Tasks',
-            icon: Icons.check_box_outlined,
-            selectedIcon: Icons.check_box,
-            appleIcon: 'checkmark.circle',
-            appleActiveIcon: 'checkmark.circle.fill',
+            assetIcon: 'assets/icons/navigation_checkbox.svg',
           ),
           AppNavigationDestination(
             label: 'Notas',
-            icon: Icons.notes_outlined,
-            selectedIcon: Icons.notes,
-            appleIcon: 'note',
-            appleActiveIcon: 'note.fill',
+            assetIcon: 'assets/icons/navigation_notes.svg',
           ),
         ],
       ),

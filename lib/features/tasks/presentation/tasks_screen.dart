@@ -65,6 +65,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         onPressed: () => unawaited(showTaskEditorSheet(context: context)),
         icon: const Icon(Icons.add_rounded),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: CustomScrollView(
         slivers: [
           tasksAsync.when(
@@ -102,7 +103,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                           AppSpacing.md,
                           AppSpacing.md,
                           AppSpacing.md,
-                          bottomContentPadding,
+                          bottomContentPadding + 112,
                         ),
                         child: const _CompletedTasksEntry(),
                       ),
@@ -116,7 +117,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   AppSpacing.md,
                   0,
                   AppSpacing.md,
-                  AppSpacing.lg,
+                  112,
                 ),
                 sliver: SliverList.builder(
                   itemCount: tasks.length + 1,
