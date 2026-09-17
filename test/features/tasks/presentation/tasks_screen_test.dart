@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -89,15 +88,8 @@ Widget _wrap(GoRouter router) {
 
 Future<void> _showNoteTasks(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('task-source-filter-menu')));
-  await tester.pump();
-  final option = find.ancestor(
-    of: find.text('Mostrar tarefas das notas'),
-    matching: find.byType(CupertinoActionSheetAction),
-  );
-  final onPressed = tester
-      .widget<CupertinoActionSheetAction>(option.first)
-      .onPressed;
-  onPressed();
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Mostrar tarefas das notas'));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 20));
 }
@@ -178,7 +170,7 @@ void main() {
           body: TaskListTile(
             item: TaskListItem.task(_task('standalone')),
             onTap: () => opened = true,
-            onToggle: () => toggled = true,
+            onToggle: () async => toggled = true,
           ),
         ),
       ),

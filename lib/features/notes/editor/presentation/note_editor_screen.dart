@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +23,9 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_shee
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_platform_icon_button.dart';
+import 'package:supanotes/shared/widgets/app_popup_menu.dart';
 import 'package:super_editor/super_editor.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -135,6 +137,7 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       backgroundColor: Colors.transparent,
       elevation: 0,
+      actionsPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
@@ -152,7 +155,9 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
           ? const []
           : [
               _NoteEditorMenuButton(noteId: noteId, note: currentNote),
+              const SizedBox(width: AppSpacing.xs),
               _NoteEditorPreferenceStatus(noteId: noteId),
+              const SizedBox(width: AppSpacing.xs),
               _NoteEditorKeyboardButton(sessionAsync: sessionAsync),
             ],
     );
@@ -197,42 +202,43 @@ class _NoteEditorMenuButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isIos = PlatformInfo.isIOS26OrHigher();
-    return AdaptivePopupMenuButton.icon<String>(
-      icon: isIos ? 'ellipsis' : Icons.more_vert,
-      items: [
-        if (note.isOwner)
-          AdaptivePopupMenuItem<String>(
-            label: NoteStrings.shareLabel,
-            icon: isIos ? 'square.and.arrow.up' : Icons.share_outlined,
-            value: 'share',
-          ),
-        AdaptivePopupMenuItem<String>(
-          label: note.hideCompleted
-              ? NoteStrings.showCompleted
-              : NoteStrings.hideCompleted,
-          icon: isIos
-              ? (note.hideCompleted ? 'eye' : 'eye.slash')
-              : (note.hideCompleted
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined),
-          value: 'hide_completed',
+    final entries = [
+      if (note.isOwner)
+        (
+          value: 'share',
+          label: NoteStrings.shareLabel,
+          symbol: 'square.and.arrow.up',
+          icon: Icons.share_outlined,
         ),
-        if (note.isOwner)
-          AdaptivePopupMenuItem<String>(
-            label: note.collapseImages
-                ? 'Expandir imagens'
-                : 'Colapsar imagens',
-            icon: isIos ? 'photo' : Icons.image_outlined,
-            value: 'collapse_images',
+      (
+        value: 'hide_completed',
+        label: note.hideCompleted
+            ? NoteStrings.showCompleted
+            : NoteStrings.hideCompleted,
+        symbol: note.hideCompleted ? 'eye' : 'eye.slash',
+        icon: note.hideCompleted
+            ? Icons.visibility_outlined
+            : Icons.visibility_off_outlined,
+      ),
+      if (note.isOwner)
+        (
+          value: 'collapse_images',
+          label: note.collapseImages ? 'Expandir imagens' : 'Colapsar imagens',
+          symbol: 'photo',
+          icon: Icons.image_outlined,
+        ),
+    ];
+    return AppPopupMenu<String>(
+      icon: Icons.more_vert,
+      onSelected: (value) => unawaited(_handleSelection(context, ref, value)),
+      items: [
+        for (final entry in entries)
+          AppPopupMenuItem(
+            label: entry.label,
+            value: entry.value,
+            appleSymbol: entry.symbol,
           ),
       ],
-      onSelected: (_, entry) {
-        final value = entry.value;
-        if (value != null) {
-          unawaited(_handleSelection(context, ref, value));
-        }
-      },
     );
   }
 }
@@ -280,11 +286,9 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
           }
           return Tooltip(
             message: 'Remover foco',
-            child: AdaptiveButton.icon(
+            child: AppPlatformIconButton(
               icon: Icons.check,
-              style: AdaptiveButtonStyle.plain,
-              size: AdaptiveButtonSize.small,
-              useNative: true,
+              size: 44,
               onPressed: () {
                 session.controller.focusNode.unfocus();
                 unawaited(

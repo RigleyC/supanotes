@@ -1,3 +1,6 @@
+import 'package:cupertino_native_better/cupertino_native_better.dart';
+import 'package:cupertino_native_better/utils/transition_observer.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +25,15 @@ import 'package:supanotes/shared/widgets/app_navigation_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
+List<NavigatorObserver> _appNavigatorObservers() {
+  final observers = <NavigatorObserver>[CNTabBarRouteObserver()];
+  if (defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS) {
+    observers.add(CNTransitionObserver());
+  }
+  return observers;
+}
+
 final goRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ValueNotifier<AsyncValue<User?>>(
     ref.read(authControllerProvider),
@@ -35,6 +47,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
+    observers: _appNavigatorObservers(),
     refreshListenable: notifier,
     routes: [
       GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashScreen()),

@@ -1,5 +1,3 @@
-
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,12 +18,7 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(centerTitle: true, title: const Text('Configurações')),
       body: ListView(
-        padding: EdgeInsets.only(
-          top: PlatformInfo.isIOS26OrHigher()
-              ? AppSpacing.ios26ToolbarHeight
-              : 0.0,
-          bottom: AppSpacing.lg,
-        ),
+        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
         children: [
           AppTile(
             leading: const Icon(Icons.person_outline),

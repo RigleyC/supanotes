@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -163,7 +163,8 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
       darkTheme: AppTheme.darkTheme,
       builder: (context, child) {
         var result = child!;
-        if (PlatformInfo.isIOS) {
+        if (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS) {
           final brightness = MediaQuery.platformBrightnessOf(context);
           final themeData = brightness == Brightness.dark
               ? AppTheme.darkTheme

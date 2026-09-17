@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
+import 'package:supanotes/shared/widgets/task_exit_animator.dart';
 
 void main() {
   testWidgets('does not animate when hideCompleted=false', (tester) async {
@@ -21,8 +21,9 @@ void main() {
     expect(completed, isFalse);
   });
 
-  testWidgets('forwards when hideCompleted && isComplete turns true',
-      (tester) async {
+  testWidgets('forwards when hideCompleted && isComplete turns true', (
+    tester,
+  ) async {
     var completed = false;
     var widget = TaskExitAnimator(
       hideCompleted: true,

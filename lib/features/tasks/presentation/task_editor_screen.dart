@@ -180,12 +180,12 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
     setState(() => _saveState = const AsyncLoading());
     try {
       final draft = _metadata;
-      final controller = ref.read(taskControllerProvider);
       if (task == null) {
         final ownerUserId = ref.read(currentUserIdProvider);
         if (ownerUserId == null || ownerUserId.isEmpty) {
           throw StateError('É necessário estar autenticado para criar tasks');
         }
+        final controller = ref.read(taskControllerProvider);
         final now = DateTime.now().toUtc();
         await controller.create(
           Task(
@@ -201,6 +201,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
           ),
         );
       } else {
+        final controller = ref.read(taskControllerProvider);
         final scheduled = task.withSchedule(
           dueDate: draft.scheduleAnchor,
           hasTime: draft.hasTime,

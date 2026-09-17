@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -130,12 +129,8 @@ void main() {
     router.go('/tasks/completed');
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('task-source-filter-menu')));
-    await tester.pump();
-    final option = find.ancestor(
-      of: find.text('Mostrar tarefas das notas'),
-      matching: find.byType(CupertinoActionSheetAction),
-    );
-    tester.widget<CupertinoActionSheetAction>(option.first).onPressed();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mostrar tarefas das notas'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
     final noteFinder = find.text('Nota concluída');

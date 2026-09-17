@@ -3,7 +3,6 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/task_exit_animator.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
@@ -12,6 +11,7 @@ import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/shared/widgets/task_exit_animator.dart';
 
 const double _taskCheckboxSize = 20;
 const double _taskCheckboxFallbackTopInset = 2;

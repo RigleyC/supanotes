@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,7 +44,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
 
     return Scaffold(
-      appBar: PlatformInfo.isIOS
+      appBar:
+          defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS
           ? CupertinoNavigationBar(
               automaticallyImplyLeading: false,
               backgroundColor: CupertinoTheme.of(context).barBackgroundColor,
@@ -117,41 +119,24 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   AppSpacing.lg,
                 ),
                 sliver: SliverList.builder(
-                  itemCount: tasks.length,
+                  itemCount: tasks.length + 1,
                   itemBuilder: (context, index) {
+                    if (index == tasks.length) {
+                      return const _CompletedTasksEntry();
+                    }
                     final item = tasks[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: TaskListTile(
                         item: item,
                         onTap: () => unawaited(_openTask(context, item)),
-                        onToggle: () => unawaited(_completeTask(item)),
+                        onToggle: () => _completeTask(item),
                       ),
                     );
                   },
                 ),
               );
             },
-          ),
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              bottomContentPadding,
-            ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                AppTile(
-                  key: const ValueKey('completed-tasks-entry'),
-                  title: 'Concluídas',
-                  subtitle: 'Histórico de tasks concluídas',
-                  leading: const Icon(Icons.task_alt_rounded),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.push(AppRoutes.completedTasks),
-                ),
-              ]),
-            ),
           ),
         ],
       ),
@@ -179,6 +164,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   Future<void> _completeTask(TaskListItem item) async {
     try {
+      await Future<void>.delayed(const Duration(milliseconds: 650));
       if (item.isStandalone) {
         await ref
             .read(taskControllerProvider)
@@ -192,8 +178,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             .complete(item.note!, scheduledAt: item.scheduledAt);
       }
     } on Object catch (error) {
-      if (!mounted) return;
-      AppMessenger.showError('Não foi possível concluir a task: $error');
+      if (mounted) {
+        AppMessenger.showError('Não foi possível concluir a task: $error');
+      }
+      rethrow;
     }
   }
 }

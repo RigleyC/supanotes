@@ -5,7 +5,11 @@ const Duration _exitAnimationDuration = Duration(milliseconds: 350);
 
 class TaskExitAnimator extends StatefulWidget {
   const TaskExitAnimator({
-    required this.hideCompleted, required this.isComplete, required this.onAnimationComplete, required this.child, super.key,
+    required this.hideCompleted,
+    required this.isComplete,
+    required this.onAnimationComplete,
+    required this.child,
+    super.key,
   });
 
   final bool hideCompleted;

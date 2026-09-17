@@ -1,13 +1,17 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_interaction_policy.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_view.dart';
+import 'package:supanotes/shared/widgets/app_popup_menu.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
 class NoteCard extends StatelessWidget {
   const NoteCard({
-    required this.note, required this.onTap, required this.onDelete, required this.onToggleFavorite, super.key,
+    required this.note,
+    required this.onTap,
+    required this.onDelete,
+    required this.onToggleFavorite,
+    super.key,
     this.onEditIcon,
   });
 
@@ -63,42 +67,29 @@ class NoteCard extends StatelessWidget {
                       color: Theme.of(context).colorScheme.tertiary,
                     ),
                   ),
-                AdaptivePopupMenuButton.widget<String>(
-                  tint: scheme.onSurfaceVariant,
-                  onSelected: (index, entry) {
-                    switch (entry.value) {
-                      case 'favorite':
-                        onToggleFavorite();
-                      case 'delete':
-                        _confirmDelete(context);
-                    }
+                AppPopupMenu<String>(
+                  icon: Icons.more_vert_rounded,
+                  appleSymbol: 'ellipsis.vertical',
+                  iconColor: scheme.onSurfaceVariant,
+                  size: 38,
+                  onSelected: (value) {
+                    if (value == 'favorite') onToggleFavorite();
+                    if (value == 'delete') _confirmDelete(context);
                   },
                   items: [
-                    AdaptivePopupMenuItem<String>(
+                    AppPopupMenuItem(
                       label: note.favorite ? 'Remover favorito' : 'Favoritar',
-                      icon: PlatformInfo.isIOS26OrHigher()
-                          ? 'star'
-                          : (note.favorite ? Icons.star : Icons.star_border),
                       value: 'favorite',
+                      appleSymbol: note.favorite ? 'star.fill' : 'star',
                     ),
-                    const AdaptivePopupMenuDivider(),
-                    AdaptivePopupMenuItem<String>(
+                    const AppPopupMenuItem(
                       label: 'Apagar',
-                      icon: PlatformInfo.isIOS26OrHigher()
-                          ? 'trash'
-                          : Icons.delete_outline,
                       value: 'delete',
+                      appleSymbol: 'trash',
+                      dividerBefore: true,
+                      isDestructive: true,
                     ),
                   ],
-                  child: SizedBox.square(
-                    dimension: 38,
-                    child: Center(
-                      child: Icon(
-                        Icons.more_vert_rounded,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),

@@ -7,9 +7,11 @@
 /// the action cannot be silently undone.
 library;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/shared/widgets/app_button.dart';
 
 /// Strings displayed inside the confirm dialog.
 ///
@@ -34,31 +36,60 @@ Future<bool> showConfirmDialog({
   String cancelLabel = ConfirmDialogStrings.cancel,
   bool destructive = false,
 }) async {
-  bool? confirmed;
-  await AdaptiveAlertDialog.show(
-    context: context,
-    title: title,
-    message: message,
-    actions: [
-      AlertAction(
-        title: cancelLabel,
-        style: AlertActionStyle.cancel,
-        onPressed: () {
-          AppHaptics.controlTap();
-          confirmed = false;
-        },
-      ),
-      AlertAction(
-        title: confirmLabel,
-        style: destructive
-            ? AlertActionStyle.destructive
-            : AlertActionStyle.primary,
-        onPressed: () {
-          AppHaptics.controlTap();
-          confirmed = true;
-        },
-      ),
-    ],
-  );
-  return confirmed ?? false;
+  final isApple =
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+  final result = isApple
+      ? await showCupertinoDialog<bool>(
+          context: context,
+          builder: (dialogContext) => CupertinoAlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () {
+                  AppHaptics.controlTap();
+                  Navigator.pop(dialogContext, false);
+                },
+                child: Text(cancelLabel),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: destructive,
+                onPressed: () {
+                  AppHaptics.controlTap();
+                  Navigator.pop(dialogContext, true);
+                },
+                child: Text(confirmLabel),
+              ),
+            ],
+          ),
+        )
+      : await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              AppButton(
+                text: cancelLabel,
+                variant: AppButtonVariant.text,
+                onPressed: () {
+                  AppHaptics.controlTap();
+                  Navigator.pop(dialogContext, false);
+                },
+              ),
+              AppButton(
+                text: confirmLabel,
+                variant: destructive
+                    ? AppButtonVariant.danger
+                    : AppButtonVariant.text,
+                onPressed: () {
+                  AppHaptics.controlTap();
+                  Navigator.pop(dialogContext, true);
+                },
+              ),
+            ],
+          ),
+        );
+  return result ?? false;
 }

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,7 +37,9 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
       onChanged: (value) => setState(() => _includeNoteTasks = value),
     );
     return Scaffold(
-      appBar: PlatformInfo.isIOS
+      appBar:
+          defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS
           ? CupertinoNavigationBar(
               leading: CupertinoNavigationBarBackButton(
                 onPressed: () => context.pop(),

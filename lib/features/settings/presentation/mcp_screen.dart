@@ -1,4 +1,3 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -303,10 +302,9 @@ class _CursorCard extends StatelessWidget {
                           ),
                         ),
                         if (token != null)
-                          AdaptiveButton.icon(
-                            style: AdaptiveButtonStyle.plain,
-                            padding: EdgeInsets.zero,
-                            icon: Icons.copy,
+                          IconButton(
+                            tooltip: 'Copiar token',
+                            icon: const Icon(Icons.copy),
                             onPressed: () {
                               Clipboard.setData(
                                 ClipboardData(text: 'Bearer $token'),

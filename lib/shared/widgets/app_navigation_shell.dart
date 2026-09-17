@@ -1,44 +1,43 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supanotes/shared/widgets/app_navigation_bar.dart';
 
 /// The public navigation frame for the two primary app resources.
-///
-/// The [StatefulNavigationShell] owns one navigator per destination, so
-/// switching tabs does not discard a note editor or a task sub-route.
 class AppNavigationShell extends StatelessWidget {
-  /// Creates the adaptive navigation shell.
   const AppNavigationShell({
     required this.navigationShell,
     super.key,
   });
 
-  /// The stateful shell that owns the app's navigation branches.
   final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context) {
-    final isIos = PlatformInfo.isIOS;
-    return AdaptiveScaffold(
+    return Scaffold(
+      extendBody: true,
       body: navigationShell,
-      bottomNavigationBar: AdaptiveBottomNavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onTap: (index) {
+      bottomNavigationBar: AppNavigationBar(
+        currentIndex: navigationShell.currentIndex,
+        onDestinationSelected: (index) {
           navigationShell.goBranch(
             index,
             initialLocation: index == navigationShell.currentIndex,
           );
         },
-        items: [
-          AdaptiveNavigationDestination(
-            icon: isIos ? 'checkmark.circle' : Icons.check_box_outlined,
-            selectedIcon: isIos ? 'checkmark.circle.fill' : Icons.check_box,
+        destinations: const [
+          AppNavigationDestination(
             label: 'Tasks',
+            icon: Icons.check_box_outlined,
+            selectedIcon: Icons.check_box,
+            appleIcon: 'checkmark.circle',
+            appleActiveIcon: 'checkmark.circle.fill',
           ),
-          AdaptiveNavigationDestination(
-            icon: isIos ? 'note' : Icons.notes_outlined,
-            selectedIcon: isIos ? 'note.fill' : Icons.notes,
+          AppNavigationDestination(
             label: 'Notas',
+            icon: Icons.notes_outlined,
+            selectedIcon: Icons.notes,
+            appleIcon: 'note',
+            appleActiveIcon: 'note.fill',
           ),
         ],
       ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
@@ -5,8 +7,9 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badg
 import 'package:supanotes/features/tasks/presentation/widgets/task_source_label.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
+import 'package:supanotes/shared/widgets/task_exit_animator.dart';
 
-class TaskListTile extends StatelessWidget {
+class TaskListTile extends StatefulWidget {
   const TaskListTile({
     required this.item,
     required this.onTap,
@@ -16,10 +19,41 @@ class TaskListTile extends StatelessWidget {
 
   final TaskListItem item;
   final VoidCallback onTap;
-  final VoidCallback? onToggle;
+  final Future<void> Function()? onToggle;
+
+  @override
+  State<TaskListTile> createState() => _TaskListTileState();
+}
+
+class _TaskListTileState extends State<TaskListTile> {
+  bool _isCompleting = false;
+
+  void _toggleTask() {
+    if (widget.onToggle == null || _isCompleting) return;
+    setState(() => _isCompleting = true);
+    unawaited(_completeTask());
+  }
+
+  Future<void> _completeTask() async {
+    try {
+      await widget.onToggle!();
+    } catch (_) {
+      if (mounted) setState(() => _isCompleting = false);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant TaskListTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.uiKey != widget.item.uiKey ||
+        oldWidget.item.dueDate != widget.item.dueDate) {
+      _isCompleting = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     final title = item.isStandalone ? item.task?.title : item.note?.title;
     final recurrence = TaskRecurrence.parse(
       item.isStandalone ? item.task?.recurrenceRule : item.note?.recurrenceRule,
@@ -27,54 +61,67 @@ class TaskListTile extends StatelessWidget {
     final reminder = item.isStandalone && item.task?.reminder != null;
     final hasMetadata = item.dueDate != null || recurrence != null || reminder;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: Row(
-        spacing: AppSpacing.md,
-        children: [
-          Semantics(
-            button: onToggle != null,
-            enabled: onToggle != null,
-            child: GestureDetector(
-              key: ValueKey('task-toggle-${item.uiKey}'),
-              behavior: HitTestBehavior.opaque,
-              onTap: onToggle,
-              child: const SizedBox(
-                width: 48,
-                height: 48,
-                child: Center(child: AppTaskCheckbox(value: false)),
+    return TaskExitAnimator(
+      hideCompleted: item.isStandalone
+          ? item.task?.recurrenceRule == null
+          : !item.note!.isRecurring,
+      isComplete: _isCompleting,
+      onAnimationComplete: null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: Row(
+          spacing: AppSpacing.md,
+          children: [
+            Semantics(
+              button: widget.onToggle != null,
+              enabled: widget.onToggle != null,
+              child: GestureDetector(
+                key: ValueKey('task-toggle-${item.uiKey}'),
+                behavior: HitTestBehavior.opaque,
+                onTap: _toggleTask,
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: AppTaskCheckbox(
+                      size: 20,
+                      value: _isCompleting,
+                      shape: AppTaskCheckboxShape.rounded,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: AppSpacing.xs,
-                children: [
-                  if (title != null && title.isNotEmpty)
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                  TaskSourceLabel(item: item),
-                  if (hasMetadata)
-                    TaskMetadataBadges(
-                      dueDate: item.dueDate,
-                      recurrence: recurrence,
-                      hasReminder: reminder,
-                      hasTime: item.hasTime,
-                      now: DateTime.now(),
-                    ),
-                ],
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onTap,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: AppSpacing.xs,
+                  children: [
+                    if (title != null && title.isNotEmpty)
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    TaskSourceLabel(item: item),
+                    if (hasMetadata)
+                      TaskMetadataBadges(
+                        dueDate: item.dueDate,
+                        recurrence: recurrence,
+                        hasReminder: reminder,
+                        hasTime: item.hasTime,
+                        now: DateTime.now(),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
