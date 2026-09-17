@@ -63,6 +63,27 @@ void main() {
       expect(fab.foregroundColor, scheme.onPrimary);
     });
 
+    testWidgets('forwards a custom hero tag to the floating action button', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppButton(
+              heroTag: 'tasks-add-fab',
+              variant: AppButtonVariant.fab,
+              onPressed: () {},
+            ),
+          ),
+        ),
+      );
+
+      final fab = tester.widget<FloatingActionButton>(
+        find.byType(FloatingActionButton),
+      );
+      expect(fab.heroTag, 'tasks-add-fab');
+    });
+
     testWidgets('AppButtonVariant.fab uses the dark theme action colors', (
       tester,
     ) async {

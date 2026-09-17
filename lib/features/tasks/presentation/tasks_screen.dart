@@ -58,6 +58,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               actions: [sourceFilterMenu],
             ),
       floatingActionButton: AppButton(
+        heroTag: 'tasks-add-fab',
         variant: AppButtonVariant.fab,
         onPressed: () => unawaited(showTaskEditorSheet(context: context)),
         icon: const Icon(Icons.add_rounded),

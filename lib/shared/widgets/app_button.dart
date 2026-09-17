@@ -13,6 +13,7 @@ class AppButton extends StatefulWidget {
     this.variant = AppButtonVariant.primary,
     this.width,
     this.icon,
+    this.heroTag,
   });
 
   final String? text;
@@ -21,6 +22,7 @@ class AppButton extends StatefulWidget {
   final AppButtonVariant variant;
   final double? width;
   final Widget? icon;
+  final Object? heroTag;
 
   @override
   State<AppButton> createState() => _AppButtonState();
@@ -61,6 +63,7 @@ class _AppButtonState extends State<AppButton> {
       isLoading: widget.isLoading,
       onPressed: widget.onPressed,
       scheme: scheme,
+      heroTag: widget.heroTag,
       child: child,
     );
     return Listener(
@@ -147,6 +150,7 @@ class _AppButtonControl extends StatelessWidget {
     required this.isLoading,
     required this.onPressed,
     required this.scheme,
+    required this.heroTag,
     required this.child,
   });
 
@@ -154,6 +158,7 @@ class _AppButtonControl extends StatelessWidget {
   final bool isLoading;
   final VoidCallback? onPressed;
   final ColorScheme scheme;
+  final Object? heroTag;
   final Widget child;
 
   @override
@@ -196,6 +201,7 @@ class _AppButtonControl extends StatelessWidget {
         child: child,
       ),
       AppButtonVariant.fab => FloatingActionButton(
+        heroTag: heroTag,
         shape: const CircleBorder(),
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,

@@ -170,6 +170,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       ),
 
       floatingActionButton: AppButton(
+        heroTag: 'notes-add-fab',
         variant: AppButtonVariant.fab,
         onPressed: () => _openNewNote(context),
         icon: const Icon(Icons.add),

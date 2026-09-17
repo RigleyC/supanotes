@@ -20,6 +20,8 @@ import 'package:supanotes/features/tasks/presentation/task_editor_screen.dart';
 import 'package:supanotes/features/tasks/presentation/tasks_screen.dart';
 import 'package:supanotes/shared/widgets/app_navigation_shell.dart';
 
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final goRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ValueNotifier<AsyncValue<User?>>(
     ref.read(authControllerProvider),
@@ -31,6 +33,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(notifier.dispose);
 
   final router = GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     refreshListenable: notifier,
     routes: [
@@ -55,11 +58,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             ShareLinkAccessScreen(token: state.pathParameters['token']!),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (_, state, navigationShell) => AppNavigationShell(
+        builder: (_, _, navigationShell) => AppNavigationShell(
           navigationShell: navigationShell,
-          showNavigationBar:
-              state.uri.path == AppRoutes.tasks ||
-              state.uri.path == AppRoutes.notes,
         ),
         branches: [
           StatefulShellBranch(
@@ -70,14 +70,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'completed',
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (_, _) => const CompletedTasksScreen(),
                   ),
                   GoRoute(
                     path: 'standalone',
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (_, _) => const TaskEditorScreen(),
                   ),
                   GoRoute(
                     path: 'standalone/:id',
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (_, state) => TaskEditorScreen(
                       taskId: state.pathParameters['id'],
                     ),
@@ -94,6 +97,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':id',
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (_, state) {
                       return NoteEditorScreen(
                         noteId: state.pathParameters['id']!,

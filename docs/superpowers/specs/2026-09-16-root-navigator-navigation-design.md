@@ -22,6 +22,7 @@ The Julius Flutter app uses the canonical alternative: the shared shell remains 
    - `/notes/:id`
 5. Leave the root `/tasks` and `/notes` routes in their existing stateful branches, preserving tab and branch state.
 6. Add focused router assertions for the route hierarchy/visibility behavior without visual tests.
+7. Give root-page FABs distinct Hero tags, because both stateful branches remain mounted during root-navigator transitions.
 
 ## Files
 
@@ -34,6 +35,7 @@ The Julius Flutter app uses the canonical alternative: the shared shell remains 
 - Do not move the navbar into each root page.
 - Do not duplicate adaptive scaffolds or navigation state.
 - Do not change task/note ownership, data loading, editor behavior, or app-bar implementation in this change.
+- Do not alter FAB behavior beyond assigning stable tags required to avoid Hero collisions.
 
 ## Validation
 

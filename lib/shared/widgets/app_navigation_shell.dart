@@ -10,46 +10,38 @@ class AppNavigationShell extends StatelessWidget {
   /// Creates the adaptive navigation shell.
   const AppNavigationShell({
     required this.navigationShell,
-    this.showNavigationBar = true,
     super.key,
   });
 
   /// The stateful shell that owns the app's navigation branches.
   final StatefulNavigationShell navigationShell;
 
-  /// Whether the adaptive tab bar should be visible for the current route.
-  final bool showNavigationBar;
-
   @override
   Widget build(BuildContext context) {
     final isIos = PlatformInfo.isIOS;
     return AdaptiveScaffold(
       body: navigationShell,
-      bottomNavigationBar: showNavigationBar
-          ? AdaptiveBottomNavigationBar(
-              selectedIndex: navigationShell.currentIndex,
-              onTap: (index) {
-                navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
-                );
-              },
-              items: [
-                AdaptiveNavigationDestination(
-                  icon: isIos ? 'checkmark.circle' : Icons.check_box_outlined,
-                  selectedIcon: isIos
-                      ? 'checkmark.circle.fill'
-                      : Icons.check_box,
-                  label: 'Tasks',
-                ),
-                AdaptiveNavigationDestination(
-                  icon: isIos ? 'note' : Icons.notes_outlined,
-                  selectedIcon: isIos ? 'note.fill' : Icons.notes,
-                  label: 'Notas',
-                ),
-              ],
-            )
-          : null,
+      bottomNavigationBar: AdaptiveBottomNavigationBar(
+        selectedIndex: navigationShell.currentIndex,
+        onTap: (index) {
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
+        },
+        items: [
+          AdaptiveNavigationDestination(
+            icon: isIos ? 'checkmark.circle' : Icons.check_box_outlined,
+            selectedIcon: isIos ? 'checkmark.circle.fill' : Icons.check_box,
+            label: 'Tasks',
+          ),
+          AdaptiveNavigationDestination(
+            icon: isIos ? 'note' : Icons.notes_outlined,
+            selectedIcon: isIos ? 'note.fill' : Icons.notes,
+            label: 'Notas',
+          ),
+        ],
+      ),
     );
   }
 }
