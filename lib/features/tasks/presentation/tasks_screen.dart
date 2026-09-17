@@ -82,12 +82,29 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             ),
             data: (tasks) {
               if (tasks.isEmpty) {
-                return const SliverFillRemaining(
+                return SliverFillRemaining(
                   hasScrollBody: false,
-                  child: EmptyState(
-                    icon: Icons.check_circle_outline_rounded,
-                    title: 'Tudo em dia',
-                    subtitle: 'Adicione uma task para começar.',
+                  child: Column(
+                    children: [
+                      const Expanded(
+                        child: Center(
+                          child: EmptyState(
+                            icon: Icons.check_circle_outline_rounded,
+                            title: 'Tudo em dia',
+                            subtitle: 'Adicione uma task para começar.',
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          bottomContentPadding,
+                        ),
+                        child: const _CompletedTasksEntry(),
+                      ),
+                    ],
                   ),
                 );
               }
@@ -147,7 +164,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       // The route remains available for the primary action and deep links.
       await showTaskEditorSheet(
         context: context,
-        taskId: item.task!.id,
+        task: item.task,
       );
       return;
     }
@@ -178,5 +195,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       if (!mounted) return;
       AppMessenger.showError('Não foi possível concluir a task: $error');
     }
+  }
+}
+
+class _CompletedTasksEntry extends StatelessWidget {
+  const _CompletedTasksEntry();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppTile(
+      key: const ValueKey('completed-tasks-entry'),
+      title: 'Concluídas',
+      subtitle: 'Histórico de tasks concluídas',
+      leading: const Icon(Icons.task_alt_rounded),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => context.push(AppRoutes.completedTasks),
+    );
   }
 }

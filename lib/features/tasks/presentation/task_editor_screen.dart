@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,11 +12,7 @@ import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_editor_form.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
-import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 import 'package:uuid/uuid.dart';
@@ -85,7 +83,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
         child: TaskEditorForm(
           titleController: _titleController,
           metadata: _metadata,
-          onMetadataTap: _openMetadata,
+          onMetadataChanged: _onMetadataChanged,
           onCancel: context.pop,
           onSave: () => _save(widget.task),
           onDelete: () => _delete(widget.task!),
@@ -101,7 +99,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
         child: TaskEditorForm(
           titleController: _titleController,
           metadata: _metadata,
-          onMetadataTap: _openMetadata,
+          onMetadataChanged: _onMetadataChanged,
           onCancel: context.pop,
           onSave: () => _save(null),
           isSaving: saveView.isSaving,
@@ -129,7 +127,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
           return TaskEditorForm(
             titleController: _titleController,
             metadata: _metadata,
-            onMetadataTap: _openMetadata,
+            onMetadataChanged: _onMetadataChanged,
             onCancel: context.pop,
             onSave: () => _save(task),
             onDelete: () => _delete(task),
@@ -157,38 +155,15 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
     );
   }
 
-  Future<void> _openMetadata() async {
-    await showAppBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => ListView(
-        children: [
-          const Text(
-            'Detalhes da task',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          AppTile(
-            title: 'Data, horário e recorrência',
-            subtitle: 'Escolha quando esta task deve aparecer',
-            leading: const Icon(Icons.event_note_outlined),
-            onTap: () async {
-              Navigator.of(sheetContext).pop();
-              final draft = await showTaskMetadataSheet(
-                context: context,
-                draft: _metadata,
-              );
-              if (!mounted) return;
-              setState(() => _metadata = draft);
-              if (draft.reminder != null) {
-                await ref
-                    .read(taskNotificationSchedulerProvider.notifier)
-                    .requestPermissionForReminder();
-              }
-            },
-          ),
-        ],
-      ),
-    );
+  void _onMetadataChanged(TaskMetadataDraft draft) {
+    setState(() => _metadata = draft);
+    if (draft.reminder != null) {
+      unawaited(
+        ref
+            .read(taskNotificationSchedulerProvider.notifier)
+            .requestPermissionForReminder(),
+      );
+    }
   }
 
   Future<void> _save(Task? task) async {

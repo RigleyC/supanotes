@@ -155,16 +155,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 },
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: AppButton(
-                key: const ValueKey('completed-notes-entry'),
-                text: 'Concluídas',
-                icon: const Icon(Icons.history_rounded),
-                variant: AppButtonVariant.tonal,
-                onPressed: () => context.push(AppRoutes.completedTasks),
-              ),
-            ),
           ],
         ),
       ),

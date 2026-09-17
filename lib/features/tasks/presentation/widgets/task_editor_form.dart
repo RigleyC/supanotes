@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
-import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
+import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_card.dart';
 import 'package:supanotes/shared/widgets/app_input.dart';
-import 'package:supanotes/shared/widgets/app_tile.dart';
 
 class TaskEditorForm extends StatelessWidget {
   const TaskEditorForm({
     required this.titleController,
     required this.metadata,
-    required this.onMetadataTap,
+    required this.onMetadataChanged,
     required this.onCancel,
     required this.onSave,
     this.onDelete,
@@ -22,7 +21,7 @@ class TaskEditorForm extends StatelessWidget {
 
   final TextEditingController titleController;
   final TaskMetadataDraft metadata;
-  final VoidCallback onMetadataTap;
+  final ValueChanged<TaskMetadataDraft> onMetadataChanged;
   final VoidCallback onCancel;
   final VoidCallback onSave;
   final VoidCallback? onDelete;
@@ -45,18 +44,9 @@ class TaskEditorForm extends StatelessWidget {
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => onSave(),
             ),
-            AppTile(
-              contentPadding: EdgeInsets.zero,
-              title: 'Data, horário e lembrete',
-              subtitleWidget: TaskMetadataBadges(
-                dueDate: metadata.scheduleAnchor,
-                recurrence: metadata.recurrence,
-                hasReminder: metadata.reminder != null,
-                hasTime: metadata.hasTime,
-                completions: metadata.completions,
-              ),
-              leading: const Icon(Icons.event_note_outlined),
-              onTap: onMetadataTap,
+            TaskMetadataSheetBody(
+              draft: metadata,
+              onChanged: onMetadataChanged,
             ),
             Row(
               spacing: AppSpacing.sm,

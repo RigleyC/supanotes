@@ -8,9 +8,9 @@ class TaskSourceLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final source = item.isNote
-        ? 'Nota${item.note?.noteTitle == null ? '' : ': ${item.note!.noteTitle}'}'
-        : 'Task independente';
+    if (item.isStandalone) return const SizedBox.shrink();
+    final source =
+        'Nota${item.note?.noteTitle == null ? '' : ': ${item.note!.noteTitle}'}';
     return Text(
       source,
       maxLines: 1,

@@ -90,7 +90,7 @@ void main() {
     expect(find.text('/notes/${repository.createdNoteId}'), findsOneWidget);
   });
 
-  testWidgets('empty notes expose the completed action', (
+  testWidgets('empty notes do not expose the completed action', (
     tester,
   ) async {
     final repository = _RecordingNotesRepository();
@@ -100,11 +100,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EmptyState), findsOneWidget);
-    expect(find.byKey(const ValueKey('completed-notes-entry')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('completed-notes-entry')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('completed-tasks'), findsOneWidget);
+    expect(find.byKey(const ValueKey('completed-notes-entry')), findsNothing);
   });
 }

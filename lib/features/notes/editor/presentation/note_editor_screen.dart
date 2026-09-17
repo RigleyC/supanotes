@@ -24,7 +24,6 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_shee
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
-import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:super_editor/super_editor.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -279,15 +278,22 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
           if (!session.controller.focusNode.hasFocus) {
             return const SizedBox.shrink();
           }
-          return AppIconButton(
-            icon: const Icon(Icons.check),
-            tooltip: 'Remover foco',
-            onPressed: () {
-              session.controller.focusNode.unfocus();
-              unawaited(
-                SystemChannels.textInput.invokeMethod<void>('TextInput.hide'),
-              );
-            },
+          return Tooltip(
+            message: 'Remover foco',
+            child: AdaptiveButton.icon(
+              icon: Icons.check,
+              style: AdaptiveButtonStyle.plain,
+              size: AdaptiveButtonSize.small,
+              useNative: true,
+              onPressed: () {
+                session.controller.focusNode.unfocus();
+                unawaited(
+                  SystemChannels.textInput.invokeMethod<void>(
+                    'TextInput.hide',
+                  ),
+                );
+              },
+            ),
           );
         },
       ),
