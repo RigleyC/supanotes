@@ -1,4 +1,15 @@
 pluginManagement {
+    if (System.getProperty("os.name").startsWith("Windows")) {
+        val flutterPluginsDependencies = file("../.flutter-plugins-dependencies")
+        if (flutterPluginsDependencies.exists()) {
+            val content = flutterPluginsDependencies.readText()
+            val normalizedContent = content.replace("\\\\\\\\", "\\\\")
+            if (content != normalizedContent) {
+                flutterPluginsDependencies.writeText(normalizedContent)
+            }
+        }
+    }
+
     val flutterSdkPath =
         run {
             val properties = java.util.Properties()

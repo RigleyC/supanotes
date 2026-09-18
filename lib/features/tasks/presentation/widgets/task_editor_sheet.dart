@@ -40,7 +40,7 @@ class TaskEditorSheet extends StatelessWidget {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
-                  padding: EdgeInsets.only(right: AppSpacing.lg),
+                  padding: const EdgeInsets.only(right: AppSpacing.lg),
                   child: Icon(
                     Icons.delete_outline_rounded,
                     color: scheme.onErrorContainer,
@@ -66,50 +66,45 @@ class TaskEditorSheet extends StatelessWidget {
 
     return Material(
       type: MaterialType.transparency,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.sm,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  AppPlatformIconButton(
-                    icon: Icons.close_rounded,
-                    tooltip: 'Fechar',
-                    onPressed: isSaving ? null : onCancel,
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        'Criar/Editar nota',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                AppPlatformIconButton(
+                  icon: Icons.close_rounded,
+                  tooltip: 'Fechar',
+                  iconSize: 18,
+                  onPressed: isSaving ? null : onCancel,
+                ),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      'Criar/Editar nota',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  AppPlatformIconButton(
-                    icon: Icons.check_rounded,
-                    tooltip: 'Salvar',
-                    onPressed: isSaving ? null : () => unawaited(onSave()),
-                  ),
-                ],
-              ),
+                ),
+                AppPlatformIconButton(
+                  icon: Icons.check_rounded,
+                  tooltip: 'Salvar',
+                  iconSize: 18,
+                  onPressed: isSaving ? null : () => unawaited(onSave()),
+                ),
+              ],
             ),
-            dismissible,
-            const SizedBox(height: AppSpacing.lg),
-          ],
-        ),
+          ),
+          dismissible,
+          const SizedBox(height: AppSpacing.lg),
+        ],
       ),
     );
   }

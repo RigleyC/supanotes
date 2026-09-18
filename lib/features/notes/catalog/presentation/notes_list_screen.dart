@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/di/providers.dart';
+import 'package:supanotes/core/navigation/navigation_bar_insets.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
@@ -159,11 +160,14 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         ),
       ),
 
-      floatingActionButton: AppButton(
-        heroTag: 'notes-add-fab',
-        variant: AppButtonVariant.fab,
-        onPressed: () => _openNewNote(context),
-        icon: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        padding: NavigationBarInsets.scrollPadding(context),
+        child: AppButton(
+          heroTag: 'notes-add-fab',
+          variant: AppButtonVariant.fab,
+          onPressed: () => _openNewNote(context),
+          icon: const Icon(Icons.add),
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );

@@ -10,6 +10,22 @@ val keyPropertiesFile = rootProject.file("key.properties")
 if (keyPropertiesFile.exists()) {
     keyPropertiesFile.inputStream().use { keyProperties.load(it) }
 }
+val requiredSigningProperties = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val hasReleaseSigning = keyPropertiesFile.exists() &&
+    requiredSigningProperties.all(keyProperties::containsKey)
+
+if (keyPropertiesFile.exists() && !hasReleaseSigning) {
+    throw GradleException(
+        "android/key.properties must define storeFile, storePassword, keyAlias and keyPassword."
+    )
+}
+
+if (!hasReleaseSigning) {
+    logger.warn(
+        "Production signing is not configured; release will use the local debug keystore " +
+            "and is not suitable for Play Store upload."
+    )
+}
 
 android {
     namespace = "com.example.supanotes"
@@ -39,17 +55,23 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file(keyProperties["storeFile"] as String)
-            storePassword = keyProperties["storePassword"] as String
-            keyAlias = keyProperties["keyAlias"] as String
-            keyPassword = keyProperties["keyPassword"] as String
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(keyProperties.getProperty("storeFile"))
+                storePassword = keyProperties.getProperty("storePassword")
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

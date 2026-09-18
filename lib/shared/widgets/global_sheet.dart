@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:family_bottom_sheet/family_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
 
 export 'global_sheet_header.dart';
 export 'global_sheet_page.dart';
@@ -15,7 +18,7 @@ Future<T?> showGlobalSheet<T>({
   required WidgetBuilder builder,
   VoidCallback? onDismissed,
 }) {
-  AppHaptics.controlTap();
+  unawaited(AppHaptics.controlTap());
   var dismissalNotified = false;
   var listenerScheduled = false;
   Animation<double>? routeAnimation;
@@ -33,6 +36,7 @@ Future<T?> showGlobalSheet<T>({
   return FamilyModalSheet.show<T>(
     context: context,
     contentBackgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+    safeAreaMinimum: const EdgeInsets.only(bottom: AppSpacing.sm),
     builder: (sheetContext) {
       if (onDismissed != null && !listenerScheduled) {
         listenerScheduled = true;

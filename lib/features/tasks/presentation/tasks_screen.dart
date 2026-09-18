@@ -1,10 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supanotes/core/navigation/navigation_bar_insets.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/tasks/application/note_task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_controller.dart';
@@ -59,11 +60,14 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               elevation: 0,
               actions: [sourceFilterMenu],
             ),
-      floatingActionButton: AppButton(
-        heroTag: 'tasks-add-fab',
-        variant: AppButtonVariant.fab,
-        onPressed: () => unawaited(showTaskEditorSheet(context: context)),
-        icon: const Icon(Icons.add_rounded),
+      floatingActionButton: Padding(
+        padding: NavigationBarInsets.scrollPadding(context),
+        child: AppButton(
+          heroTag: 'tasks-add-fab',
+          variant: AppButtonVariant.fab,
+          onPressed: () => unawaited(showTaskEditorSheet(context: context)),
+          icon: const Icon(Icons.add_rounded),
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: CustomScrollView(
