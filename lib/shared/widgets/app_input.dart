@@ -4,6 +4,7 @@ class AppInput extends StatefulWidget {
   const AppInput({
     super.key,
     this.controller,
+    this.focusNode,
     this.labelText,
     this.hintText,
     this.errorText,
@@ -22,6 +23,7 @@ class AppInput extends StatefulWidget {
   });
 
   final TextEditingController? controller;
+  final FocusNode? focusNode;
   final String? labelText;
   final String? hintText;
   final String? errorText;
@@ -63,6 +65,7 @@ class _AppInputState extends State<AppInput> {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: widget.controller,
+      focusNode: widget.focusNode,
       obscureText: _obscured,
       keyboardType: widget.keyboardType,
       onChanged: widget.onChanged,

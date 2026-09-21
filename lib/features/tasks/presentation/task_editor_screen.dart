@@ -42,10 +42,12 @@ class TaskEditorScreen extends ConsumerStatefulWidget {
 
 class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   late final TextEditingController _titleController;
+  late final FocusNode _titleFocusNode;
   late final String _metadataKey;
   late TaskMetadataDraft _metadata;
   AsyncValue<void> _saveState = const AsyncData(null);
   String? _loadedTaskId;
+  bool _focusRequested = false;
 
   bool get _isNew => widget.taskId == null && widget.task == null;
 
@@ -53,6 +55,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   void initState() {
     super.initState();
     _titleController = TextEditingController();
+    _titleFocusNode = FocusNode();
     _metadataKey = widget.task?.id ?? widget.taskId ?? const Uuid().v4();
     _metadata = const TaskMetadataDraft(
       scheduleAnchor: null,
@@ -60,11 +63,20 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
       recurrence: null,
       reminder: null,
     );
+    // `autofocus` on the field fires before the bottom-sheet route settles,
+    // which opens the keyboard without delivering focus to the input.
+    // Requesting focus after the first frame lands it reliably, exactly once.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _focusRequested) return;
+      _focusRequested = true;
+      _titleFocusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _titleController.dispose();
+    _titleFocusNode.dispose();
     super.dispose();
   }
 
@@ -85,6 +97,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
         isSaving: saveView.isSaving,
         child: TaskEditorForm(
           titleController: _titleController,
+          titleFocusNode: _titleFocusNode,
           metadata: _metadata,
           onMetadataChanged: _onMetadataChanged,
           onSubmitted: () => unawaited(_save(widget.task)),
@@ -97,8 +110,10 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
       return TaskEditorSheet(
         onCancel: context.pop,
         onSave: () => _save(null),
+        isSaving: saveView.isSaving,
         child: TaskEditorForm(
           titleController: _titleController,
+          titleFocusNode: _titleFocusNode,
           metadata: _metadata,
           onMetadataChanged: _onMetadataChanged,
           onSubmitted: () => unawaited(_save(null)),
@@ -141,6 +156,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
           isSaving: saveView.isSaving,
           child: TaskEditorForm(
             titleController: _titleController,
+          titleFocusNode: _titleFocusNode,
             metadata: _metadata,
             onMetadataChanged: _onMetadataChanged,
             onSubmitted: () => unawaited(_save(task)),
@@ -168,8 +184,11 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   }
 
   void _onMetadataChanged(TaskMetadataDraft draft) {
+    // The platform permission prompt is expensive: only fire it when a
+    // reminder is newly added, not on every tweak while one is already set.
+    final hadReminder = _metadata.reminder != null;
     setState(() => _metadata = draft);
-    if (draft.reminder != null) {
+    if (draft.reminder != null && !hadReminder) {
       unawaited(
         ref
             .read(taskNotificationSchedulerProvider.notifier)

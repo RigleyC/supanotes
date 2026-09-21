@@ -33,6 +33,10 @@ class TaskListTile extends StatefulWidget {
 class _TaskListTileState extends State<TaskListTile> {
   bool _isCompleting = false;
 
+  // `DateFormat` construction does locale-data lookup: far too expensive to
+  // rebuild for every tile on every list emission.
+  static final _completedAtFormat = DateFormat('dd/MM/yyyy HH:mm');
+
   void _toggleTask() {
     if (widget.onToggle == null || _isCompleting) return;
     setState(() => _isCompleting = true);
@@ -123,7 +127,7 @@ class _TaskListTileState extends State<TaskListTile> {
                       ),
                     if (widget.completedAt != null)
                       Text(
-                        'Concluída em ${DateFormat('dd/MM/yyyy HH:mm').format(widget.completedAt!.toLocal())}',
+                        'Concluída em ${_completedAtFormat.format(widget.completedAt!.toLocal())}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),

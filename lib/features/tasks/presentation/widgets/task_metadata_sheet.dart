@@ -58,6 +58,10 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
   late final ValueNotifier<TaskMetadataDraft> _draftNotifier;
   late final bool _ownsDraftNotifier;
 
+  // `DateFormat` construction does locale-data lookup: far too expensive to
+  // rebuild on every draft change.
+  static final _timeFormat = DateFormat('h:mm a');
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +80,14 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
     widget.onChanged?.call(next);
   }
 
+  void _openPickerPage(BuildContext context, Widget page) {
+    // Release text-field focus before the picker covers it. Otherwise the
+    // keyboard fights the page transition and a stale selection lingers on
+    // the title field after returning.
+    FocusManager.instance.primaryFocus?.unfocus();
+    FamilyModalSheet.of(context).pushPage(page);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<TaskMetadataDraft>(
@@ -83,7 +95,7 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
       builder: (context, state, _) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: AppSpacing.md,
+        spacing: AppSpacing.sm,
         children: [
           AppTile(
             contentPadding: EdgeInsets.zero,
@@ -107,7 +119,8 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
                     ),
                   ),
             onTap: () {
-              FamilyModalSheet.of(context).pushPage(
+              _openPickerPage(
+                context,
                 TaskMetadataDatePage(
                   selected: state.scheduleAnchor,
                   onSelected: (date) => _update(
@@ -121,7 +134,7 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
             contentPadding: EdgeInsets.zero,
             selected: state.hasTime,
             title: state.hasTime && state.scheduleAnchor != null
-                ? DateFormat('h:mm a').format(state.scheduleAnchor!)
+                ? _timeFormat.format(state.scheduleAnchor!)
                 : 'Adicionar horário',
             leading: const Icon(Icons.access_time_rounded, size: 20),
             trailing: state.hasTime
@@ -144,7 +157,8 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
                   )
                 : null,
             onTap: () {
-              FamilyModalSheet.of(context).pushPage(
+              _openPickerPage(
+                context,
                 TaskMetadataTimePage(
                   currentDueDate: state.scheduleAnchor ?? DateTime.now(),
                   hasTime: state.hasTime,
@@ -170,7 +184,8 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
                     onPressed: () => _update(state.copyWith(recurrence: null)),
                   ),
             onTap: () {
-              FamilyModalSheet.of(context).pushPage(
+              _openPickerPage(
+                context,
                 TaskMetadataSelectionPage<TaskRecurrence>(
                   title: 'Repetição',
                   selected: state.recurrence,
@@ -204,7 +219,8 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
                     onPressed: () => _update(state.copyWith(reminder: null)),
                   ),
             onTap: () {
-              FamilyModalSheet.of(context).pushPage(
+              _openPickerPage(
+                context,
                 TaskMetadataSelectionPage<TaskReminderOption>(
                   title: 'Lembrete',
                   selected: state.reminder,

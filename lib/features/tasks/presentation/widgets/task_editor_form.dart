@@ -7,6 +7,7 @@ import 'package:supanotes/shared/widgets/app_input.dart';
 class TaskEditorForm extends StatelessWidget {
   const TaskEditorForm({
     required this.titleController,
+    required this.titleFocusNode,
     required this.metadata,
     required this.onMetadataChanged,
     this.onSubmitted,
@@ -15,6 +16,7 @@ class TaskEditorForm extends StatelessWidget {
   });
 
   final TextEditingController titleController;
+  final FocusNode titleFocusNode;
   final TaskMetadataDraft metadata;
   final ValueChanged<TaskMetadataDraft> onMetadataChanged;
   final VoidCallback? onSubmitted;
@@ -28,9 +30,9 @@ class TaskEditorForm extends StatelessWidget {
       children: [
         AppInput(
           controller: titleController,
+          focusNode: titleFocusNode,
           hintText: 'O que precisa ser feito?',
           errorText: errorText,
-          autofocus: true,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => onSubmitted?.call(),
         ),

@@ -157,6 +157,19 @@ void main() {
 
     verify(() => controller.delete(task.id)).called(1);
   });
+
+  testWidgets('focuses the title field when the editor opens', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [currentUserIdProvider.overrideWithValue('user-1')],
+        child: const MaterialApp(home: TaskEditorScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = tester.widget<EditableText>(find.byType(EditableText));
+    expect(field.focusNode.hasFocus, isTrue);
+  });
 }
 
 Task _task() {
