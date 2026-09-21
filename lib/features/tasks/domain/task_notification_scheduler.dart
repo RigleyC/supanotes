@@ -456,8 +456,16 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
 
   /// Public method to request notification permission — called ONLY when
   /// the user explicitly saves a reminder (not during auto-reconciliation).
+  /// Never re-prompts: if the OS reports notifications already enabled, the
+  /// request is skipped instead of hitting the system dialog again.
   Future<void> requestPermissionForReminder() async {
     final service = ref.read(localNotificationServiceProvider);
+    if (await service.areNotificationsEnabled()) {
+      dev.log(
+        '[Scheduler] Notification permission already granted; skipping prompt',
+      );
+      return;
+    }
     await service.requestPermissions();
     dev.log('[Scheduler] Permission explicitly requested for reminder save');
   }

@@ -50,6 +50,29 @@ class LocalNotificationService {
     }
   }
 
+  /// Live OS status, used to skip redundant permission prompts. If the user
+  /// already granted notifications, requesting again is pure overhead — and
+  /// on some OS versions it can re-surface system UI.
+  Future<bool> areNotificationsEnabled() async {
+    if (!isSupportedPlatform) return false;
+    await initialize();
+    if (Platform.isAndroid) {
+      return await _plugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+              ?.areNotificationsEnabled() ??
+          false;
+    }
+    if (Platform.isIOS) {
+      final options = await _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>()
+          ?.checkPermissions();
+      return options?.isEnabled ?? false;
+    }
+    return false;
+  }
+
   Future<void> scheduleTaskNotification(
     int notificationId,
     String title,
