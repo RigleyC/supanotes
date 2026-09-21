@@ -142,10 +142,16 @@ final taskRepositoryProvider = Provider.autoDispose<TaskRepository>((ref) {
   if (userId == null || userId.isEmpty) {
     throw StateError('TaskRepository requires an authenticated user');
   }
+  // The outbox worker instance is captured here instead of reading through
+  // `ref` on every mutation: repository mutations outlive the provider frame
+  // (auto-dispose + `ref.read` without a listener), and a `ref.read` after
+  // dispose throws while the SQLite mutation already persisted — surfacing
+  // as a phantom create/delete error.
+  final outboxWorker = ref.watch(taskOutboxWorkerProvider);
   return TaskRepository(
     ref.watch(tasksDaoProvider),
     userId,
-    onMutation: () => ref.read(taskOutboxWorkerProvider)?.wake(),
+    onMutation: () => outboxWorker?.wake(),
   );
 });
 
