@@ -105,6 +105,12 @@ final class NoteEditorOperationBuilder {
     final beforeById = {
       for (final block in before.blocks) block.id: block,
     };
+    // Indexed once: the per-block loop below used `before.blocks.indexOf`,
+    // which scans the whole list on every keystroke (O(n^2) per edit).
+    final beforeIndexById = <String, int>{
+      for (var i = 0; i < before.blocks.length; i++)
+        before.blocks[i].id: i,
+    };
     final afterIds = after.blocks.map((block) => block.id).toSet();
     final operations = <NoteEditorOperation>[];
 
@@ -141,7 +147,7 @@ final class NoteEditorOperationBuilder {
         continue;
       }
 
-      final previousIndex = before.blocks.indexOf(previous);
+      final previousIndex = beforeIndexById[block.id]!;
       final previousAfterBlockId = previousIndex <= 0
           ? null
           : before.blocks[previousIndex - 1].id;
