@@ -12,6 +12,7 @@ import 'package:supanotes/features/tasks/domain/task_notification_entry.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_id.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_source.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_time.dart';
+import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 final AsyncNotifierProvider<TaskNotificationScheduler, Map<String, DateTime>>
 taskNotificationSchedulerProvider =
@@ -359,7 +360,11 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     required TaskNotificationEntry? previous,
     required Map<String, DateTime> currentState,
   }) async {
-    final due = task.dueDate;
+    // Scheduled task dates are wall-clock values, not instants. Rebuild the
+    // value as a local DateTime before formatting or handing it to timezone,
+    // otherwise a UTC representation can move the platform notification to a
+    // different calendar day.
+    final due = canonicalScheduledAt(task.dueDate, hasTime: task.hasTime);
     final key = task.sourceKey;
 
     // Unchanged entries skip the platform notification call.
@@ -407,7 +412,7 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     dev.log(
       '[Scheduler] Scheduling notification source=$key at $notificationTime',
     );
-    final body = formatDueDate(due, hasTime: task.hasTime);
+    final body = formatDueDate(due, hasTime: task.hasTime, now: now);
     final nid = _notificationId(
       currentUserId,
       task,
