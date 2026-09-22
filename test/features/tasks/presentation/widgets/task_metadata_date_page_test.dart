@@ -19,7 +19,7 @@ void main() {
     expect(find.byIcon(Icons.calendar_month_rounded), findsNWidgets(3));
   });
 
-  testWidgets('shows the complete calendar without an inner scroll view', (
+  testWidgets('keeps the complete calendar reachable without overflowing', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -28,7 +28,13 @@ void main() {
       ),
     );
 
-    expect(find.byType(SingleChildScrollView), findsNothing);
+    // The full content (quick dates + calendar) is taller than the sheet's
+    // content slot on tight screens; when it doesn't fit, the page scrolls
+    // instead of overflowing (the previous "no inner scroll view" assertion
+    // pinned a RenderFlex overflow of the sheet container).
+    expect(find.byType(CalendarDatePicker), findsOneWidget);
+    expect(find.byIcon(Icons.calendar_month_rounded), findsNWidgets(3));
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
   });
 
   testWidgets('aligns task tiles with the sheet title', (tester) async {

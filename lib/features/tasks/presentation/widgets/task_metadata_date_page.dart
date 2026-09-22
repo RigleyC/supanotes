@@ -45,44 +45,56 @@ class TaskMetadataDatePage extends StatelessWidget {
     final now = DateTime.now();
     return GlobalSheetPage(
       title: 'Escolher data',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: QuickDueDate.values.length,
-            itemBuilder: (context, index) {
-              final option = QuickDueDate.values[index];
-              final date = option.compute(now);
-              return AppTile(
-                contentPadding: EdgeInsets.zero,
-                title: option.label,
-                leading: Icon(option.icon),
-                selected: selected != null && selected!.isSameDayAs(date),
-                enableHaptics: false,
-                onTap: () {
-                  if (selected == null || !selected!.isSameDayAs(date)) {
-                    AppHaptics.selectionChange();
-                  }
+      child: ConstrainedBox(
+        // The Column above hands children unbounded height, so without a cap
+        // the quick-date tiles plus calendar (≈600px) overflow the sheet's
+        // ~592px content slot by a few pixels on tight screens. Cap to what
+        // GlobalSheetPage has left after its header/footer and let the scroll
+        // view absorb the rest only when the content truly doesn't fit.
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height - 120,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: QuickDueDate.values.length,
+                itemBuilder: (context, index) {
+                  final option = QuickDueDate.values[index];
+                  final date = option.compute(now);
+                  return AppTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: option.label,
+                    leading: Icon(option.icon),
+                    selected: selected != null && selected!.isSameDayAs(date),
+                    enableHaptics: false,
+                    onTap: () {
+                      if (selected == null || !selected!.isSameDayAs(date)) {
+                        AppHaptics.selectionChange();
+                      }
+                      onSelected(date);
+                      FamilyModalSheet.of(context).popPage();
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              CalendarDatePicker(
+                initialDate: selected ?? now.startOfDay,
+                firstDate: DateTime(now.year - 1),
+                lastDate: DateTime(now.year + 5),
+                onDateChanged: (date) {
                   onSelected(date);
                   FamilyModalSheet.of(context).popPage();
                 },
-              );
-            },
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          CalendarDatePicker(
-            initialDate: selected ?? now.startOfDay,
-            firstDate: DateTime(now.year - 1),
-            lastDate: DateTime(now.year + 5),
-            onDateChanged: (date) {
-              onSelected(date);
-              FamilyModalSheet.of(context).popPage();
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
