@@ -17,36 +17,154 @@ import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/global_sheet.dart';
 import 'package:uuid/uuid.dart';
 
+/// Session-owned editing state for one task-editor sheet invocation.
+///
+/// Instances live in the [showTaskEditorSheet] closure — outside the sheet's
+/// page subtree. Pushing a picker page unmounts the whole sheet content (and
+/// the transition briefly mounts duplicates), so state owned by the screen
+/// would be discarded and its [ValueNotifier] disposed while a selection is
+/// still pending. Mounts [retain]/[release]; the last release disposes. This
+/// keeps title, draft and in-flight selections alive across push/pop cycles,
+/// and guarantees disposal only after the sheet is truly gone: the sheet
+/// future completes before its exit animation ends, so disposing there races
+/// rebuilds of the still-mounted subtree.
+final class _TaskEditorSession {
+  _TaskEditorSession({Task? task, String? newTaskId})
+    : titleController = TextEditingController(text: task?.title ?? ''),
+      draftNotifier = ValueNotifier<TaskMetadataDraft>(_draftForTask(task)),
+      newTaskId = task?.id ?? newTaskId ?? const Uuid().v4() {
+    titleController.addListener(_onTitleChanged);
+  }
+
+  final TextEditingController titleController;
+  final ValueNotifier<TaskMetadataDraft> draftNotifier;
+
+  /// Stable id for a created task, so a remount between concurrent saves
+  /// cannot mint a second task.
+  final String newTaskId;
+
+  /// Last task snapshot applied to the controllers. Lives here (not in the
+  /// screen State) so a picker push/pop remount never re-applies a stale
+  /// snapshot over in-flight edits.
+  Task? lastSyncedTask;
+
+  /// Local-first guards: once the user has typed in the title or edited the
+  /// metadata draft, a later remote snapshot must never be re-applied over
+  /// their in-flight input. Reassigning `TextEditingController.text` mid-typing
+  /// resets the cursor and corrupts the IME composition, interleaving the
+  /// letters that follow.
+  bool titleTouched = false;
+  bool draftTouched = false;
+
+  /// True while [applyTask] is assigning, so its own change notifications are
+  /// not mistaken for user edits (and never fire the permission prompt).
+  bool applyingTask = false;
+
+  int _retains = 0;
+
+  void retain() => _retains++;
+
+  void release() {
+    assert(_retains > 0, 'Task editor session released without a retain');
+    if (--_retains > 0) return;
+    titleController.removeListener(_onTitleChanged);
+    titleController.dispose();
+    draftNotifier.dispose();
+  }
+
+  void _onTitleChanged() {
+    if (applyingTask) return;
+    titleTouched = true;
+  }
+
+  /// Applies a task snapshot to the controllers. Must never run during
+  /// `build`: sibling subtrees (sheet height measurer, crossfade duplicates)
+  /// listen to the same objects, and notifying them mid-build crashes.
+  void applyTask(Task task) {
+    lastSyncedTask = task;
+    applyingTask = true;
+    try {
+      // Skip identical text: assigning `.text` also resets the selection,
+      // which would move the cursor even when the content is unchanged.
+      if (titleController.text != task.title) {
+        titleController.text = task.title;
+      }
+      draftNotifier.value = _draftForTask(task);
+    } finally {
+      applyingTask = false;
+    }
+  }
+}
+
 /// Opens the standalone task editor directly in the app's global sheet.
 Future<void> showTaskEditorSheet({
   required BuildContext context,
   String? taskId,
   Task? task,
 }) async {
-  await showGlobalSheet<void>(
-    context: context,
-    builder: (_) => TaskEditorScreen(taskId: taskId, task: task),
+  final session = _TaskEditorSession(task: task);
+  session.retain();
+  try {
+    await showGlobalSheet<void>(
+      context: context,
+      builder: (_) =>
+          TaskEditorScreen(taskId: taskId, task: task, session: session),
+    );
+  } finally {
+    session.release();
+  }
+}
+
+/// Initial metadata draft for a task, shared by the sheet opener (which seeds
+/// externally-owned controllers) and the screen fallback (async task load).
+TaskMetadataDraft _draftForTask(Task? task) {
+  if (task == null) {
+    return const TaskMetadataDraft(
+      scheduleAnchor: null,
+      hasTime: false,
+      recurrence: null,
+      reminder: null,
+    );
+  }
+  return TaskMetadataDraft(
+    scheduleAnchor: task.dueDate,
+    hasTime: task.hasTime,
+    recurrence: TaskRecurrence.parse(task.recurrenceRule),
+    reminder: TaskReminderOption.fromValue(task.reminder),
+    completions: readScheduledCompletions(
+      task.completions,
+      hasTime: task.hasTime,
+    ),
   );
 }
 
 class TaskEditorScreen extends ConsumerStatefulWidget {
-  const TaskEditorScreen({this.taskId, this.task, super.key})
-    : assert(taskId == null || task == null);
+  const TaskEditorScreen({
+    this.taskId,
+    this.task,
+    this.session,
+    super.key,
+  }) : assert(taskId == null || task == null);
 
   final String? taskId;
   final Task? task;
+
+  /// Externally-owned editing state, provided by [showTaskEditorSheet].
+  /// When present, the screen retains/releases it instead of owning it, so
+  /// title and draft survive the sheet's page push/pop cycles (which unmount
+  /// this subtree, sometimes with transient duplicate mounts).
+  final _TaskEditorSession? session;
 
   @override
   ConsumerState<TaskEditorScreen> createState() => _TaskEditorScreenState();
 }
 
 class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
-  late final TextEditingController _titleController;
+  late final _TaskEditorSession _session;
   late final FocusNode _titleFocusNode;
-  late final String _metadataKey;
-  late TaskMetadataDraft _metadata;
   AsyncValue<void> _saveState = const AsyncData(null);
-  String? _loadedTaskId;
+  Task? _syncPending;
+  TaskMetadataDraft? _lastDraft;
   bool _focusRequested = false;
 
   bool get _isNew => widget.taskId == null && widget.task == null;
@@ -54,18 +172,15 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController();
+    _session = widget.session ?? _TaskEditorSession(task: widget.task);
+    _session.retain();
+    _lastDraft = _session.draftNotifier.value;
+    _session.draftNotifier.addListener(_onDraftChanged);
     _titleFocusNode = FocusNode();
-    _metadataKey = widget.task?.id ?? widget.taskId ?? const Uuid().v4();
-    _metadata = const TaskMetadataDraft(
-      scheduleAnchor: null,
-      hasTime: false,
-      recurrence: null,
-      reminder: null,
-    );
     // `autofocus` on the field fires before the bottom-sheet route settles,
     // which opens the keyboard without delivering focus to the input.
-    // Requesting focus after the first frame lands it reliably, exactly once.
+    // Requesting focus after the first frame lands it reliably, and re-runs
+    // after a picker push/pop remounts this subtree.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _focusRequested) return;
       _focusRequested = true;
@@ -75,7 +190,8 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
 
   @override
   void dispose() {
-    _titleController.dispose();
+    _session.draftNotifier.removeListener(_onDraftChanged);
+    _session.release();
     _titleFocusNode.dispose();
     super.dispose();
   }
@@ -96,10 +212,9 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
         onDelete: () => _delete(widget.task!),
         isSaving: saveView.isSaving,
         child: TaskEditorForm(
-          titleController: _titleController,
+          titleController: _session.titleController,
           titleFocusNode: _titleFocusNode,
-          metadata: _metadata,
-          onMetadataChanged: _onMetadataChanged,
+          draftNotifier: _session.draftNotifier,
           onSubmitted: () => unawaited(_save(widget.task)),
           errorText: saveView.errorText,
         ),
@@ -112,10 +227,9 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
         onSave: () => _save(null),
         isSaving: saveView.isSaving,
         child: TaskEditorForm(
-          titleController: _titleController,
+          titleController: _session.titleController,
           titleFocusNode: _titleFocusNode,
-          metadata: _metadata,
-          onMetadataChanged: _onMetadataChanged,
+          draftNotifier: _session.draftNotifier,
           onSubmitted: () => unawaited(_save(null)),
           errorText: saveView.errorText,
         ),
@@ -155,10 +269,9 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
           onDelete: () => _delete(task),
           isSaving: saveView.isSaving,
           child: TaskEditorForm(
-            titleController: _titleController,
-          titleFocusNode: _titleFocusNode,
-            metadata: _metadata,
-            onMetadataChanged: _onMetadataChanged,
+            titleController: _session.titleController,
+            titleFocusNode: _titleFocusNode,
+            draftNotifier: _session.draftNotifier,
             onSubmitted: () => unawaited(_save(task)),
             errorText: saveView.errorText,
           ),
@@ -168,27 +281,45 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   }
 
   void _synchronizeTask(Task task) {
-    if (_loadedTaskId == task.id) return;
-    _loadedTaskId = task.id;
-    _titleController.text = task.title;
-    _metadata = TaskMetadataDraft(
-      scheduleAnchor: task.dueDate,
-      hasTime: task.hasTime,
-      recurrence: TaskRecurrence.parse(task.recurrenceRule),
-      reminder: TaskReminderOption.fromValue(task.reminder),
-      completions: readScheduledCompletions(
-        task.completions,
-        hasTime: task.hasTime,
-      ),
-    );
+    // Value equality: re-seeds on genuine remote changes, but never clobbers
+    // in-flight title/metadata edits after a picker push/pop remount (which
+    // replays the same snapshot through a fresh State).
+    if (task == _session.lastSyncedTask || task == _syncPending) return;
+    if (_session.lastSyncedTask == null) {
+      // Virgin session: no sibling subtree can be listening yet, so seeding
+      // synchronously keeps the first painted frame correct.
+      _session.applyTask(task);
+      _lastDraft = _session.draftNotifier.value;
+      return;
+    }
+    if (_session.titleTouched || _session.draftTouched) {
+      // Local-first: the user already edited this task in the sheet. Record
+      // the snapshot as seen (so equal re-emissions short-circuit) but never
+      // write it back over their unsaved input.
+      _session.lastSyncedTask = task;
+      return;
+    }
+    _syncPending = task;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncPending = null;
+      if (!mounted) return;
+      _session.applyTask(task);
+      _lastDraft = _session.draftNotifier.value;
+    });
   }
 
-  void _onMetadataChanged(TaskMetadataDraft draft) {
+  void _onDraftChanged() {
+    final next = _session.draftNotifier.value;
+    // A programmatic re-seed (applyTask) is not a user action: it must not
+    // mark the draft as touched nor fire the permission prompt.
+    if (!_session.applyingTask) _session.draftTouched = true;
     // The platform permission prompt is expensive: only fire it when a
     // reminder is newly added, not on every tweak while one is already set.
-    final hadReminder = _metadata.reminder != null;
-    setState(() => _metadata = draft);
-    if (draft.reminder != null && !hadReminder) {
+    // The service itself skips the prompt when already granted.
+    final hadReminder = _lastDraft?.reminder != null;
+    _lastDraft = next;
+    if (_session.applyingTask) return;
+    if (next.reminder != null && !hadReminder) {
       unawaited(
         ref
             .read(taskNotificationSchedulerProvider.notifier)
@@ -198,7 +329,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
   }
 
   Future<void> _save(Task? task) async {
-    final title = _titleController.text.trim();
+    final title = _session.titleController.text.trim();
     if (title.isEmpty) {
       setState(() {
         _saveState = AsyncError(
@@ -210,7 +341,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
     }
     setState(() => _saveState = const AsyncLoading());
     try {
-      final draft = _metadata;
+      final draft = _session.draftNotifier.value;
       if (task == null) {
         final ownerUserId = ref.read(currentUserIdProvider);
         if (ownerUserId == null || ownerUserId.isEmpty) {
@@ -220,7 +351,7 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
         final now = DateTime.now().toUtc();
         await controller.create(
           Task(
-            id: _metadataKey,
+            id: _session.newTaskId,
             ownerUserId: ownerUserId,
             title: title,
             dueDate: draft.scheduleAnchor,
