@@ -350,4 +350,224 @@ void main() {
       );
     },
   );
+
+  test(
+    'preserves untouched blocks and the caret during a remote rebuild',
+    () async {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'block-1', text: AttributedText('Local typing')),
+          ParagraphNode(id: 'block-2', text: AttributedText('Old remote')),
+        ],
+      );
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      final applier = DocumentProjectionApplier(
+        document: document,
+        editor: editor,
+        codec: const NoteDocumentCodec(),
+      );
+
+      const caret = DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: 'block-1',
+          nodePosition: TextNodePosition(offset: 5),
+        ),
+      );
+      editor.execute([
+        const ChangeSelectionRequest(
+          caret,
+          SelectionChangeType.placeCaret,
+          SelectionReason.userInteraction,
+        ),
+      ]);
+      final untouchedNode = document.getNodeById('block-1');
+      var selectionNotifications = 0;
+      composer.addListener(() => selectionNotifications++);
+
+      await applier.rebuildFromSnapshot(
+        snapshot: const {
+          'blocks': [
+            {
+              'id': 'block-1',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'Local typing'},
+              ],
+            },
+            {
+              'id': 'block-2',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'New remote'},
+              ],
+            },
+          ],
+        },
+        pendingOps: null,
+        repairPersistedSnapshot: false,
+        suppressCapture: () {},
+        resumeCapture: () {},
+        rebuildMirror: () {},
+      );
+
+      // The block the user is editing keeps its exact node instance, so its
+      // widget and IME state are never torn down by the update.
+      expect(
+        identical(document.getNodeById('block-1'), untouchedNode),
+        isTrue,
+      );
+      expect(
+        (document.getNodeById('block-2') as TextNode).text.toPlainText(),
+        'New remote',
+      );
+      // The caret never moved, and the composer never emitted a selection
+      // change (the old rebuild cleared and restored the selection, which
+      // closes the keyboard through the IME selection policy).
+      expect(selectionNotifications, 0);
+      expect(composer.selection, isNotNull);
+      expect(composer.selection!.base.nodeId, 'block-1');
+      expect(
+        (composer.selection!.base.nodePosition as TextNodePosition).offset,
+        5,
+      );
+    },
+  );
+
+  test('maps the caret through a remote insert before it', () async {
+    final document = MutableDocument(
+      nodes: [ParagraphNode(id: 'block-1', text: AttributedText('abcd'))],
+    );
+    final composer = MutableDocumentComposer();
+    final editor = createDefaultDocumentEditor(
+      document: document,
+      composer: composer,
+    );
+    final applier = DocumentProjectionApplier(
+      document: document,
+      editor: editor,
+      codec: const NoteDocumentCodec(),
+    );
+
+    const caret = DocumentSelection.collapsed(
+      position: DocumentPosition(
+        nodeId: 'block-1',
+        nodePosition: TextNodePosition(offset: 4),
+      ),
+    );
+    editor.execute([
+      const ChangeSelectionRequest(
+        caret,
+        SelectionChangeType.placeCaret,
+        SelectionReason.userInteraction,
+      ),
+    ]);
+
+    await applier.rebuildFromSnapshot(
+      snapshot: const {
+        'blocks': [
+          {
+            'id': 'block-1',
+            'type': 'paragraph',
+            'delta': [
+              {'insert': 'abXcd'},
+            ],
+          },
+        ],
+      },
+      pendingOps: null,
+      repairPersistedSnapshot: false,
+      suppressCapture: () {},
+      resumeCapture: () {},
+      rebuildMirror: () {},
+    );
+
+    expect((document.first as TextNode).text.toPlainText(), 'abXcd');
+    expect(composer.selection, isNotNull);
+    expect(composer.selection!.base.nodeId, 'block-1');
+    expect(
+      (composer.selection!.base.nodePosition as TextNodePosition).offset,
+      5,
+    );
+  });
+
+  test(
+    'applies structural remote changes without recreating survivors',
+    () async {
+      final document = MutableDocument(
+        nodes: [
+          ParagraphNode(id: 'block-a', text: AttributedText('one')),
+          ParagraphNode(id: 'block-b', text: AttributedText('two')),
+          ParagraphNode(id: 'block-c', text: AttributedText('removed')),
+        ],
+      );
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: document,
+        composer: composer,
+      );
+      final applier = DocumentProjectionApplier(
+        document: document,
+        editor: editor,
+        codec: const NoteDocumentCodec(),
+      );
+      final survivorA = document.getNodeById('block-a');
+      final survivorB = document.getNodeById('block-b');
+
+      await applier.rebuildFromSnapshot(
+        snapshot: const {
+          'blocks': [
+            {
+              'id': 'block-a',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'one'},
+              ],
+            },
+            {
+              'id': 'block-new',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'inserted'},
+              ],
+            },
+            {
+              'id': 'block-b',
+              'type': 'paragraph',
+              'delta': [
+                {'insert': 'two'},
+              ],
+            },
+          ],
+        },
+        pendingOps: null,
+        repairPersistedSnapshot: false,
+        suppressCapture: () {},
+        resumeCapture: () {},
+        rebuildMirror: () {},
+      );
+
+      expect(document.toList().map((node) => node.id), [
+        'block-a',
+        'block-new',
+        'block-b',
+      ]);
+      expect(
+        identical(document.getNodeById('block-a'), survivorA),
+        isTrue,
+      );
+      expect(
+        identical(document.getNodeById('block-b'), survivorB),
+        isTrue,
+      );
+      expect(document.getNodeById('block-c'), isNull);
+      expect(
+        (document.getNodeById('block-new') as TextNode).text.toPlainText(),
+        'inserted',
+      );
+    },
+  );
 }

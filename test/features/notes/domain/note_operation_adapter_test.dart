@@ -1150,4 +1150,116 @@ void main() {
       expect(capturedOps, isNull);
     });
   });
+
+  group('ime composition', () {
+    test(
+      'defers a remote rebuild while composing and applies it after commit',
+      () async {
+        final adapter = createAdapter();
+        addTearDown(adapter.dispose);
+        await adapter.start();
+
+        // The IME previews a word: the text changes while a composing region
+        // is active on the composer.
+        editor.execute([
+          ReplaceNodeRequest(
+            existingNodeId: 'block-1',
+            newNode: ParagraphNode(
+              id: 'block-1',
+              text: AttributedText('Hello compo'),
+            ),
+          ),
+        ]);
+        editor.execute([
+          ChangeComposingRegionRequest(
+            DocumentRange(
+              start: const DocumentPosition(
+                nodeId: 'block-1',
+                nodePosition: TextNodePosition(offset: 6),
+              ),
+              end: const DocumentPosition(
+                nodeId: 'block-1',
+                nodePosition: TextNodePosition(offset: 11),
+              ),
+            ),
+          ),
+        ]);
+
+        await adapter.reconcile(
+          SyncResult(
+            acceptedCount: 1,
+            acceptedOperationIds: ['remote-1'],
+            finalRevision: 2,
+            remoteOperations: [
+              Operation(
+                operationId: 'remote-1',
+                noteId: 'note-1',
+                revision: 2,
+                baseRevision: 1,
+                actorId: '',
+                kind: 'text_delta',
+                blockId: 'block-2',
+                payload: {
+                  'ops': [
+                    {'insert': 'Remote block'},
+                  ],
+                },
+                createdAt: DateTime.utc(2026, 8, 3),
+              ),
+            ],
+            canonicalDocument: NoteDocumentResponse(
+              noteId: 'note-1',
+              revision: 2,
+              document: {
+                'blocks': [
+                  {
+                    'id': 'block-1',
+                    'type': 'paragraph',
+                    'delta': [
+                      {'insert': 'Hello compo'},
+                    ],
+                  },
+                  {
+                    'id': 'block-2',
+                    'type': 'paragraph',
+                    'delta': [
+                      {'insert': 'Remote block'},
+                    ],
+                  },
+                ],
+              },
+              serverTime: DateTime.utc(2026, 8, 3),
+            ),
+          ),
+        );
+
+        // The rebuild must not run while the composition is active: no node
+        // may be torn down under the IME, and the preview text must survive.
+        expect(document.getNodeById('block-2'), isNull);
+        expect((document.first as TextNode).text.toPlainText(), 'Hello compo');
+
+        // The IME commits the word and clears the composing region.
+        editor.execute([
+          ReplaceNodeRequest(
+            existingNodeId: 'block-1',
+            newNode: ParagraphNode(
+              id: 'block-1',
+              text: AttributedText('Hello composed'),
+            ),
+          ),
+        ]);
+        editor.execute([ChangeComposingRegionRequest(null)]);
+
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+
+        // The deferred rebuild applied, and the committed text survived it.
+        expect(document.getNodeById('block-2'), isNotNull);
+        expect(
+          (document.getNodeById('block-1') as TextNode).text.toPlainText(),
+          'Hello composed',
+        );
+      },
+    );
+  });
 }

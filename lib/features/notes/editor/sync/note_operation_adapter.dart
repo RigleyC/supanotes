@@ -29,6 +29,7 @@ class NoteOperationAdapter {
   }) : _syncService = syncService,
        _noteId = noteId,
        _document = document,
+       _editor = editor,
        _captureLocalOperations = captureLocalOperations,
        _codec = codec {
     _applier = DocumentProjectionApplier(
@@ -42,11 +43,18 @@ class NoteOperationAdapter {
       codec: _codec,
       onOperationsCaptured: _onOperationsCaptured,
     );
+    // The composer is the source of truth for IME composition in this
+    // super_editor version. A deferred rebuild is flushed as soon as the
+    // platform commits (or cancels) the composition.
+    _editor.maybeComposer?.composingRegion.addListener(
+      _onComposingRegionChanged,
+    );
   }
 
   final NoteOperationsSyncService _syncService;
   final String _noteId;
   final MutableDocument _document;
+  final Editor _editor;
   bool _captureLocalOperations;
   final NoteDocumentCodec _codec;
 
@@ -70,25 +78,40 @@ class NoteOperationAdapter {
 
   void Function(List<OperationRequest> ops)? onLocalOperations;
 
-  bool _isComposing = false;
   bool _disposed = false;
   bool _hasCapturedLocalOperations = false;
   _RebuildRequest? _pendingRebuild;
 
-  void onCompositionStart() {
-    if (!_disposed) _isComposing = true;
+  /// Whether the platform IME is mid-composition in the editor.
+  ///
+  /// Composition state lives on the composer (`composer.composingRegion`),
+  /// not on the text: this super_editor version never writes a 'composing'
+  /// text attribution, so any guard based on attributions or on manually
+  /// forwarded start/end calls is dead code and never protects typing.
+  bool get _isEditorComposing {
+    final composer = _editor.maybeComposer;
+    return composer != null && composer.composingRegion.value != null;
   }
 
-  void onCompositionEnd() {
+  void _onComposingRegionChanged() {
+    if (_disposed || _pendingRebuild == null) return;
+    if (_isEditorComposing) return;
+    // Flush on a microtask so the deferred rebuild never mutates the document
+    // re-entrantly inside the edit that ended the composition. Capture runs
+    // synchronously on that document change, so by flush time the committed
+    // operations are already merged into the projection.
+    scheduleMicrotask(_flushDeferredRebuild);
+  }
+
+  void _flushDeferredRebuild() {
     if (_disposed) return;
-    _isComposing = false;
-    if (_pendingRebuild != null) {
-      final req = _pendingRebuild!;
-      _pendingRebuild = null;
-      unawaited(
-        rebuildFromSnapshot(snapshot: req.snapshot, rebasedOps: req.ops),
-      );
-    }
+    final request = _pendingRebuild;
+    if (request == null) return;
+    if (_isEditorComposing) return; // composition restarted; wait again
+    _pendingRebuild = null;
+    unawaited(
+      rebuildFromSnapshot(snapshot: request.snapshot, rebasedOps: request.ops),
+    );
   }
 
   Future<void> start() async {
@@ -365,7 +388,7 @@ class NoteOperationAdapter {
     required List<PendingNoteOperationData>? rebasedOps,
   }) async {
     if (_disposed) return;
-    if (_isComposing) {
+    if (_isEditorComposing) {
       NoteSyncDebug.log('adapter.rebuild.deferred_composing', noteId: _noteId);
       _pendingRebuild = _RebuildRequest(snapshot: snapshot, ops: rebasedOps);
       return;
@@ -402,6 +425,9 @@ class NoteOperationAdapter {
     _disposed = true;
     _debounceTimer?.cancel();
     _pendingRebuild = null;
+    _editor.maybeComposer?.composingRegion.removeListener(
+      _onComposingRegionChanged,
+    );
     _capture.stop();
     _pendingOpsController.close();
   }
