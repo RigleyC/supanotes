@@ -230,8 +230,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   bool _isUpdatingCompletion = false;
   Timer? _occurrenceBoundaryTimer;
 
-  bool get _isRecurring => widget.isRecurring;
-
   bool get _isHidden => widget.hideCompleted && _isComplete;
 
   @override
@@ -276,11 +274,24 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       anchorDay: anchor.day,
     );
     if (next == null) return;
-    final delay = next.difference(DateTime.now());
-    if (delay <= Duration.zero) {
-      _refreshOccurrence();
-      return;
-    }
+    final now = DateTime.now();
+    // Visibility changes at the next local date boundary; an open occurrence
+    // also changes from pending to overdue at its scheduled wall-clock time.
+    final boundaries = <DateTime>[
+      current.scheduledAt,
+      DateTime(
+        current.scheduledAt.year,
+        current.scheduledAt.month,
+        current.scheduledAt.day,
+      ),
+      DateTime(next.year, next.month, next.day),
+    ].where((boundary) => boundary.isAfter(now));
+    if (boundaries.isEmpty) return;
+    final boundary = boundaries.reduce(
+      (earliest, candidate) =>
+          candidate.isBefore(earliest) ? candidate : earliest,
+    );
+    final delay = boundary.difference(now);
     _occurrenceBoundaryTimer = Timer(delay, _refreshOccurrence);
   }
 

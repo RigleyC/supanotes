@@ -1,5 +1,31 @@
 # Implementation plan — local-first note persistence
 
+## Open timed recurring occurrences at the start of their calendar day
+
+Status: complete.
+
+Decision: a timed recurring task's occurrence for a local calendar date becomes
+the visible/actionable occurrence at local midnight, not at its scheduled clock
+time. It is pending until its scheduled time, becomes overdue after that time if
+still open, and can be completed early against that date's scheduledAt key. A
+completion remains visible until the next scheduled occurrence date begins.
+This applies consistently to note tasks and independent tasks. Reminder timing
+continues to use its own future-occurrence calculation.
+
+Implementation scope:
+- [x] Update the shared occurrence policy so recurrence selection advances by
+  calendar date while overdue status still compares the scheduled wall-clock.
+- [x] Keep note editor refresh aligned with both midnight and the scheduled
+  time, so it opens the new day early and becomes overdue on time.
+- [x] Verify standalone task completion and backend mutation accept the
+  current-day occurrence before its scheduled time.
+- [x] Preserve local calendar values and completion history; no account data
+  was rewritten.
+
+Verification: formatter, targeted analyzer, Android debug build, and diff
+checks passed. No tests were run because the repository AGENTS.md prohibits
+unit tests.
+
 ## Tasks independentes e navegação Tasks/Notas
 
 Status: Tasks 1–10 implementadas; documentação normativa e runbook da Task 11

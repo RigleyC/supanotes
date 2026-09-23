@@ -1,5 +1,18 @@
 # Task — iOS task text selection
 
+## Timed recurring tasks open at local midnight (2026-09-23)
+
+- [x] Make today's timed occurrence current from the start of its local date.
+- [x] Keep it pending until its scheduled time and overdue afterward.
+- [x] Preserve completion against the exact scheduled occurrence for note and
+  independent tasks.
+- [x] Keep note-editor refresh aligned with midnight and scheduled-time
+  boundaries; preserve notification timing.
+- [x] Verify targeted Flutter analysis, Android debug build, and diff checks.
+- [x] Confirm the backend accepts canonical future `scheduledAt` values; no
+  server change is needed.
+- [x] Do not rewrite task data in production.
+
 - [x] Confirm that task text captures the iOS selection long press.
 - [x] Move the task action long press to the checkbox target.
 - [x] Add regression coverage for task actions and task text selection.

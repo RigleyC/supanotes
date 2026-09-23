@@ -55,8 +55,9 @@ class TaskOccurrencePolicy {
 
   final DateTime Function()? clock;
 
-  /// Returns the latest scheduled occurrence that has started, or `null` when
-  /// the task has no anchor date.
+  /// Returns the latest occurrence date that has begun, or `null` when the
+  /// task has no anchor date. Timed occurrences become current at local
+  /// midnight on their scheduled date so they can be completed early.
   DateTime? currentScheduledAt({
     required DateTime? anchor,
     required TaskRecurrence? recurrence,
@@ -122,10 +123,10 @@ class TaskOccurrencePolicy {
 
   /// Returns the occurrence that should be used for a future reminder.
   ///
-  /// The editor still uses [resolveCurrent], so an overdue occurrence remains
-  /// visible until the next scheduled date starts. A reminder cannot be
-  /// scheduled in the past, therefore an overdue recurring task points at its
-  /// first future, uncompleted occurrence instead.
+  /// Visible task surfaces use [resolveCurrent], so an overdue occurrence
+  /// remains visible until the next scheduled date starts. Notifications retain their
+  /// own time-based future check, so a same-day occurrence can still receive a
+  /// reminder at its scheduled time even though it became current at midnight.
   TaskOccurrence? resolveNotificationOccurrence({
     required String taskId,
     required DateTime? anchor,
@@ -160,7 +161,7 @@ class TaskOccurrencePolicy {
         completedAtByScheduledAt: completedAtByScheduledAt,
       );
       final isNotificationInFuture = notificationAt == null
-          ? !_hasStarted(scheduledAt, effectiveNow, hasTime)
+          ? !_hasScheduledTimeStarted(scheduledAt, effectiveNow, hasTime)
           : notificationAt(scheduledAt)?.isAfter(effectiveNow) ?? false;
       if (completedAt == null && isNotificationInFuture) {
         return TaskOccurrence(
@@ -240,7 +241,7 @@ class TaskOccurrencePolicy {
     DateTime? latestStarted;
 
     for (var i = 0; i < 10000; i++) {
-      final hasStarted = _hasStarted(scheduledAt, now, hasTime);
+      final hasStarted = _hasDateStarted(scheduledAt, now);
 
       if (!hasStarted) {
         final current = latestStarted ?? scheduledAt;
@@ -263,9 +264,8 @@ class TaskOccurrencePolicy {
         );
       }
 
-      // Keep the latest occurrence that has started visible, including after
-      // completion. It remains the current occurrence until its successor
-      // reaches its scheduled boundary.
+      // Keep the latest occurrence date visible, including after completion.
+      // A new timed occurrence replaces it at local midnight on its date.
       latestStarted = scheduledAt;
 
       final next = nextDueDate(
@@ -295,10 +295,25 @@ class TaskOccurrencePolicy {
     );
   }
 
-  bool _hasStarted(DateTime scheduledAt, DateTime now, bool hasTime) {
+  bool _hasScheduledTimeStarted(
+    DateTime scheduledAt,
+    DateTime now,
+    bool hasTime,
+  ) {
     final scheduled = canonicalScheduledAt(scheduledAt, hasTime: hasTime);
     final current = canonicalScheduledAt(now.toLocal(), hasTime: hasTime);
     return !scheduled.isAfter(current);
+  }
+
+  bool _hasDateStarted(DateTime scheduledAt, DateTime now) {
+    final scheduledDate = DateTime(
+      scheduledAt.year,
+      scheduledAt.month,
+      scheduledAt.day,
+    );
+    final current = now.toLocal();
+    final currentDate = DateTime(current.year, current.month, current.day);
+    return !scheduledDate.isAfter(currentDate);
   }
 }
 

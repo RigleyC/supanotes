@@ -266,3 +266,26 @@ artifacts but does not publish an app update; the user will generate APK/IPA
 after the staged backend release.
 
 Verification: focused task/editor Flutter tests passed (76 tests). The full Flutter suite completed with 866 passes and one unrelated failure, reproduced in isolation: `test/shared/widgets/confirm_dialog_test.dart`, “showConfirmDialog emits a control tap for Cancelar e Confirmar” expects one haptic but receives two. Task/editor expectations were updated to the approved occurrence behavior without adding tests. Targeted Flutter analysis completed with infos only; Go `go test ./...` passed (462 tests/29 packages), `go build ./...` and `git diff --check` passed. Reminder delivery and note rollover were not device-tested; the note component schedules a local refresh at the next occurrence boundary so hide-completed does not depend on a document event.
+
+## Timed recurring occurrences open at local midnight (2026-09-23)
+
+Timed recurring tasks now use the occurrence scheduled for the current local
+calendar date from midnight onward. It remains pending before its scheduled
+time, becomes overdue after that time if still open, and can be completed early
+against today's schedule key. The prior day's completion no longer makes
+today's later-timed occurrence appear checked. At the next scheduled date's
+midnight, the following occurrence becomes current.
+
+This uses the shared domain resolver, so it applies to tasks inside notes and
+independent tasks in the Tasks tab. Note-editor refresh now considers both the
+local midnight date boundary and the scheduled wall-clock boundary. Reminder
+calculation remains time-based and separate. The backend already accepts the
+canonical scheduled key for early completion, so it needed no change. No
+production task data was modified.
+
+Verification: Dart formatting, targeted Flutter analysis, Android debug APK
+build, and `git diff --check` passed. Analysis reported existing `info`
+diagnostics only. The debug build emitted existing Gradle/AGP/Kotlin deprecation
+and Java source/target warnings. Tests were not run because project
+`AGENTS.md` prohibits unit tests. Device behavior and the iOS build were not
+verified here.

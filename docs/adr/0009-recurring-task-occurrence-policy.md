@@ -18,12 +18,16 @@ therefore make the editor, task projection, and task views disagree.
 
 ## Decision
 
-- The current occurrence is the latest scheduled occurrence that has started
-  at the evaluation time.
+- The current occurrence is the latest scheduled calendar date that has begun
+  in the local timezone. A timed occurrence becomes current at local midnight
+  on its scheduled date, so the user can complete it before its scheduled time.
+- A timed occurrence is pending until its scheduled wall-clock time and overdue
+  afterward if it remains open.
 - Missed occurrences are not kept as a permanent backlog.
 - An overdue occurrence remains the visible occurrence until the next
-  scheduled date starts. Notification readers may resolve a separate future
-  occurrence so they never schedule a reminder in the past.
+  scheduled calendar date starts. Notification readers retain their own
+  time-based future-occurrence calculation, so a reminder still targets its
+  scheduled time rather than the midnight visibility boundary.
 - The recurrence anchor day is stable. A monthly series anchored on day 31
   clamps February to day 28 and returns to day 31 in March.
 - A completion records the scheduled calendar identity and the actual UTC
