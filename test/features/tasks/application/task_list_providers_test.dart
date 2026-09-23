@@ -39,14 +39,12 @@ VisibleNoteDocument _noteDocument({
   required String blockId,
   required String title,
   String? dueDate,
-  bool hideCompleted = true,
   bool isCompleted = false,
   String? lastCompletedAt,
   DateTime? createdAt,
 }) => VisibleNoteDocument(
   noteId: noteId,
   noteTitle: 'Origem',
-  hideCompleted: hideCompleted,
   createdAt: createdAt,
   documentJson: jsonEncode({
     'schemaVersion': 1,
@@ -265,8 +263,11 @@ void main() {
       taskListProvider(includeNoteTasks: false).future,
     );
 
-    expect(items, hasLength(1));
-    expect(items.single.task!.id, 'task-1');
+    expect(items, hasLength(2));
+    expect(
+      items.map((item) => item.task!.id),
+      containsAll(['task-1', 'task-done']),
+    );
   });
 
   test(

@@ -108,8 +108,7 @@ final class NoteEditorOperationBuilder {
     // Indexed once: the per-block loop below used `before.blocks.indexOf`,
     // which scans the whole list on every keystroke (O(n^2) per edit).
     final beforeIndexById = <String, int>{
-      for (var i = 0; i < before.blocks.length; i++)
-        before.blocks[i].id: i,
+      for (var i = 0; i < before.blocks.length; i++) before.blocks[i].id: i,
     };
     final afterIds = after.blocks.map((block) => block.id).toSet();
     final operations = <NoteEditorOperation>[];
@@ -206,41 +205,45 @@ final class NoteEditorOperationBuilder {
     final afterCompletions = Map<String, dynamic>.from(
       after.metadata['completions'] as Map? ?? {},
     );
+    final scheduleChanged = _hasScheduleChange(before.metadata, after.metadata);
 
-    for (final entry in afterCompletions.entries) {
-      if (beforeCompletions[entry.key] == entry.value) continue;
-      operations.add(
-        NoteEditorOperation(
-          kind: NoteEditorOperationKind.completeTaskOccurrence,
-          blockId: after.id,
-          payload: {
-            'taskId': after.id,
-            'scheduledAt': entry.key,
-            'completedAt': entry.value,
-          },
-        ),
-      );
-    }
+    if (!scheduleChanged) {
+      for (final entry in afterCompletions.entries) {
+        if (beforeCompletions[entry.key] == entry.value) continue;
+        operations.add(
+          NoteEditorOperation(
+            kind: NoteEditorOperationKind.completeTaskOccurrence,
+            blockId: after.id,
+            payload: {
+              'taskId': after.id,
+              'scheduledAt': entry.key,
+              'completedAt': entry.value,
+            },
+          ),
+        );
+      }
 
-    for (final key in beforeCompletions.keys) {
-      if (afterCompletions.containsKey(key)) continue;
-      operations.add(
-        NoteEditorOperation(
-          kind: NoteEditorOperationKind.completeTaskOccurrence,
-          blockId: after.id,
-          payload: {
-            'taskId': after.id,
-            'scheduledAt': key,
-            'completedAt': null,
-          },
-        ),
-      );
+      for (final key in beforeCompletions.keys) {
+        if (afterCompletions.containsKey(key)) continue;
+        operations.add(
+          NoteEditorOperation(
+            kind: NoteEditorOperationKind.completeTaskOccurrence,
+            blockId: after.id,
+            payload: {
+              'taskId': after.id,
+              'scheduledAt': key,
+              'completedAt': null,
+            },
+          ),
+        );
+      }
     }
 
     final afterOtherMetadata = Map<String, dynamic>.from(after.metadata)
       ..remove('completions');
     final beforeOtherMetadata = Map<String, dynamic>.from(before.metadata)
       ..remove('completions');
+    if (scheduleChanged) afterOtherMetadata['completions'] = null;
     if (!mapEquals(afterOtherMetadata, beforeOtherMetadata)) {
       for (final key in beforeOtherMetadata.keys) {
         if (!afterOtherMetadata.containsKey(key)) {
@@ -256,6 +259,15 @@ final class NoteEditorOperationBuilder {
       );
     }
   }
+
+  bool _hasScheduleChange(
+    Map<String, dynamic> before,
+    Map<String, dynamic> after,
+  ) =>
+      before['dueDate'] != after['dueDate'] ||
+      (before['hasTime'] as bool? ?? false) !=
+          (after['hasTime'] as bool? ?? false) ||
+      before['recurrenceRule'] != after['recurrenceRule'];
 
   List<Map<String, dynamic>> _computeAttributedTextDelta(
     AttributedText oldText,

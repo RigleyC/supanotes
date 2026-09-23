@@ -228,5 +228,34 @@ func validateCanonicalTaskMetadata(metadata map[string]any) error {
 		}
 	}
 
+	if value, exists := metadata["completionHistory"]; exists && value != nil {
+		records, ok := value.([]any)
+		if !ok {
+			return fmt.Errorf("invalid completionHistory metadata")
+		}
+		for _, rawRecord := range records {
+			record, ok := rawRecord.(map[string]any)
+			if !ok {
+				return fmt.Errorf("invalid completionHistory metadata")
+			}
+			_, ok = record["hasTime"].(bool)
+			if !ok {
+				return fmt.Errorf("invalid completionHistory metadata")
+			}
+			if value, exists := record["scheduledAt"]; exists && value != nil {
+				scheduledAt, ok := value.(string)
+				if !ok || !isCanonicalScheduledAt(scheduledAt) {
+					return fmt.Errorf("invalid completionHistory metadata")
+				}
+			} else if !exists {
+				return fmt.Errorf("invalid completionHistory metadata")
+			}
+			completedAt, ok := record["completedAt"].(string)
+			if !ok || !isCanonicalCompletedAt(completedAt) {
+				return fmt.Errorf("invalid completionHistory metadata")
+			}
+		}
+	}
+
 	return nil
 }

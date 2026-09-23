@@ -266,7 +266,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 33;
+  int get schemaVersion => 34;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -287,6 +287,14 @@ class AppDatabase extends _$AppDatabase {
     await migratePerUserCollapse(this, m, from);
     await _migrateSyncInbox(m, from);
     await _migrateTasks(m, from, to);
+    if (from < 34 && to >= 34) {
+      await _addColumnIfMissing(
+        m,
+        tasks,
+        'tasks',
+        tasks.completionHistory,
+      );
+    }
   }
 
   Future<void> _migrateSyncInbox(Migrator m, int from) async {

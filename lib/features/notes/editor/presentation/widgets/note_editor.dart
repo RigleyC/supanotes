@@ -18,6 +18,8 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -170,8 +172,20 @@ class _NoteEditorState extends State<NoteEditor> {
     controller.setHiddenTaskPredicate(_isHiddenTask);
   }
 
-  bool _isHiddenTask(TaskNode node) =>
-      widget.hideCompleted && node.isComplete && !isRecurringTaskNode(node);
+  bool _isHiddenTask(TaskNode node) {
+    if (!widget.hideCompleted) return false;
+    final metadata = TaskMetadataDraft.fromTaskNode(node);
+    final occurrence = TaskOccurrencePolicy().resolveCurrent(
+      taskId: node.id,
+      anchor: metadata.scheduleAnchor,
+      recurrence: metadata.recurrence,
+      hasTime: metadata.hasTime,
+      completedAtByScheduledAt: metadata.completions,
+    );
+    return metadata.recurrence == null
+        ? node.isComplete || occurrence?.isCompleted == true
+        : occurrence?.isCompleted == true;
+  }
 
   Future<void> _attachFile({bool imageOnly = false}) async {
     try {
@@ -237,7 +251,7 @@ class _NoteEditorState extends State<NoteEditor> {
     final selectedNode = selection == null
         ? null
         : _controller?.editor.document.getNodeById(selection.extent.nodeId);
-    if (selectedNode is TaskNode && selectedNode.isComplete) {
+    if (selectedNode is TaskNode && _isHiddenTask(selectedNode)) {
       _controller?.composer.clearSelection();
       _controller?.focusNode.unfocus();
     }

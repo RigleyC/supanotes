@@ -42,8 +42,9 @@ func apply(c context.Context, r Repository, u, id pgtype.UUID, m Mutation) (Muta
 			ID: id, OwnerUserID: u, Title: patch.title,
 			DueDate: patch.dueDate, HasTime: patch.hasTime,
 			RecurrenceRule: patch.recurrenceRule, Reminder: patch.reminder,
-			Completions: encodeCompletions(patch.completions),
-			IsCompleted: patch.isCompleted, LastCompletedAt: patch.lastCompleted,
+			Completions:       encodeCompletions(patch.completions),
+			CompletionHistory: encodeCompletionHistory(nil),
+			IsCompleted:       patch.isCompleted, LastCompletedAt: patch.lastCompleted,
 			ScheduleGeneration: m.ScheduleGeneration,
 		})
 		if err == nil {
@@ -100,7 +101,8 @@ func apply(c context.Context, r Repository, u, id pgtype.UUID, m Mutation) (Muta
 		row, err = r.UpdateTask(c, taskUpdate{
 			ID: id, OwnerUserID: u, Title: row.Title, DueDate: row.DueDate, HasTime: row.HasTime,
 			RecurrenceRule: row.RecurrenceRule, Reminder: row.Reminder, Completions: row.Completions,
-			IsCompleted: row.IsCompleted, LastCompletedAt: row.LastCompletedAt,
+			CompletionHistory: row.CompletionHistory,
+			IsCompleted:       row.IsCompleted, LastCompletedAt: row.LastCompletedAt,
 			ScheduleGeneration: row.ScheduleGeneration, DeletedAt: row.DeletedAt,
 		})
 		if err != nil {
@@ -141,6 +143,7 @@ func apply(c context.Context, r Repository, u, id pgtype.UUID, m Mutation) (Muta
 		title = patch.title
 	}
 	completions := decodeCompletions(row.Completions)
+	history := decodeCompletionHistory(row.CompletionHistory)
 	originalCompletions := cloneCompletions(completions)
 	if patch.hasCompletions {
 		for key, value := range patch.completions {
@@ -167,7 +170,10 @@ func apply(c context.Context, r Repository, u, id pgtype.UUID, m Mutation) (Muta
 	generation := row.ScheduleGeneration
 	if scheduleChanged {
 		generation++
+		history = archiveActiveCompletions(history, row)
 		completions = map[string]string{}
+		isCompleted = false
+		lastCompleted = pgtype.Timestamptz{}
 	} else if err := validateCompletionsForTask(completions, hasTime, recurrence); err != nil {
 		return MutationResult{}, err
 	}
@@ -178,7 +184,8 @@ func apply(c context.Context, r Repository, u, id pgtype.UUID, m Mutation) (Muta
 	row, err = r.UpdateTask(c, taskUpdate{
 		ID: id, OwnerUserID: u, Title: title, DueDate: dueDate, HasTime: hasTime,
 		RecurrenceRule: recurrence, Reminder: reminder, Completions: encodeCompletions(completions),
-		IsCompleted: isCompleted, LastCompletedAt: lastCompleted,
+		CompletionHistory: encodeCompletionHistory(history),
+		IsCompleted:       isCompleted, LastCompletedAt: lastCompleted,
 		ScheduleGeneration: generation, DeletedAt: row.DeletedAt,
 	})
 	if err != nil {
@@ -236,7 +243,8 @@ func applyOccurrence(c context.Context, r Repository, u, id pgtype.UUID, m Mutat
 	updated, err := r.UpdateTask(c, taskUpdate{
 		ID: id, OwnerUserID: u, Title: row.Title, DueDate: row.DueDate, HasTime: row.HasTime,
 		RecurrenceRule: row.RecurrenceRule, Reminder: row.Reminder, Completions: encodeCompletions(completions),
-		IsCompleted: row.IsCompleted, LastCompletedAt: row.LastCompletedAt,
+		CompletionHistory: row.CompletionHistory,
+		IsCompleted:       row.IsCompleted, LastCompletedAt: row.LastCompletedAt,
 		ScheduleGeneration: row.ScheduleGeneration, DeletedAt: row.DeletedAt,
 	})
 	if err != nil {

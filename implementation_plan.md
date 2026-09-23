@@ -357,3 +357,29 @@ by `AdaptiveBottomNavigationBar`; route gating controls when that bar is shown.
 The implementation reuses shared components, keeps `AsyncValue.when` as the
 state boundary, and adds no visual-only tests. Focused Flutter tests/analyzer,
 auth interceptor coverage, `git diff --check`, and Sol low review are complete.
+
+## Task occurrence completion and archived history (2026-09-23)
+
+Status: implementation complete; focused verification is recorded in
+`task.md` and `walkthrough.md`.
+
+- Keep the latest started recurring occurrence visibly completed until the
+  next scheduled boundary. Completed takes precedence over overdue.
+- Keep non-recurring tasks completed until explicitly reopened.
+- Show the current completed occurrence in the Tasks list and preserve the
+  separate historical screen. Reopen uses the displayed occurrence identity.
+- Keep note task operations in the REST/OT document path and independent task
+  operations in the TaskRepository/outbox path.
+- Keep the note checkbox checked after animation, refresh at the next
+  occurrence boundary without a document operation, and respect hide-completed.
+- Archive schedule history separately in `completionHistory`. Records retain
+  the original civil `scheduledAt`, original `hasTime`, and UTC `completedAt`;
+  `scheduledAt` is nullable for tasks completed before they had a date.
+- Independent task history lives in Drift and Postgres. Note task history lives
+  in TaskNode metadata. The server archives transactionally on schedule edits;
+  migrations start with an empty archive and infer no lost history.
+- Keep reminder resolution on the next eligible occurrence after completion.
+- Exclude blocked outbox operations from local rebase.
+- Enforce the note-task schedule/history invariant in the REST/OT document
+  service. The client sends schedule, archive, and active-state clear in one
+  metadata operation; the server rejects changes that would lose completions.

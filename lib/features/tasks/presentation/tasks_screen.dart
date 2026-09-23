@@ -88,7 +88,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               ),
             ),
             data: (tasks) {
-              if (tasks.isEmpty) {
+              final openTasks = tasks
+                  .where((task) => !task.isCompleted)
+                  .toList();
+              final completedTasks = tasks
+                  .where((task) => task.isCompleted)
+                  .toList();
+              if (openTasks.isEmpty && completedTasks.isEmpty) {
                 return SliverFillRemaining(
                   hasScrollBody: false,
                   child: Column(
@@ -124,18 +130,41 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   112,
                 ),
                 sliver: SliverList.builder(
-                  itemCount: tasks.length + 1,
+                  itemCount:
+                      openTasks.length +
+                      completedTasks.length +
+                      (completedTasks.isEmpty ? 0 : 1) +
+                      1,
                   itemBuilder: (context, index) {
-                    if (index == tasks.length) {
+                    if (completedTasks.isNotEmpty &&
+                        index == openTasks.length) {
+                      return const Padding(
+                        padding: EdgeInsets.only(
+                          top: AppSpacing.lg,
+                          bottom: AppSpacing.sm,
+                        ),
+                        child: Text(
+                          'Concluídas',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      );
+                    }
+                    final completedStart =
+                        openTasks.length + (completedTasks.isEmpty ? 0 : 1);
+                    if (index == completedStart + completedTasks.length) {
                       return const _CompletedTasksEntry();
                     }
-                    final item = tasks[index];
+                    final item = index < openTasks.length
+                        ? openTasks[index]
+                        : completedTasks[index - completedStart];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: TaskListTile(
                         item: item,
+                        checked: item.isCompleted,
+                        completedAt: item.completedAt,
                         onTap: () => unawaited(_openTask(context, item)),
-                        onToggle: () => _completeTask(item),
+                        onToggle: () => _toggleTask(item),
                       ),
                     );
                   },
@@ -167,20 +196,29 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  Future<void> _completeTask(TaskListItem item) async {
+  Future<void> _toggleTask(TaskListItem item) async {
     try {
       await Future<void>.delayed(const Duration(milliseconds: 650));
       if (item.isStandalone) {
-        await ref
-            .read(taskControllerProvider)
-            .complete(
-              item.task!.id,
-              scheduledAt: item.scheduledAt?.toIso8601String(),
-            );
+        final controller = ref.read(taskControllerProvider);
+        if (item.isCompleted) {
+          await controller.reopen(
+            item.task!.id,
+            scheduledAt: item.scheduledAt?.toIso8601String(),
+          );
+        } else {
+          await controller.complete(
+            item.task!.id,
+            scheduledAt: item.scheduledAt?.toIso8601String(),
+          );
+        }
       } else {
-        await ref
-            .read(noteTaskControllerProvider)
-            .complete(item.note!, scheduledAt: item.scheduledAt);
+        final controller = ref.read(noteTaskControllerProvider);
+        if (item.isCompleted) {
+          await controller.reopen(item.note!, scheduledAt: item.scheduledAt);
+        } else {
+          await controller.complete(item.note!, scheduledAt: item.scheduledAt);
+        }
       }
     } on Object catch (error) {
       if (mounted) {

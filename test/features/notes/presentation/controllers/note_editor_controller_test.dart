@@ -195,7 +195,7 @@ void main() {
 
     final task = controller.document.getNodeById('task-1')! as TaskNode;
     expect(task.isComplete, true);
-    expect(task.metadata['dueDate'], isNull);
+    expect(task.metadata['dueDate'], '2026-08-12T09:00:00.000');
     expect(task.metadata['lastCompletedAt'], now.toUtc().toIso8601String());
     await controller.dispose();
   });
@@ -230,12 +230,12 @@ void main() {
       );
 
       expect(first?.scheduledAt, DateTime(2026, 8, 12, 9));
-      expect(second?.scheduledAt, DateTime(2026, 8, 19, 9));
+      expect(second?.scheduledAt, DateTime(2026, 8, 12, 9));
       final task = controller.document.getNodeById('task-1')! as TaskNode;
       expect(task.metadata['dueDate'], '2026-08-12T09:00:00.000');
       expect(
         (task.metadata['completions'] as Map).keys,
-        containsAll(['2026-08-12T09:00:00.000', '2026-08-19T09:00:00.000']),
+        ['2026-08-12T09:00:00.000'],
       );
       await controller.dispose();
     },

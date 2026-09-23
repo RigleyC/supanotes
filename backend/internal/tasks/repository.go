@@ -36,6 +36,7 @@ type taskRow struct {
 	RecurrenceRule     pgtype.Text
 	Reminder           pgtype.Text
 	Completions        []byte
+	CompletionHistory  []byte
 	IsCompleted        bool
 	LastCompletedAt    pgtype.Timestamptz
 	Revision           int64
@@ -61,6 +62,7 @@ type taskInsert struct {
 	RecurrenceRule     pgtype.Text
 	Reminder           pgtype.Text
 	Completions        []byte
+	CompletionHistory  []byte
 	IsCompleted        bool
 	LastCompletedAt    pgtype.Timestamptz
 	ScheduleGeneration int64
@@ -75,6 +77,7 @@ type taskUpdate struct {
 	RecurrenceRule     pgtype.Text
 	Reminder           pgtype.Text
 	Completions        []byte
+	CompletionHistory  []byte
 	IsCompleted        bool
 	LastCompletedAt    pgtype.Timestamptz
 	ScheduleGeneration int64
@@ -155,7 +158,7 @@ func (r *repository) InsertTask(c context.Context, a taskInsert) (taskRow, error
 	row, err := r.q.InsertTask(c, sqlcgen.InsertTaskParams{
 		ID: a.ID, OwnerUserID: a.OwnerUserID, Title: a.Title, DueDate: a.DueDate,
 		HasTime: a.HasTime, RecurrenceRule: a.RecurrenceRule, Reminder: a.Reminder,
-		Completions: a.Completions, IsCompleted: a.IsCompleted,
+		Completions: a.Completions, CompletionHistory: a.CompletionHistory, IsCompleted: a.IsCompleted,
 		LastCompletedAt: a.LastCompletedAt, ScheduleGeneration: a.ScheduleGeneration,
 	})
 	return taskRowFromSQL(row), err
@@ -164,7 +167,7 @@ func (r *repository) UpdateTask(c context.Context, a taskUpdate) (taskRow, error
 	row, err := r.q.UpdateTask(c, sqlcgen.UpdateTaskParams{
 		ID: a.ID, OwnerUserID: a.OwnerUserID, Title: a.Title, DueDate: a.DueDate,
 		HasTime: a.HasTime, RecurrenceRule: a.RecurrenceRule, Reminder: a.Reminder,
-		Completions: a.Completions, IsCompleted: a.IsCompleted,
+		Completions: a.Completions, CompletionHistory: a.CompletionHistory, IsCompleted: a.IsCompleted,
 		LastCompletedAt: a.LastCompletedAt, ScheduleGeneration: a.ScheduleGeneration,
 		DeletedAt: a.DeletedAt,
 	})
@@ -190,7 +193,8 @@ func taskRowFromSQL(row sqlcgen.Task) taskRow {
 		ID: row.ID, OwnerUserID: row.OwnerUserID, Title: row.Title, DueDate: row.DueDate,
 		HasTime: row.HasTime, RecurrenceRule: row.RecurrenceRule, Reminder: row.Reminder,
 		Completions: row.Completions, IsCompleted: row.IsCompleted,
-		LastCompletedAt: row.LastCompletedAt, Revision: row.Revision,
+		CompletionHistory: row.CompletionHistory,
+		LastCompletedAt:   row.LastCompletedAt, Revision: row.Revision,
 		ScheduleGeneration: row.ScheduleGeneration, CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt, DeletedAt: row.DeletedAt,
 	}

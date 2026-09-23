@@ -234,3 +234,35 @@ Verification for this pass:
 
 No real iOS device/simulator or opt-in PostgreSQL integration database was
 available in this environment, so those runtime checks remain pending.
+
+## Task occurrence completion and archived history (2026-09-23)
+
+- Recurring occurrence resolution retains the latest started occurrence as
+  completed until its successor starts. Timed tasks use their scheduled time;
+  all-day tasks use their local calendar date.
+- The Tasks screen separates open tasks from the current completed occurrence
+  and reopens through the owning independent-task or note-document controller.
+  Completion history remains a separate route.
+- Note task components keep the check after animation and schedule a local
+  refresh at the next occurrence boundary. Hiding follows the note preference.
+- Schedule edits move active conclusions into `completionHistory`, preserving
+  the old schedule identity, `hasTime`, and completion instant. Independent
+  tasks store it in Drift/Postgres; note tasks store it in document metadata.
+  A nullable `scheduledAt` represents tasks completed before they had a date.
+- Database migrations initialize the archive as empty and do not infer history
+  already erased by previous schedule edits.
+- Blocked outbox operations no longer participate in task rebase.
+- The note-document service rejects metadata changes that erase archived
+  completions. Schedule edits must archive active completions and clear the
+  active state atomically. The Flutter operation builder now sends this as one
+  `set_block_metadata` operation; the server also checks removals earlier in
+  the same sync transaction from older clients.
+
+Release compatibility: the backend accepts the older client's one-off
+completion operation that removes `dueDate`. An older client changing a
+schedule with active completions receives a sync error rather than losing
+history. The updated client sends the archive atomically. Android CI generates
+artifacts but does not publish an app update; the user will generate APK/IPA
+after the staged backend release.
+
+Verification: focused task/editor Flutter tests passed (76 tests). The full Flutter suite completed with 866 passes and one unrelated failure, reproduced in isolation: `test/shared/widgets/confirm_dialog_test.dart`, “showConfirmDialog emits a control tap for Cancelar e Confirmar” expects one haptic but receives two. Task/editor expectations were updated to the approved occurrence behavior without adding tests. Targeted Flutter analysis completed with infos only; Go `go test ./...` passed (462 tests/29 packages), `go build ./...` and `git diff --check` passed. Reminder delivery and note rollover were not device-tested; the note component schedules a local refresh at the next occurrence boundary so hide-completed does not depend on a document event.

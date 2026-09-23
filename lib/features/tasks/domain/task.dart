@@ -1,5 +1,6 @@
 import 'dart:collection';
 
+import 'package:supanotes/features/tasks/domain/task_completion_record.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
 const _unset = Object();
@@ -15,6 +16,7 @@ class Task {
     this.recurrenceRule,
     this.reminder,
     Map<String, Object?> completions = const {},
+    List<TaskCompletionRecord> completionHistory = const [],
     this.isCompleted = false,
     this.lastCompletedAt,
     this.revision = 0,
@@ -28,7 +30,8 @@ class Task {
            : canonicalScheduledAt(dueDate, hasTime: hasTime),
        completions = UnmodifiableMapView(
          _normalizeCompletions(completions, hasTime: hasTime),
-       ) {
+       ),
+       completionHistory = List.unmodifiable(completionHistory) {
     _requireGeneration(scheduleGeneration);
     if (revision < 0)
       throw const FormatException('revision must not be negative');
@@ -46,6 +49,9 @@ class Task {
     reminder: json['reminder'] as String?,
     completions:
         (json['completions'] as Map?)?.cast<String, Object?>() ?? const {},
+    completionHistory: parseTaskCompletionHistory(
+      json['completion_history'] ?? json['completionHistory'],
+    ),
     isCompleted:
         json['is_completed'] as bool? ?? json['isCompleted'] as bool? ?? false,
     lastCompletedAt: _parseInstant(
@@ -68,6 +74,7 @@ class Task {
   final String? recurrenceRule;
   final String? reminder;
   final Map<String, String> completions;
+  final List<TaskCompletionRecord> completionHistory;
   final bool isCompleted;
   final DateTime? lastCompletedAt;
   final int revision;
@@ -87,6 +94,9 @@ class Task {
     'recurrence_rule': recurrenceRule,
     'reminder': reminder,
     'completions': SplayTreeMap<String, String>.from(completions),
+    'completion_history': completionHistory
+        .map((entry) => entry.toJson())
+        .toList(),
     'is_completed': isCompleted,
     'last_completed_at': lastCompletedAt?.toUtc().toIso8601String(),
     'revision': revision,
@@ -105,6 +115,7 @@ class Task {
     Object? recurrenceRule = _unset,
     Object? reminder = _unset,
     Map<String, Object?>? completions,
+    List<TaskCompletionRecord>? completionHistory,
     bool? isCompleted,
     Object? lastCompletedAt = _unset,
     int? revision,
@@ -123,6 +134,7 @@ class Task {
         : recurrenceRule as String?,
     reminder: identical(reminder, _unset) ? this.reminder : reminder as String?,
     completions: completions ?? this.completions,
+    completionHistory: completionHistory ?? this.completionHistory,
     isCompleted: isCompleted ?? this.isCompleted,
     lastCompletedAt: identical(lastCompletedAt, _unset)
         ? this.lastCompletedAt
@@ -159,11 +171,24 @@ class Task {
             )) ||
         nextHasTime != this.hasTime ||
         nextRecurrenceRule != this.recurrenceRule;
+    final archived = changed
+        ? archiveTaskCompletionHistory(
+            history: completionHistory,
+            completions: completions,
+            scheduledAt: this.dueDate,
+            hasTime: this.hasTime,
+            isCompleted: isCompleted,
+            lastCompletedAt: lastCompletedAt,
+          )
+        : completionHistory;
     return copyWith(
       dueDate: nextDueDate,
       hasTime: hasTime,
       recurrenceRule: nextRecurrenceRule,
       completions: changed ? const {} : completions,
+      completionHistory: archived,
+      isCompleted: changed ? false : isCompleted,
+      lastCompletedAt: changed ? null : lastCompletedAt,
       scheduleGeneration: changed ? scheduleGeneration + 1 : scheduleGeneration,
     );
   }

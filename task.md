@@ -122,3 +122,25 @@
 wiring (`pushDirtyPreferences`, `applyRemotePreference` in hydration), extending
 `RemoteNoteMetadata` to all four flags, controller/sync test fixtures, and final
 dead-code audit.
+
+## Task occurrence completion and archived history (2026-09-23)
+
+- [x] Keep a recurring occurrence completed through the next scheduled
+  boundary, with completed status taking precedence over overdue.
+- [x] Add current completions to the Tasks list and provide re-open by the
+  displayed occurrence while keeping the history route separate.
+- [x] Preserve due dates for completed non-recurring note tasks.
+- [x] Archive completions separately on schedule edits for independent tasks
+  and TaskNode blocks, preserving the original wall-clock and `hasTime`.
+- [x] Reevaluate note task state at the next boundary without waiting for a
+  document operation; obey the note hide-completed preference.
+- [x] Ignore blocked outbox operations during local rebase.
+- [x] Generate Drift schema changes and run focused analysis/build checks.
+- [x] Run existing focused task/editor/widget checks after static corrections.
+- [x] Review the task feature with thermo-nuclear-code-quality-review.
+- [x] Enforce note-task completion-history preservation on the backend and
+  send schedule edits as one metadata operation from Flutter.
+
+Verification notes (2026-09-23): targeted `flutter analyze --no-pub` completed with 78 infos and no errors/warnings; Go `go test ./...` passed (462 tests/29 packages), `go build ./...` and `git diff --check` passed. The focused task/editor Flutter battery passed (76 tests). The full Flutter suite completed with 866 passes and one unrelated failure reproduced in isolation: `test/shared/widgets/confirm_dialog_test.dart`, “showConfirmDialog emits a control tap for Cancelar and Confirmar” expects one haptic but receives two. Existing task/editor expectations were updated to the approved occurrence contract; no tests were added. TaskNode completion timestamps now come from the resolved occurrence instead of an exact `DateTime` map lookup.
+
+Release audit: the backend accepts the legacy one-off completion operation that removes `dueDate`. Older clients still receive a sync error if they edit a schedule while active completions would be lost; the updated Flutter client archives them atomically. Android CI generates artifacts but does not publish an app update. The user requested a staged backend release and will generate the APK/IPA.

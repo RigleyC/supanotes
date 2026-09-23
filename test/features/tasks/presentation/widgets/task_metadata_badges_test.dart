@@ -52,7 +52,7 @@ void main() {
     expect(find.textContaining('Atrasada'), findsNothing);
   });
 
-  testWidgets('shows the next occurrence after an early completion', (
+  testWidgets('shows the completed occurrence until its successor starts', (
     tester,
   ) async {
     final now = DateTime(2026, 8, 10, 12);
@@ -69,7 +69,7 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('19 ago'), findsOneWidget);
+    expect(find.textContaining('12 ago'), findsOneWidget);
   });
 
   testWidgets('shows recurrence label', (tester) async {

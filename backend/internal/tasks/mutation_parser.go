@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -259,6 +261,67 @@ func encodeCompletions(values map[string]string) []byte {
 	return b
 }
 
+func decodeCompletionHistory(raw []byte) []CompletionRecord {
+	var records []CompletionRecord
+	if len(raw) == 0 || json.Unmarshal(raw, &records) != nil || records == nil {
+		return []CompletionRecord{}
+	}
+	return records
+}
+
+func encodeCompletionHistory(records []CompletionRecord) []byte {
+	if records == nil {
+		records = []CompletionRecord{}
+	}
+	raw, _ := json.Marshal(records)
+	return raw
+}
+
+func archiveActiveCompletions(history []CompletionRecord, row taskRow) []CompletionRecord {
+	seen := make(map[string]struct{}, len(history))
+	for _, record := range history {
+		seen[completionRecordKey(record)] = struct{}{}
+	}
+	appendRecord := func(scheduledAt *string, completedAt time.Time) {
+		record := CompletionRecord{ScheduledAt: scheduledAt, HasTime: row.HasTime, CompletedAt: formatUTCInstant(completedAt)}
+		key := completionRecordKey(record)
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		history = append(history, record)
+	}
+	if row.RecurrenceRule.Valid {
+		for scheduled, completed := range decodeCompletions(row.Completions) {
+			scheduledAt := scheduled
+			completedAt, err := parseUTCInstant(completed)
+			if err != nil {
+				continue
+			}
+			appendRecord(&scheduledAt, completedAt)
+		}
+	} else if row.IsCompleted && row.LastCompletedAt.Valid {
+		var scheduledAt *string
+		if row.DueDate.Valid {
+			value := formatWallClock(row.DueDate.Time)
+			scheduledAt = &value
+		}
+		appendRecord(scheduledAt, row.LastCompletedAt.Time)
+	}
+	sort.Slice(history, func(i, j int) bool {
+		return completionRecordKey(history[i]) < completionRecordKey(history[j])
+	})
+	return history
+}
+
+func completionRecordKey(record CompletionRecord) string {
+	scheduled := "<null>"
+	if record.ScheduledAt != nil {
+		scheduled = *record.ScheduledAt
+	}
+	return scheduled + "\x00" + strconv.FormatBool(record.HasTime) + "\x00" + record.CompletedAt
+}
+
 func validateCompletions(values map[string]string) error {
 	for scheduledAt, completedAt := range values {
 		if _, err := parseWallClock(scheduledAt, false); err != nil {
@@ -346,16 +409,16 @@ func isMidnight(value time.Time) bool {
 }
 
 func taskFromRow(row taskRow) Task {
-	return taskFromFields(row.ID, row.OwnerUserID, row.Title, row.DueDate, row.HasTime, row.RecurrenceRule, row.Reminder, row.Completions, row.IsCompleted, row.LastCompletedAt, row.Revision, row.ScheduleGeneration, row.CreatedAt, row.UpdatedAt, row.DeletedAt)
+	return taskFromFields(row.ID, row.OwnerUserID, row.Title, row.DueDate, row.HasTime, row.RecurrenceRule, row.Reminder, row.Completions, row.CompletionHistory, row.IsCompleted, row.LastCompletedAt, row.Revision, row.ScheduleGeneration, row.CreatedAt, row.UpdatedAt, row.DeletedAt)
 }
 
-func taskFromFields(id, owner pgtype.UUID, title string, due pgtype.Timestamp, has bool, rec, rem pgtype.Text, comp []byte, done bool, last pgtype.Timestamptz, rev, gen int64, created, updated, deleted pgtype.Timestamptz) Task {
+func taskFromFields(id, owner pgtype.UUID, title string, due pgtype.Timestamp, has bool, rec, rem pgtype.Text, comp, history []byte, done bool, last pgtype.Timestamptz, rev, gen int64, created, updated, deleted pgtype.Timestamptz) Task {
 	if len(comp) == 0 {
 		comp = []byte(`{}`)
 	}
 	return Task{
 		ID: id.String(), OwnerUserID: owner.String(), Title: title, DueDate: formatDate(due), HasTime: has,
-		RecurrenceRule: textPtr(rec), Reminder: textPtr(rem), Completions: json.RawMessage(comp), IsCompleted: done,
+		RecurrenceRule: textPtr(rec), Reminder: textPtr(rem), Completions: json.RawMessage(comp), CompletionHistory: decodeCompletionHistory(history), IsCompleted: done,
 		LastCompletedAt: formatTimestamp(last), Revision: rev, ScheduleGeneration: gen,
 		CreatedAt: created.Time.UTC().Format(time.RFC3339Nano), UpdatedAt: updated.Time.UTC().Format(time.RFC3339Nano), DeletedAt: formatTimestamp(deleted),
 	}

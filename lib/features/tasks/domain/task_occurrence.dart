@@ -141,7 +141,9 @@ class TaskOccurrencePolicy {
       hasTime: hasTime,
       completedAtByScheduledAt: completedAtByScheduledAt,
     );
-    if (current == null || recurrence == null || !current.isOverdue) {
+    if (current == null ||
+        recurrence == null ||
+        (!current.isOverdue && !current.isCompleted)) {
       return current;
     }
 
@@ -235,30 +237,36 @@ class TaskOccurrencePolicy {
     required Map<DateTime, DateTime> completedAtByScheduledAt,
   }) {
     var scheduledAt = anchor;
-    DateTime? latestStartedUncompleted;
+    DateTime? latestStarted;
 
     for (var i = 0; i < 10000; i++) {
-      final completedAt = _findCompletion(
-        scheduledAt,
-        hasTime: hasTime,
-        completedAtByScheduledAt: completedAtByScheduledAt,
-      );
       final hasStarted = _hasStarted(scheduledAt, now, hasTime);
 
-      if (completedAt == null && !hasStarted) {
+      if (!hasStarted) {
+        final current = latestStarted ?? scheduledAt;
+        final currentCompletion = _findCompletion(
+          current,
+          hasTime: hasTime,
+          completedAtByScheduledAt: completedAtByScheduledAt,
+        );
         return TaskOccurrence(
           taskId: '',
-          scheduledAt: latestStartedUncompleted ?? scheduledAt,
-          status: OccurrenceStatus.pending,
+          scheduledAt: current,
+          status: currentCompletion != null
+              ? OccurrenceStatus.completed
+              : latestStarted == null
+              ? OccurrenceStatus.pending
+              : _isOverdue(current, now, hasTime)
+              ? OccurrenceStatus.overdue
+              : OccurrenceStatus.pending,
+          completedAt: currentCompletion,
         );
       }
 
-      if (hasStarted) {
-        // Only the latest occurrence that has started can be active. Earlier
-        // uncompleted occurrences remain history once a newer occurrence
-        // starts.
-        latestStartedUncompleted = completedAt == null ? scheduledAt : null;
-      }
+      // Keep the latest occurrence that has started visible, including after
+      // completion. It remains the current occurrence until its successor
+      // reaches its scheduled boundary.
+      latestStarted = scheduledAt;
 
       final next = nextDueDate(
         from: scheduledAt,
@@ -269,11 +277,21 @@ class TaskOccurrencePolicy {
       scheduledAt = next;
     }
 
-    final result = latestStartedUncompleted ?? scheduledAt;
+    final result = latestStarted ?? scheduledAt;
+    final completedAt = _findCompletion(
+      result,
+      hasTime: hasTime,
+      completedAtByScheduledAt: completedAtByScheduledAt,
+    );
     return TaskOccurrence(
       taskId: '',
       scheduledAt: result,
-      status: OccurrenceStatus.pending,
+      status: completedAt != null
+          ? OccurrenceStatus.completed
+          : _isOverdue(result, now, hasTime)
+          ? OccurrenceStatus.overdue
+          : OccurrenceStatus.pending,
+      completedAt: completedAt,
     );
   }
 

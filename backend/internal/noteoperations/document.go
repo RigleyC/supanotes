@@ -47,6 +47,24 @@ var ErrInvalidOperationKind = fmt.Errorf("invalid operation kind")
 const InitialBlockID = "init"
 
 func (d *Document) ApplyOperation(kind Kind, blockID string, payload json.RawMessage) error {
+	return d.applyOperation(kind, blockID, payload, nil)
+}
+
+func (d *Document) ApplyOperationWithCompletionEvidence(
+	kind Kind,
+	blockID string,
+	payload json.RawMessage,
+	evidence []taskCompletionHistoryRecord,
+) error {
+	return d.applyOperation(kind, blockID, payload, evidence)
+}
+
+func (d *Document) applyOperation(
+	kind Kind,
+	blockID string,
+	payload json.RawMessage,
+	evidence []taskCompletionHistoryRecord,
+) error {
 	switch kind {
 	case KindTextDelta:
 		return d.applyTextDelta(blockID, payload)
@@ -59,7 +77,7 @@ func (d *Document) ApplyOperation(kind Kind, blockID string, payload json.RawMes
 	case KindSetBlockType:
 		return d.applySetBlockType(blockID, payload)
 	case KindSetBlockMetadata:
-		return d.applySetBlockMetadata(blockID, payload)
+		return d.applySetBlockMetadata(blockID, payload, evidence)
 	case KindCompleteTaskOccurrence:
 		return d.applyCompleteTaskOccurrence(blockID, payload)
 	default:
@@ -257,7 +275,11 @@ func (d *Document) applySetBlockType(blockID string, payload json.RawMessage) er
 	return fmt.Errorf("%w: %s", ErrBlockNotFound, blockID)
 }
 
-func (d *Document) applySetBlockMetadata(blockID string, payload json.RawMessage) error {
+func (d *Document) applySetBlockMetadata(
+	blockID string,
+	payload json.RawMessage,
+	evidence []taskCompletionHistoryRecord,
+) error {
 	var p SetBlockMetadataPayload
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return fmt.Errorf("parse set block metadata payload: %w", err)
@@ -265,6 +287,9 @@ func (d *Document) applySetBlockMetadata(blockID string, payload json.RawMessage
 
 	for i := range d.Blocks {
 		if d.Blocks[i].ID == blockID {
+			if err := validateTaskScheduleMetadataTransition(d.Blocks[i], p.Metadata, evidence); err != nil {
+				return err
+			}
 			if d.Blocks[i].Metadata == nil {
 				d.Blocks[i].Metadata = make(map[string]any)
 			}

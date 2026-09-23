@@ -17,7 +17,6 @@ class NoteTaskListReader {
     required String noteId,
     required String noteTitle,
     required String documentJson,
-    required bool hideCompleted,
     DateTime? createdAt,
   }) {
     final policy = TaskOccurrencePolicy(clock: clock);
@@ -33,11 +32,6 @@ class NoteTaskListReader {
       final isCompleted = parsed.recurrence == null
           ? parsed.isCompleted || occurrence?.isCompleted == true
           : occurrence?.isCompleted == true;
-      // The open list never includes completed tasks. Completion history is
-      // projected separately from the canonical task metadata, so the
-      // per-note preference must not turn completed tasks back into open ones.
-      if (isCompleted) continue;
-
       result.add(
         NoteTask(
           noteId: noteId,
@@ -47,9 +41,13 @@ class NoteTaskListReader {
           dueDate: occurrence?.scheduledAt ?? parsed.dueDate,
           hasTime: parsed.hasTime,
           isCompleted: isCompleted,
+          completedAt: parsed.recurrence == null
+              ? parsed.lastCompletedAt
+              : occurrence?.completedAt,
           recurrenceRule: parsed.recurrence?.name,
           completions: parsed.completions,
           lastCompletedAt: parsed.lastCompletedAt,
+          completionHistory: parsed.completionHistory,
           createdAt: createdAt,
         ),
       );
@@ -80,6 +78,7 @@ class NoteTaskListReader {
           recurrenceRule: parsed.recurrence?.name,
           completions: parsed.completions,
           lastCompletedAt: parsed.lastCompletedAt,
+          completionHistory: parsed.completionHistory,
           createdAt: createdAt,
         ),
     ];

@@ -48,7 +48,6 @@ void main() {
               recurrenceRule: 'weekly',
             ),
           ]),
-          hideCompleted: true,
         );
 
     expect(tasks, hasLength(1));
@@ -57,7 +56,7 @@ void main() {
     expect(tasks.single.blockId, 'block-1');
   });
 
-  test('keeps an undated task and excludes completed tasks', () {
+  test('keeps undated and completed task rows for the global task list', () {
     final tasks =
         const NoteTaskListReader(
           clock: _fixedNow,
@@ -68,14 +67,16 @@ void main() {
             _taskBlock(id: 'open', title: 'Sem data'),
             _taskBlock(id: 'done', title: 'Concluída', isCompleted: true),
           ]),
-          hideCompleted: true,
         );
 
-    expect(tasks.map((task) => task.blockId), ['open']);
-    expect(tasks.single.dueDate, isNull);
+    expect(tasks.map((task) => task.blockId), ['open', 'done']);
+    expect(
+      tasks.firstWhere((task) => task.blockId == 'open').dueDate,
+      isNull,
+    );
   });
 
-  test('excludes completed blocks when hideCompleted is false', () {
+  test('includes completed blocks for the global task list', () {
     final tasks =
         const NoteTaskListReader(
           clock: _fixedNow,
@@ -86,10 +87,10 @@ void main() {
             _taskBlock(id: 'open', title: 'Em aberto'),
             _taskBlock(id: 'done', title: 'Concluída', isCompleted: true),
           ]),
-          hideCompleted: false,
         );
 
-    expect(tasks.map((task) => task.blockId), ['open']);
+    expect(tasks.map((task) => task.blockId), ['open', 'done']);
+    expect(tasks.last.isCompleted, isTrue);
   });
 }
 

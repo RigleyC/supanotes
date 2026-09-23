@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/features/tasks/data/task_repository.dart';
+import 'package:supanotes/features/tasks/domain/task_completion_record.dart';
 import 'package:supanotes/features/tasks/domain/note_task_list_reader.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_history_entry.dart';
@@ -37,7 +39,6 @@ class VisibleNoteDocument {
     required this.noteId,
     required this.noteTitle,
     required this.documentJson,
-    required this.hideCompleted,
     this.createdAt,
   });
 
@@ -55,7 +56,6 @@ class VisibleNoteDocument {
       noteId: note.note.id,
       noteTitle: note.title,
       documentJson: json,
-      hideCompleted: note.hideCompleted,
       createdAt: note.note.createdAt,
     );
   }
@@ -63,7 +63,6 @@ class VisibleNoteDocument {
   final String noteId;
   final String noteTitle;
   final String documentJson;
-  final bool hideCompleted;
   final DateTime? createdAt;
 }
 
@@ -219,9 +218,15 @@ List<TaskListItem> buildTaskList({
     final completed = task.recurrenceRule == null
         ? task.isCompleted || occurrence?.isCompleted == true
         : occurrence?.isCompleted == true;
-    if (completed) continue;
     result.add(
-      TaskListItem.task(task, scheduledAt: occurrence?.scheduledAt),
+      TaskListItem.task(
+        task,
+        scheduledAt: occurrence?.scheduledAt,
+        isCompleted: completed,
+        completedAt: task.recurrenceRule == null
+            ? task.lastCompletedAt ?? occurrence?.completedAt
+            : occurrence?.completedAt,
+      ),
     );
   }
 
@@ -232,14 +237,19 @@ List<TaskListItem> buildTaskList({
         noteId: visibleNote.noteId,
         noteTitle: visibleNote.noteTitle,
         documentJson: visibleNote.documentJson,
-        hideCompleted: visibleNote.hideCompleted,
         createdAt: visibleNote.createdAt,
       );
-      result.addAll(
-        noteTasks.map(
-          (task) => TaskListItem.note(task, scheduledAt: task.dueDate),
-        ),
-      );
+      for (final task in noteTasks) {
+        final isCompleted = task.isCompleted;
+        result.add(
+          TaskListItem.note(
+            task,
+            scheduledAt: task.dueDate,
+            isCompleted: isCompleted,
+            completedAt: task.completedAt,
+          ),
+        );
+      }
     }
   }
 
@@ -256,23 +266,63 @@ List<TaskHistoryEntry> buildCompletedTaskHistory({
   final result = <TaskHistoryEntry>[];
   for (final task in standalone) {
     if (task.deletedAt != null) continue;
+    final seen = <String>{};
+    for (final archived in task.completionHistory) {
+      final identity = _completionIdentity(
+        archived.scheduledAt,
+        archived.hasTime,
+        archived.completedAt,
+      );
+      if (!seen.add(identity)) continue;
+      result.add(
+        TaskHistoryEntry(
+          task: TaskListItem.task(
+            task,
+            scheduledAt: archived.scheduledAt,
+            explicitScheduledAt: true,
+            scheduledHasTime: archived.hasTime,
+          ),
+          scheduledAt: archived.scheduledAt ?? archived.completedAt,
+          completedAt: archived.completedAt,
+        ),
+      );
+    }
     if (task.recurrenceRule != null) {
       for (final entry in task.completions.entries) {
         final scheduledAt = DateTime.tryParse(entry.key);
         final completedAt = DateTime.tryParse(entry.value);
         if (scheduledAt == null || completedAt == null) continue;
+        if (!seen.add(
+          _completionIdentity(scheduledAt, task.hasTime, completedAt),
+        )) {
+          continue;
+        }
         result.add(
           TaskHistoryEntry(
-            task: TaskListItem.task(task, scheduledAt: scheduledAt),
+            task: TaskListItem.task(
+              task,
+              scheduledAt: scheduledAt,
+              explicitScheduledAt: true,
+            ),
             scheduledAt: scheduledAt,
             completedAt: completedAt,
           ),
         );
       }
     } else if (task.lastCompletedAt != null) {
+      final identity = _completionIdentity(
+        task.dueDate,
+        task.hasTime,
+        task.lastCompletedAt!,
+      );
+      if (!seen.add(identity)) continue;
       result.add(
         TaskHistoryEntry(
-          task: TaskListItem.task(task, scheduledAt: task.dueDate),
+          task: TaskListItem.task(
+            task,
+            scheduledAt: task.dueDate,
+            explicitScheduledAt: true,
+          ),
           scheduledAt: task.dueDate ?? task.lastCompletedAt!,
           completedAt: task.lastCompletedAt!,
         ),
@@ -289,23 +339,45 @@ List<TaskHistoryEntry> buildCompletedTaskHistory({
         documentJson: visibleNote.documentJson,
         createdAt: visibleNote.createdAt,
       )) {
+        final completions = [...note.completionHistory];
         if (note.isRecurring) {
-          for (final entry in note.completions.entries) {
-            result.add(
-              TaskHistoryEntry(
-                task: TaskListItem.note(note, scheduledAt: entry.key),
+          completions.addAll(
+            note.completions.entries.map(
+              (entry) => TaskCompletionRecord(
                 scheduledAt: entry.key,
+                hasTime: note.hasTime,
                 completedAt: entry.value,
-                note: note,
               ),
-            );
-          }
+            ),
+          );
         } else if (note.lastCompletedAt != null) {
+          completions.add(
+            TaskCompletionRecord(
+              scheduledAt: note.dueDate,
+              hasTime: note.hasTime,
+              completedAt: note.lastCompletedAt!,
+            ),
+          );
+        }
+
+        final seen = <String>{};
+        for (final completion in completions) {
+          final identity = _completionIdentity(
+            completion.scheduledAt,
+            completion.hasTime,
+            completion.completedAt,
+          );
+          if (!seen.add(identity)) continue;
           result.add(
             TaskHistoryEntry(
-              task: TaskListItem.note(note, scheduledAt: note.dueDate),
-              scheduledAt: note.dueDate ?? note.lastCompletedAt!,
-              completedAt: note.lastCompletedAt!,
+              task: TaskListItem.note(
+                note,
+                scheduledAt: completion.scheduledAt,
+                explicitScheduledAt: true,
+                scheduledHasTime: completion.hasTime,
+              ),
+              scheduledAt: completion.scheduledAt ?? completion.completedAt,
+              completedAt: completion.completedAt,
               note: note,
             ),
           );
@@ -321,6 +393,13 @@ List<TaskHistoryEntry> buildCompletedTaskHistory({
   });
   return result;
 }
+
+String _completionIdentity(
+  DateTime? scheduledAt,
+  bool hasTime,
+  DateTime completedAt,
+) =>
+    '${scheduledAt == null ? 'null' : scheduledAtKey(scheduledAt, hasTime: hasTime)}|$hasTime|${completedAt.toUtc().toIso8601String()}';
 
 Stream<List<TaskListItem>> _watchOpenTasks({
   required Stream<List<TaskData>> standalone,
@@ -406,8 +485,24 @@ DateTime? _nextTaskListBoundary(Iterable<TaskListItem> items, DateTime now) {
   var next = DateTime(now.year, now.month, now.day + 1);
   for (final item in items) {
     final boundary = item.dueDate;
-    if (boundary != null && boundary.isAfter(now) && boundary.isBefore(next)) {
-      next = boundary;
+    if (boundary == null) continue;
+    final recurrence = TaskRecurrence.parse(
+      item.isStandalone ? item.task?.recurrenceRule : item.note?.recurrenceRule,
+    );
+    final anchor = item.isStandalone ? item.task?.dueDate : item.note?.dueDate;
+    final nextOccurrence = boundary.isAfter(now)
+        ? boundary
+        : recurrence == null
+        ? null
+        : nextDueDate(
+            from: boundary,
+            recurrence: recurrence,
+            anchorDay: anchor?.day ?? boundary.day,
+          );
+    if (nextOccurrence != null &&
+        nextOccurrence.isAfter(now) &&
+        nextOccurrence.isBefore(next)) {
+      next = nextOccurrence;
     }
   }
   return next;

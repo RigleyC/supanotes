@@ -225,7 +225,7 @@ func TestCreateConflictReloadsOwnerRowAndReplaysOperation(t *testing.T) {
 	response, err := json.Marshal(MutationResult{
 		OperationID: m.OperationID,
 		Revision:    existing.Revision,
-		Task:        taskFromFields(existing.ID, existing.OwnerUserID, existing.Title, existing.DueDate, existing.HasTime, existing.RecurrenceRule, existing.Reminder, existing.Completions, existing.IsCompleted, existing.LastCompletedAt, existing.Revision, existing.ScheduleGeneration, existing.CreatedAt, existing.UpdatedAt, existing.DeletedAt),
+		Task:        taskFromFields(existing.ID, existing.OwnerUserID, existing.Title, existing.DueDate, existing.HasTime, existing.RecurrenceRule, existing.Reminder, existing.Completions, existing.CompletionHistory, existing.IsCompleted, existing.LastCompletedAt, existing.Revision, existing.ScheduleGeneration, existing.CreatedAt, existing.UpdatedAt, existing.DeletedAt),
 	})
 	if err != nil {
 		t.Fatal(err)

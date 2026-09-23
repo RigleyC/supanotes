@@ -38,6 +38,10 @@ final class NoteDocumentMetadataValidator {
         requireType('hasTime', metadata['hasTime'] is bool);
         requireType('lastCompletedAt', metadata['lastCompletedAt'] is String);
         requireType('completions', metadata['completions'] is Map);
+        requireType(
+          'completionHistory',
+          metadata['completionHistory'] is List,
+        );
 
         final dueDate = metadata['dueDate'];
         if (dueDate is String && !_isCanonicalScheduledAt(dueDate)) {
@@ -81,6 +85,28 @@ final class NoteDocumentMetadataValidator {
                 !_isCanonicalCompletedAt(entry.value as String)) {
               throw const FormatException(
                 'Invalid completions metadata for task block',
+              );
+            }
+          }
+        }
+        final completionHistory = metadata['completionHistory'];
+        if (completionHistory is List) {
+          for (final entry in completionHistory) {
+            if (entry is! Map ||
+                (entry['scheduledAt'] != null &&
+                    entry['scheduledAt'] is! String) ||
+                entry['hasTime'] is! bool ||
+                entry['completedAt'] is! String) {
+              throw const FormatException(
+                'Invalid archived completion metadata for task block',
+              );
+            }
+            final scheduledAt = entry['scheduledAt'];
+            if ((scheduledAt is String &&
+                    !_isCanonicalScheduledAt(scheduledAt)) ||
+                !_isCanonicalCompletedAt(entry['completedAt'] as String)) {
+              throw const FormatException(
+                'Invalid archived completion metadata for task block',
               );
             }
           }

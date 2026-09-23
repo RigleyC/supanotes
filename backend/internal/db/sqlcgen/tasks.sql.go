@@ -13,7 +13,7 @@ import (
 
 const getTaskForOwner = `-- name: GetTaskForOwner :one
 SELECT id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,
-       completions, is_completed, last_completed_at, revision, schedule_generation,
+       completions, completion_history, is_completed, last_completed_at, revision, schedule_generation,
        created_at, updated_at, deleted_at
 FROM tasks
 WHERE id = $1 AND owner_user_id = $2
@@ -36,6 +36,7 @@ func (q *Queries) GetTaskForOwner(ctx context.Context, arg GetTaskForOwnerParams
 		&i.RecurrenceRule,
 		&i.Reminder,
 		&i.Completions,
+		&i.CompletionHistory,
 		&i.IsCompleted,
 		&i.LastCompletedAt,
 		&i.Revision,
@@ -86,11 +87,11 @@ func (q *Queries) GetTaskWatermark(ctx context.Context, targetUserID pgtype.UUID
 
 const insertTask = `-- name: InsertTask :one
 INSERT INTO tasks (id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,
-                   completions, is_completed, last_completed_at, revision, schedule_generation)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11)
+                   completions, completion_history, is_completed, last_completed_at, revision, schedule_generation)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1, $12)
 ON CONFLICT (id) DO NOTHING
 RETURNING id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,
-          completions, is_completed, last_completed_at, revision, schedule_generation,
+          completions, completion_history, is_completed, last_completed_at, revision, schedule_generation,
           created_at, updated_at, deleted_at
 `
 
@@ -103,6 +104,7 @@ type InsertTaskParams struct {
 	RecurrenceRule     pgtype.Text        `json:"recurrence_rule"`
 	Reminder           pgtype.Text        `json:"reminder"`
 	Completions        []byte             `json:"completions"`
+	CompletionHistory  []byte             `json:"completion_history"`
 	IsCompleted        bool               `json:"is_completed"`
 	LastCompletedAt    pgtype.Timestamptz `json:"last_completed_at"`
 	ScheduleGeneration int64              `json:"schedule_generation"`
@@ -118,6 +120,7 @@ func (q *Queries) InsertTask(ctx context.Context, arg InsertTaskParams) (Task, e
 		arg.RecurrenceRule,
 		arg.Reminder,
 		arg.Completions,
+		arg.CompletionHistory,
 		arg.IsCompleted,
 		arg.LastCompletedAt,
 		arg.ScheduleGeneration,
@@ -132,6 +135,7 @@ func (q *Queries) InsertTask(ctx context.Context, arg InsertTaskParams) (Task, e
 		&i.RecurrenceRule,
 		&i.Reminder,
 		&i.Completions,
+		&i.CompletionHistory,
 		&i.IsCompleted,
 		&i.LastCompletedAt,
 		&i.Revision,
@@ -189,7 +193,7 @@ func (q *Queries) InsertTaskSyncChange(ctx context.Context, arg InsertTaskSyncCh
 
 const listTasksForBootstrap = `-- name: ListTasksForBootstrap :many
 SELECT id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,
-       completions, is_completed, last_completed_at, revision, schedule_generation,
+       completions, completion_history, is_completed, last_completed_at, revision, schedule_generation,
        created_at, updated_at, deleted_at
 FROM tasks
 WHERE owner_user_id = $1
@@ -214,6 +218,7 @@ func (q *Queries) ListTasksForBootstrap(ctx context.Context, ownerUserID pgtype.
 			&i.RecurrenceRule,
 			&i.Reminder,
 			&i.Completions,
+			&i.CompletionHistory,
 			&i.IsCompleted,
 			&i.LastCompletedAt,
 			&i.Revision,
@@ -234,7 +239,7 @@ func (q *Queries) ListTasksForBootstrap(ctx context.Context, ownerUserID pgtype.
 
 const lockTaskForOwner = `-- name: LockTaskForOwner :one
 SELECT id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,
-       completions, is_completed, last_completed_at, revision, schedule_generation,
+       completions, completion_history, is_completed, last_completed_at, revision, schedule_generation,
        created_at, updated_at, deleted_at
 FROM tasks
 WHERE id = $1 AND owner_user_id = $2
@@ -258,6 +263,7 @@ func (q *Queries) LockTaskForOwner(ctx context.Context, arg LockTaskForOwnerPara
 		&i.RecurrenceRule,
 		&i.Reminder,
 		&i.Completions,
+		&i.CompletionHistory,
 		&i.IsCompleted,
 		&i.LastCompletedAt,
 		&i.Revision,
@@ -272,12 +278,12 @@ func (q *Queries) LockTaskForOwner(ctx context.Context, arg LockTaskForOwnerPara
 const updateTask = `-- name: UpdateTask :one
 UPDATE tasks
 SET title = $3, due_date = $4, has_time = $5, recurrence_rule = $6, reminder = $7,
-    completions = $8, is_completed = $9, last_completed_at = $10,
-    revision = revision + 1, schedule_generation = $11,
-    deleted_at = $12
+    completions = $8, completion_history = $9, is_completed = $10, last_completed_at = $11,
+    revision = revision + 1, schedule_generation = $12,
+    deleted_at = $13
 WHERE id = $1 AND owner_user_id = $2
 RETURNING id, owner_user_id, title, due_date, has_time, recurrence_rule, reminder,
-          completions, is_completed, last_completed_at, revision, schedule_generation,
+          completions, completion_history, is_completed, last_completed_at, revision, schedule_generation,
           created_at, updated_at, deleted_at
 `
 
@@ -290,6 +296,7 @@ type UpdateTaskParams struct {
 	RecurrenceRule     pgtype.Text        `json:"recurrence_rule"`
 	Reminder           pgtype.Text        `json:"reminder"`
 	Completions        []byte             `json:"completions"`
+	CompletionHistory  []byte             `json:"completion_history"`
 	IsCompleted        bool               `json:"is_completed"`
 	LastCompletedAt    pgtype.Timestamptz `json:"last_completed_at"`
 	ScheduleGeneration int64              `json:"schedule_generation"`
@@ -306,6 +313,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		arg.RecurrenceRule,
 		arg.Reminder,
 		arg.Completions,
+		arg.CompletionHistory,
 		arg.IsCompleted,
 		arg.LastCompletedAt,
 		arg.ScheduleGeneration,
@@ -321,6 +329,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		&i.RecurrenceRule,
 		&i.Reminder,
 		&i.Completions,
+		&i.CompletionHistory,
 		&i.IsCompleted,
 		&i.LastCompletedAt,
 		&i.Revision,

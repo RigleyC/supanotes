@@ -301,8 +301,14 @@ class _TaskEditorScreenState extends ConsumerState<TaskEditorScreen> {
     }
     _syncPending = task;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _syncPending != task) return;
       _syncPending = null;
-      if (!mounted) return;
+      // The user may start editing after this update was queued. Keep those
+      // edits even if the remote snapshot arrived first in this frame.
+      if (_session.titleTouched || _session.draftTouched) {
+        _session.lastSyncedTask = task;
+        return;
+      }
       _session.applyTask(task);
       _lastDraft = _session.draftNotifier.value;
     });

@@ -1,10 +1,12 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 
 import 'package:flutter/material.dart';
+import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
+import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
@@ -16,6 +18,8 @@ import 'package:supanotes/shared/widgets/task_exit_animator.dart';
 const double _taskCheckboxSize = 20;
 const double _taskCheckboxFallbackTopInset = 2;
 const double _taskCheckboxTextGap = noteEditorMarkerTextGap;
+const double _taskTopSpacing = 14;
+const double _taskCheckboxTouchHeight = 44;
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
@@ -30,7 +34,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final bool readOnly;
   ValueChanged<String>? onTaskLongPress;
   final Future<DateTime?> Function(String taskId)? onTaskComplete;
-  final Future<void> Function(String taskId)? onTaskReopen;
+  final Future<void> Function(String taskId, DateTime? scheduledAt)?
+  onTaskReopen;
 
   @override
   TaskComponentViewModel? createViewModel(
@@ -41,6 +46,16 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     final metadata = TaskMetadataDraft.fromTaskNode(node);
     final isRecurring = isRecurringTaskNode(node);
+    final occurrence = TaskOccurrencePolicy().resolveCurrent(
+      taskId: node.id,
+      anchor: metadata.scheduleAnchor,
+      recurrence: metadata.recurrence,
+      hasTime: metadata.hasTime,
+      completedAtByScheduledAt: metadata.completions,
+    );
+    final isComplete = isRecurring
+        ? occurrence?.isCompleted ?? false
+        : node.isComplete || occurrence?.isCompleted == true;
 
     Future<void> updateCompletion(bool isComplete) async {
       if (readOnly) return;
@@ -48,7 +63,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       if (isComplete) {
         await onTaskComplete?.call(node.id);
       } else {
-        await onTaskReopen?.call(node.id);
+        await onTaskReopen?.call(node.id, occurrence?.scheduledAt);
       }
     }
 
@@ -57,7 +72,7 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       createdAt: node.metadata[NodeMetadata.createdAt] as DateTime?,
       padding: EdgeInsets.zero,
       indent: node.indent,
-      isComplete: node.isComplete,
+      isComplete: isComplete,
       setComplete: (isComplete) => unawaited(updateCompletion(isComplete)),
       text: node.text,
       textDirection: getParagraphDirection(node.text.toPlainText()),
@@ -213,29 +228,77 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   late bool _isComplete;
   bool _isAnimating = false;
   bool _isUpdatingCompletion = false;
+  Timer? _occurrenceBoundaryTimer;
 
   bool get _isRecurring => widget.isRecurring;
 
-  bool get _isHidden => widget.hideCompleted && _isComplete && !_isRecurring;
+  bool get _isHidden => widget.hideCompleted && _isComplete;
 
   @override
   void initState() {
     super.initState();
     _isComplete = widget.viewModel.isComplete;
+    _scheduleOccurrenceRefresh();
   }
 
   @override
   void didUpdateWidget(covariant CustomTaskComponent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_isRecurring) {
-      if (widget.viewModel.isComplete) {
-        _isComplete = false;
-      }
-      return;
-    }
     if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
       _isComplete = widget.viewModel.isComplete;
     }
+    _scheduleOccurrenceRefresh();
+  }
+
+  @override
+  void dispose() {
+    _occurrenceBoundaryTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleOccurrenceRefresh() {
+    _occurrenceBoundaryTimer?.cancel();
+    final metadata = widget.taskMetadata;
+    final anchor = metadata?.scheduleAnchor;
+    final recurrence = metadata?.recurrence;
+    if (anchor == null || recurrence == null) return;
+    final current = TaskOccurrencePolicy().resolveCurrent(
+      taskId: widget.viewModel.nodeId,
+      anchor: anchor,
+      recurrence: recurrence,
+      hasTime: metadata!.hasTime,
+      completedAtByScheduledAt: metadata.completions,
+    );
+    if (current == null) return;
+    final next = nextDueDate(
+      from: current.scheduledAt,
+      recurrence: recurrence,
+      anchorDay: anchor.day,
+    );
+    if (next == null) return;
+    final delay = next.difference(DateTime.now());
+    if (delay <= Duration.zero) {
+      _refreshOccurrence();
+      return;
+    }
+    _occurrenceBoundaryTimer = Timer(delay, _refreshOccurrence);
+  }
+
+  void _refreshOccurrence() {
+    final metadata = widget.taskMetadata;
+    if (!mounted || metadata == null) return;
+    final occurrence = TaskOccurrencePolicy().resolveCurrent(
+      taskId: widget.viewModel.nodeId,
+      anchor: metadata.scheduleAnchor,
+      recurrence: metadata.recurrence,
+      hasTime: metadata.hasTime,
+      completedAtByScheduledAt: metadata.completions,
+    );
+    final completed = metadata.recurrence == null
+        ? widget.viewModel.isComplete || occurrence?.isCompleted == true
+        : occurrence?.isCompleted == true;
+    if (completed != _isComplete) setState(() => _isComplete = completed);
+    _scheduleOccurrenceRefresh();
   }
 
   Future<void> _onCheckboxTap() async {
@@ -248,7 +311,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     setState(() {
       _isComplete = newComplete;
       _isUpdatingCompletion = true;
-      if (widget.hideCompleted && newComplete && !_isRecurring) {
+      if (widget.hideCompleted && newComplete) {
         _isAnimating = true;
       }
     });
@@ -288,8 +351,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   }
 
   void _onCheckAnimationCompleted() {
-    if (!_isRecurring || !_isComplete || !mounted) return;
-    setState(() => _isComplete = false);
+    if (!_isAnimating || !mounted) return;
+    setState(() => _isAnimating = false);
   }
 
   @override
@@ -341,7 +404,6 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     const checkboxMarkerWidth = _taskCheckboxSize + _taskCheckboxTextGap;
     final indentUnit = noteEditorIndentUnit(textStyle);
     final levelOffset = indentUnit * widget.viewModel.indent;
-
     final content = Directionality(
       textDirection: widget.viewModel.textDirection,
       child: GestureDetector(
@@ -353,6 +415,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
             SizedBox(width: levelOffset),
             SizedBox(
               width: checkboxMarkerWidth,
+              height: _taskCheckboxTouchHeight,
               child: Semantics(
                 button: true,
                 checked: _isComplete,
@@ -371,17 +434,18 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
-                      padding: EdgeInsets.only(top: checkboxTopInset),
+                      padding: EdgeInsets.only(
+                        top: _taskTopSpacing + checkboxTopInset,
+                      ),
                       child: AppTaskCheckbox(
                         size: 20,
                         value: _isComplete,
                         accentColor: taskColor,
                         inactiveColor: colorScheme.outline,
                         shape: AppTaskCheckboxShape.rounded,
-                        onCheckAnimationCompleted:
-                            !widget.isReadOnly && _isRecurring
-                            ? _onCheckAnimationCompleted
-                            : null,
+                        onCheckAnimationCompleted: widget.isReadOnly
+                            ? null
+                            : _onCheckAnimationCompleted,
                       ),
                     ),
                   ),
@@ -389,46 +453,48 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
               ),
             ),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextComponent(
-                    key: _textKey,
-                    text: widget.viewModel.text,
-                    textDirection: widget.viewModel.textDirection,
-                    textAlign: widget.viewModel.textAlignment,
-                    maxLines: widget.viewModel.maxLines,
-                    overflow: widget.viewModel.overflow,
-                    textStyleBuilder: (attributions) => resolveTaskTextStyle(
-                      widget.viewModel.textStyleBuilder(attributions),
-                      Theme.of(context).colorScheme.onSurface,
-                      _isComplete,
+              child: Padding(
+                padding: const EdgeInsets.only(top: _taskTopSpacing),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextComponent(
+                      key: _textKey,
+                      text: widget.viewModel.text,
+                      textDirection: widget.viewModel.textDirection,
+                      textAlign: widget.viewModel.textAlignment,
+                      maxLines: widget.viewModel.maxLines,
+                      overflow: widget.viewModel.overflow,
+                      textStyleBuilder: (attributions) => resolveTaskTextStyle(
+                        widget.viewModel.textStyleBuilder(attributions),
+                        Theme.of(context).colorScheme.onSurface,
+                        _isComplete,
+                      ),
+                      inlineWidgetBuilders:
+                          widget.viewModel.inlineWidgetBuilders,
+                      textSelection: widget.viewModel.selection,
+                      selectionColor: widget.viewModel.selectionColor,
+                      highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
+                      underlines: widget.viewModel.createUnderlines(),
                     ),
-                    inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
-                    textSelection: widget.viewModel.selection,
-                    selectionColor: widget.viewModel.selectionColor,
-                    highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
-                    underlines: widget.viewModel.createUnderlines(),
-                  ),
-                  if (widget.taskMetadata?.scheduleAnchor != null ||
-                      widget.taskMetadata?.recurrence != null ||
-                      widget.taskMetadata?.reminder != null) ...[
-                    const SizedBox(height: 4),
-                    TaskMetadataBadges(
-                      dueDate: widget.taskMetadata?.scheduleAnchor,
-                      recurrence: widget.taskMetadata?.recurrence,
-                      hasReminder: widget.taskMetadata?.reminder != null,
-                      hasTime: widget.taskMetadata?.hasTime ?? false,
-                      completions: widget.taskMetadata?.completions ?? const {},
-                      // A recurring checkbox is only an occurrence animation.
-                      // Its metadata badge must keep resolving the next
-                      // occurrence from the document completion map.
-                      isCompleted: _isComplete && !_isRecurring,
-                    ),
-                    const SizedBox(height: 4),
+                    if (widget.taskMetadata?.scheduleAnchor != null ||
+                        widget.taskMetadata?.recurrence != null ||
+                        widget.taskMetadata?.reminder != null) ...[
+                      const SizedBox(height: 4),
+                      TaskMetadataBadges(
+                        dueDate: widget.taskMetadata?.scheduleAnchor,
+                        recurrence: widget.taskMetadata?.recurrence,
+                        hasReminder: widget.taskMetadata?.reminder != null,
+                        hasTime: widget.taskMetadata?.hasTime ?? false,
+                        completions:
+                            widget.taskMetadata?.completions ?? const {},
+                        isCompleted: _isComplete,
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ],
@@ -437,7 +503,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     );
 
     return TaskExitAnimator(
-      hideCompleted: widget.hideCompleted && !_isRecurring,
+      hideCompleted: widget.hideCompleted,
       isComplete: _isComplete,
       onAnimationComplete: _isAnimating
           ? () => setState(() => _isAnimating = false)
@@ -446,10 +512,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
         excluding: _isHidden,
         child: IgnorePointer(
           ignoring: _isHidden,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: content,
-          ),
+          child: content,
         ),
       ),
     );

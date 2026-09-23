@@ -178,6 +178,7 @@ type Task struct {
 	RecurrenceRule     pgtype.Text        `json:"recurrence_rule"`
 	Reminder           pgtype.Text        `json:"reminder"`
 	Completions        []byte             `json:"completions"`
+	CompletionHistory  []byte             `json:"completion_history"`
 	IsCompleted        bool               `json:"is_completed"`
 	LastCompletedAt    pgtype.Timestamptz `json:"last_completed_at"`
 	Revision           int64              `json:"revision"`

@@ -1,4 +1,5 @@
 import 'task.dart';
+import 'task_completion_record.dart';
 
 class NoteTask {
   const NoteTask({
@@ -9,9 +10,11 @@ class NoteTask {
     this.dueDate,
     this.hasTime = false,
     this.isCompleted = false,
+    this.completedAt,
     this.recurrenceRule,
     this.completions = const {},
     this.lastCompletedAt,
+    this.completionHistory = const [],
     this.createdAt,
   });
 
@@ -22,9 +25,11 @@ class NoteTask {
   final DateTime? dueDate;
   final bool hasTime;
   final bool isCompleted;
+  final DateTime? completedAt;
   final String? recurrenceRule;
   final Map<DateTime, DateTime> completions;
   final DateTime? lastCompletedAt;
+  final List<TaskCompletionRecord> completionHistory;
   final DateTime? createdAt;
 
   bool get isRecurring => recurrenceRule != null;
@@ -33,8 +38,22 @@ class NoteTask {
 }
 
 class TaskListItem {
-  const TaskListItem.task(this.task, {this.scheduledAt}) : note = null;
-  const TaskListItem.note(this.note, {this.scheduledAt}) : task = null;
+  const TaskListItem.task(
+    this.task, {
+    this.scheduledAt,
+    this.explicitScheduledAt = false,
+    this.scheduledHasTime,
+    this.isCompleted = false,
+    this.completedAt,
+  }) : note = null;
+  const TaskListItem.note(
+    this.note, {
+    this.scheduledAt,
+    this.explicitScheduledAt = false,
+    this.scheduledHasTime,
+    this.isCompleted = false,
+    this.completedAt,
+  }) : task = null;
 
   final Task? task;
   final NoteTask? note;
@@ -43,6 +62,10 @@ class TaskListItem {
   /// normally equals the persisted due date; for recurring tasks it can be a
   /// later visible occurrence while the persisted anchor remains unchanged.
   final DateTime? scheduledAt;
+  final bool explicitScheduledAt;
+  final bool? scheduledHasTime;
+  final bool isCompleted;
+  final DateTime? completedAt;
 
   bool get isStandalone => task != null;
   bool get isNote => note != null;
@@ -59,10 +82,12 @@ class TaskListItem {
       ? 'standalone:${task!.id}'
       : 'note:${note!.noteId}:${note!.blockId}';
 
-  DateTime? get dueDate =>
-      scheduledAt ?? (isStandalone ? task!.dueDate : note!.dueDate);
+  DateTime? get dueDate => explicitScheduledAt
+      ? scheduledAt
+      : scheduledAt ?? (isStandalone ? task!.dueDate : note!.dueDate);
 
-  bool get hasTime => isStandalone ? task!.hasTime : note!.hasTime;
+  bool get hasTime =>
+      scheduledHasTime ?? (isStandalone ? task!.hasTime : note!.hasTime);
 
   DateTime? get createdAt => isStandalone ? task!.createdAt : note!.createdAt;
 }

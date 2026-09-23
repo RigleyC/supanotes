@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:supanotes/core/database/daos/tasks_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
+import 'package:supanotes/features/tasks/domain/task_completion_record.dart';
 import 'package:supanotes/features/tasks/domain/task_operation.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 
@@ -193,7 +194,8 @@ class TaskRepository {
     final pending = (await _dao.getPendingOperations(_ownerUserId, task.id))
         .where(
           (operation) =>
-              afterOrdinal == null || operation.ordinal > afterOrdinal,
+              operation.status != 'blocked' &&
+              (afterOrdinal == null || operation.ordinal > afterOrdinal),
         )
         .toList(growable: false);
     var blockedByScheduleConflict = false;
@@ -257,19 +259,20 @@ class TaskRepository {
     final current = await _requireTask(draft.id);
     _assertOwner(draft);
     final now = DateTime.now().toUtc();
-    final updated = current
-        .withSchedule(
-          dueDate: draft.dueDate,
-          hasTime: draft.hasTime,
-          recurrenceRule: draft.recurrenceRule,
-        )
-        .copyWith(
-          title: draft.title,
-          reminder: draft.reminder,
-          isCompleted: draft.isCompleted,
-          lastCompletedAt: draft.lastCompletedAt,
-          updatedAt: now,
-        );
+    final scheduled = current.withSchedule(
+      dueDate: draft.dueDate,
+      hasTime: draft.hasTime,
+      recurrenceRule: draft.recurrenceRule,
+    );
+    final scheduleChanged =
+        scheduled.scheduleGeneration != current.scheduleGeneration;
+    final updated = scheduled.copyWith(
+      title: draft.title,
+      reminder: draft.reminder,
+      isCompleted: scheduleChanged ? false : draft.isCompleted,
+      lastCompletedAt: scheduleChanged ? null : draft.lastCompletedAt,
+      updatedAt: now,
+    );
     final operation = TaskOperation.upsert(
       taskId: updated.id,
       observedRevision: current.revision,
@@ -427,6 +430,9 @@ class TaskRepository {
     recurrenceRule: Value(task.recurrenceRule),
     reminder: Value(task.reminder),
     completions: Value(jsonEncode(task.toJson()['completions'])),
+    completionHistory: Value(
+      jsonEncode(task.toJson()['completion_history']),
+    ),
     isCompleted: Value(task.isCompleted),
     lastCompletedAt: Value(task.lastCompletedAt),
     revision: Value(task.revision),
@@ -535,12 +541,19 @@ class TaskRepository {
         current.hasTime != hasTime ||
         current.recurrenceRule != recurrence;
     final decodedCompletions = fields['completions'];
+    final scheduledCurrent = scheduleChanged
+        ? current.withSchedule(
+            dueDate: dueDate,
+            hasTime: hasTime,
+            recurrenceRule: recurrence,
+          )
+        : current;
     final completions = scheduleChanged
         ? const <String, Object?>{}
         : decodedCompletions is Map
         ? decodedCompletions.cast<String, Object?>()
         : current.completions;
-    return current.copyWith(
+    return scheduledCurrent.copyWith(
       title: fields['title'] as String? ?? current.title,
       dueDate: dueDate,
       hasTime: hasTime,
@@ -549,9 +562,18 @@ class TaskRepository {
           ? fields['reminder'] as String?
           : current.reminder,
       completions: completions,
-      isCompleted: fields['isCompleted'] as bool? ?? current.isCompleted,
-      lastCompletedAt: fields.containsKey('lastCompletedAt')
+      completionHistory: scheduleChanged
+          ? scheduledCurrent.completionHistory
+          : fields.containsKey('completionHistory')
+          ? parseTaskCompletionHistory(fields['completionHistory'])
+          : scheduledCurrent.completionHistory,
+      isCompleted: scheduleChanged
+          ? false
+          : fields['isCompleted'] as bool? ?? current.isCompleted,
+      lastCompletedAt: fields.containsKey('lastCompletedAt') && !scheduleChanged
           ? _parseInstant(fields['lastCompletedAt'])
+          : scheduleChanged
+          ? null
           : current.lastCompletedAt,
       updatedAt: operation.createdAt,
       scheduleGeneration: scheduleChanged
@@ -633,6 +655,9 @@ class TaskRepository {
       recurrenceRule: row.recurrenceRule,
       reminder: row.reminder,
       completions: decoded.cast<String, Object?>(),
+      completionHistory: parseTaskCompletionHistory(
+        jsonDecode(row.completionHistory),
+      ),
       isCompleted: row.isCompleted,
       lastCompletedAt: row.lastCompletedAt,
       revision: row.revision,

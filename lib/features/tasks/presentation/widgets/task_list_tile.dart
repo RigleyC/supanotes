@@ -31,15 +31,15 @@ class TaskListTile extends StatefulWidget {
 }
 
 class _TaskListTileState extends State<TaskListTile> {
-  bool _isCompleting = false;
+  bool? _optimisticChecked;
 
   // `DateFormat` construction does locale-data lookup: far too expensive to
   // rebuild for every tile on every list emission.
   static final _completedAtFormat = DateFormat('dd/MM/yyyy HH:mm');
 
   void _toggleTask() {
-    if (widget.onToggle == null || _isCompleting) return;
-    setState(() => _isCompleting = true);
+    if (widget.onToggle == null || _optimisticChecked != null) return;
+    setState(() => _optimisticChecked = !widget.checked);
     unawaited(_completeTask());
   }
 
@@ -47,7 +47,7 @@ class _TaskListTileState extends State<TaskListTile> {
     try {
       await widget.onToggle!();
     } catch (_) {
-      if (mounted) setState(() => _isCompleting = false);
+      if (mounted) setState(() => _optimisticChecked = null);
     }
   }
 
@@ -55,8 +55,9 @@ class _TaskListTileState extends State<TaskListTile> {
   void didUpdateWidget(covariant TaskListTile oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.item.uiKey != widget.item.uiKey ||
-        oldWidget.item.dueDate != widget.item.dueDate) {
-      _isCompleting = false;
+        oldWidget.item.dueDate != widget.item.dueDate ||
+        (_optimisticChecked != null && widget.checked == _optimisticChecked)) {
+      _optimisticChecked = null;
     }
   }
 
@@ -71,10 +72,8 @@ class _TaskListTileState extends State<TaskListTile> {
     final hasMetadata = item.dueDate != null || recurrence != null || reminder;
 
     return TaskExitAnimator(
-      hideCompleted: item.isStandalone
-          ? item.task?.recurrenceRule == null
-          : !item.note!.isRecurring,
-      isComplete: _isCompleting,
+      hideCompleted: false,
+      isComplete: _optimisticChecked ?? widget.checked,
       onAnimationComplete: null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -94,7 +93,7 @@ class _TaskListTileState extends State<TaskListTile> {
                   child: Center(
                     child: AppTaskCheckbox(
                       size: 20,
-                      value: widget.checked || _isCompleting,
+                      value: _optimisticChecked ?? widget.checked,
                       shape: AppTaskCheckboxShape.rounded,
                     ),
                   ),
@@ -123,6 +122,7 @@ class _TaskListTileState extends State<TaskListTile> {
                         recurrence: recurrence,
                         hasReminder: reminder,
                         hasTime: item.hasTime,
+                        isCompleted: widget.checked || item.isCompleted,
                         now: DateTime.now(),
                       ),
                     if (widget.completedAt != null)

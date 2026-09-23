@@ -94,7 +94,7 @@ void main() {
       expect(result.single.status, OccurrenceStatus.pending);
     });
 
-    test('moves to the next occurrence after an early completion', () {
+    test('keeps the current occurrence completed after early completion', () {
       final currentOccurrence = DateTime(2026, 7, 21);
       final result = buildOccurrences(
         taskId: 't1',
@@ -106,8 +106,8 @@ void main() {
       );
 
       expect(result, hasLength(1));
-      expect(result.single.scheduledAt, DateTime(2026, 7, 22));
-      expect(result.single.status, OccurrenceStatus.pending);
+      expect(result.single.scheduledAt, currentOccurrence);
+      expect(result.single.status, OccurrenceStatus.completed);
     });
 
     test('respects hasTime in date comparison', () {
@@ -217,14 +217,15 @@ void main() {
         anchor: DateTime(2026, 1, 31),
         recurrence: TaskRecurrence.monthly,
         hasTime: false,
-        now: DateTime(2026, 3),
+        now: DateTime(2026, 3, 31),
         completedScheduledAts: {DateTime(2026, 2, 28)},
       );
 
       expect(result.single.scheduledAt, DateTime(2026, 3, 31));
+      expect(result.single.status, OccurrenceStatus.pending);
     });
 
-    test('allows multiple consecutive early completions', () {
+    test('keeps the first not-yet-started completed occurrence current', () {
       final result = buildOccurrences(
         taskId: 't1',
         anchor: DateTime(2026, 8, 12),
@@ -234,8 +235,8 @@ void main() {
         completedScheduledAts: {DateTime(2026, 8, 12), DateTime(2026, 8, 19)},
       );
 
-      expect(result.single.scheduledAt, DateTime(2026, 8, 26));
-      expect(result.single.status, OccurrenceStatus.pending);
+      expect(result.single.scheduledAt, DateTime(2026, 8, 12));
+      expect(result.single.status, OccurrenceStatus.completed);
     });
 
     test('keeps an overdue occurrence until the next date starts', () {

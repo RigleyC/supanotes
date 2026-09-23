@@ -504,8 +504,8 @@ class _NoteEditorTaskDelegate {
     );
   }
 
-  Future<void> _onTaskReopen(String taskId) async {
+  Future<void> _onTaskReopen(String taskId, DateTime? scheduledAt) async {
     final controller = readSession().value?.controller;
-    controller?.reopenTaskInEditor(taskId);
+    controller?.reopenTaskInEditor(taskId, scheduledAt: scheduledAt);
   }
 }

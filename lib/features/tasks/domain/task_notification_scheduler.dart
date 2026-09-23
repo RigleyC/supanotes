@@ -412,7 +412,14 @@ class TaskNotificationScheduler extends AsyncNotifier<Map<String, DateTime>> {
     dev.log(
       '[Scheduler] Scheduling notification source=$key at $notificationTime',
     );
-    final body = formatDueDate(due, hasTime: task.hasTime, now: now);
+    // The platform stores this body until delivery. Relative labels must use
+    // the delivery date, otherwise a reminder scheduled today for tomorrow
+    // still says "Amanhã" when it arrives.
+    final body = formatDueDate(
+      due,
+      hasTime: task.hasTime,
+      now: notificationTime,
+    );
     final nid = _notificationId(
       currentUserId,
       task,

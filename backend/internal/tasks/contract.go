@@ -15,21 +15,30 @@ type Mutation struct {
 }
 
 type Task struct {
-	ID                 string          `json:"id"`
-	OwnerUserID        string          `json:"ownerUserId"`
-	Title              string          `json:"title"`
-	DueDate            *string         `json:"dueDate,omitempty"`
-	HasTime            bool            `json:"hasTime"`
-	RecurrenceRule     *string         `json:"recurrenceRule,omitempty"`
-	Reminder           *string         `json:"reminder,omitempty"`
-	Completions        json.RawMessage `json:"completions"`
-	IsCompleted        bool            `json:"isCompleted"`
-	LastCompletedAt    *string         `json:"lastCompletedAt,omitempty"`
-	Revision           int64           `json:"revision"`
-	ScheduleGeneration int64           `json:"scheduleGeneration"`
-	CreatedAt          string          `json:"createdAt"`
-	UpdatedAt          string          `json:"updatedAt"`
-	DeletedAt          *string         `json:"deletedAt,omitempty"`
+	ID                 string             `json:"id"`
+	OwnerUserID        string             `json:"ownerUserId"`
+	Title              string             `json:"title"`
+	DueDate            *string            `json:"dueDate,omitempty"`
+	HasTime            bool               `json:"hasTime"`
+	RecurrenceRule     *string            `json:"recurrenceRule,omitempty"`
+	Reminder           *string            `json:"reminder,omitempty"`
+	Completions        json.RawMessage    `json:"completions"`
+	CompletionHistory  []CompletionRecord `json:"completionHistory"`
+	IsCompleted        bool               `json:"isCompleted"`
+	LastCompletedAt    *string            `json:"lastCompletedAt,omitempty"`
+	Revision           int64              `json:"revision"`
+	ScheduleGeneration int64              `json:"scheduleGeneration"`
+	CreatedAt          string             `json:"createdAt"`
+	UpdatedAt          string             `json:"updatedAt"`
+	DeletedAt          *string            `json:"deletedAt,omitempty"`
+}
+
+// CompletionRecord is a completed occurrence archived when its task schedule changes.
+// ScheduledAt is a civil wall-clock value and stays null when the original task had no date.
+type CompletionRecord struct {
+	ScheduledAt *string `json:"scheduledAt"`
+	HasTime     bool    `json:"hasTime"`
+	CompletedAt string  `json:"completedAt"`
 }
 
 type MutationResult struct {

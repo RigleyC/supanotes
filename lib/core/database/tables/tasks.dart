@@ -23,8 +23,9 @@ class Tasks extends Table {
   TextColumn get reminder => text().nullable()();
 
   /// Canonical JSON object containing scheduledAt -> completedAt entries.
-  TextColumn get completions =>
-      text().withDefault(const Constant('{}'))();
+  TextColumn get completions => text().withDefault(const Constant('{}'))();
+  TextColumn get completionHistory =>
+      text().withDefault(const Constant('[]'))();
   BoolColumn get isCompleted => boolean().withDefault(const Constant(false))();
   DateTimeColumn get lastCompletedAt => dateTime().nullable()();
   IntColumn get revision => integer().withDefault(const Constant(0))();

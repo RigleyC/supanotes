@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_entry.dart';
+import 'package:supanotes/features/tasks/domain/task_completion_record.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_time.dart';
 import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
@@ -24,6 +25,7 @@ class ParsedNoteTask {
     required this.completions,
     required this.isCompleted,
     required this.lastCompletedAt,
+    required this.completionHistory,
   });
 
   final String blockId;
@@ -35,6 +37,7 @@ class ParsedNoteTask {
   final Map<DateTime, DateTime> completions;
   final bool isCompleted;
   final DateTime? lastCompletedAt;
+  final List<TaskCompletionRecord> completionHistory;
 }
 
 /// Decodes task blocks from an effective document snapshot.
@@ -80,7 +83,22 @@ ParsedNoteTask _parseNoteTaskBlock(
     ),
     isCompleted: metadata['isCompleted'] as bool? ?? false,
     lastCompletedAt: _parseCompletedAt(metadata['lastCompletedAt']),
+    completionHistory: _parseCompletionHistory(metadata['completionHistory']),
   );
+}
+
+List<TaskCompletionRecord> _parseCompletionHistory(Object? value) {
+  if (value == null) return const [];
+  if (value is! List) {
+    throw const FormatException('Task completionHistory must be an array');
+  }
+  return List.unmodifiable([
+    for (final entry in value)
+      if (entry is Map)
+        TaskCompletionRecord.fromJson(entry.cast<String, dynamic>())
+      else
+        throw const FormatException('Invalid archived task completion'),
+  ]);
 }
 
 DateTime? _parseCompletedAt(Object? value) {

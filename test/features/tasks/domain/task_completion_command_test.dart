@@ -31,7 +31,7 @@ void main() {
       expect(result.nextDue, DateTime(2026, 7, 27));
     });
 
-    test('uses the next calendar occurrence after early completion', () {
+    test('keeps the current occurrence after early completion', () {
       final result = TaskCompletionCommand(() => DateTime(2026, 8, 10, 14))
           .complete(
             TaskSnapshot(
@@ -44,26 +44,29 @@ void main() {
             ),
           );
 
-      expect(result.scheduledAt, DateTime(2026, 8, 19, 9));
-      expect(result.nextDue, DateTime(2026, 8, 26, 9));
+      expect(result.scheduledAt, DateTime(2026, 8, 12, 9));
+      expect(result.nextDue, DateTime(2026, 8, 19, 9));
     });
 
-    test('allows a second early completion on the next occurrence', () {
-      final result = TaskCompletionCommand(() => DateTime(2026, 8, 10, 15))
-          .complete(
-            TaskSnapshot(
-              dueDate: DateTime(2026, 8, 12, 9),
-              hasTime: true,
-              recurrence: TaskRecurrence.weekly,
-              completions: {
-                DateTime(2026, 8, 12, 9): DateTime(2026, 8, 10, 14),
-              },
-            ),
-          );
+    test(
+      'repeats completion on the current occurrence until successor starts',
+      () {
+        final result = TaskCompletionCommand(() => DateTime(2026, 8, 10, 15))
+            .complete(
+              TaskSnapshot(
+                dueDate: DateTime(2026, 8, 12, 9),
+                hasTime: true,
+                recurrence: TaskRecurrence.weekly,
+                completions: {
+                  DateTime(2026, 8, 12, 9): DateTime(2026, 8, 10, 14),
+                },
+              ),
+            );
 
-      expect(result.scheduledAt, DateTime(2026, 8, 19, 9));
-      expect(result.nextDue, DateTime(2026, 8, 26, 9));
-    });
+        expect(result.scheduledAt, DateTime(2026, 8, 12, 9));
+        expect(result.nextDue, DateTime(2026, 8, 19, 9));
+      },
+    );
 
     test('preserves the anchor day after a monthly short month', () {
       final result = TaskCompletionCommand(() => DateTime(2026, 3, 1, 10))
@@ -78,8 +81,8 @@ void main() {
             ),
           );
 
-      expect(result.scheduledAt, DateTime(2026, 3, 31));
-      expect(result.nextDue, DateTime(2026, 4, 30));
+      expect(result.scheduledAt, DateTime(2026, 2, 28));
+      expect(result.nextDue, DateTime(2026, 3, 31));
     });
 
     test(

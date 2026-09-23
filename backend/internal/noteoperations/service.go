@@ -111,6 +111,10 @@ func syncOperationsInRepository(
 
 	currentRevision := locked.Revision
 	var accepted []AcceptedOperation
+	// Evidence lasts for this sync transaction. Reopening a completion and then
+	// changing its schedule in the same transaction archives that completion;
+	// an explicit reopen committed in an earlier transaction is a separate action.
+	completionEvidence := make(map[string][]taskCompletionHistoryRecord)
 
 	for _, opReq := range req.Operations {
 		opID := mustParseUUID(opReq.OperationID)
@@ -136,11 +140,43 @@ func syncOperationsInRepository(
 			return SyncResponse{}, err
 		}
 
-		if err := doc.ApplyOperation(Kind(opReq.Kind), ptrStr(opReq.BlockID), opReq.Payload); err != nil {
+		kind := Kind(opReq.Kind)
+		taskBlockID := ptrStr(opReq.BlockID)
+		if kind == KindCompleteTaskOccurrence {
+			if taskBlockID == "" {
+				var payload CompleteTaskOccurrencePayload
+				if err := json.Unmarshal(opReq.Payload, &payload); err == nil {
+					taskBlockID = payload.TaskID
+				}
+			}
+			if record, ok := completionEvidenceForClear(&doc, taskBlockID, opReq.Payload); ok {
+				completionEvidence[taskBlockID] = append(completionEvidence[taskBlockID], record)
+			}
+		}
+
+		beforeBlock, hadBeforeBlock := documentBlock(&doc, taskBlockID)
+		beforeMetadata := cloneTaskMetadata(beforeBlock.Metadata)
+		var applyErr error
+		if kind == KindSetBlockMetadata {
+			applyErr = doc.ApplyOperationWithCompletionEvidence(
+				kind,
+				taskBlockID,
+				opReq.Payload,
+				completionEvidence[taskBlockID],
+			)
+		} else {
+			applyErr = doc.ApplyOperation(kind, taskBlockID, opReq.Payload)
+		}
+		if applyErr != nil {
 			return SyncResponse{}, &ValidationError{
 				Code:    "INVALID_DOCUMENT_MUTATION",
 				Message: "operation cannot be applied to the current document",
-				Err:     err,
+				Err:     applyErr,
+			}
+		}
+		if kind == KindSetBlockMetadata && hadBeforeBlock {
+			if afterBlock, ok := documentBlock(&doc, taskBlockID); ok && !sameTaskSchedule(beforeMetadata, afterBlock.Metadata) {
+				delete(completionEvidence, taskBlockID)
 			}
 		}
 
@@ -217,6 +253,48 @@ func syncOperationsInRepository(
 		CanonicalDocument: docJSON,
 		ServerTime:        time.Now().UTC(),
 	}, nil
+}
+
+func completionEvidenceForClear(
+	document *Document,
+	blockID string,
+	payload json.RawMessage,
+) (taskCompletionHistoryRecord, bool) {
+	var request CompleteTaskOccurrencePayload
+	if err := json.Unmarshal(payload, &request); err != nil || request.CompletedAt != nil {
+		return taskCompletionHistoryRecord{}, false
+	}
+	block, ok := documentBlock(document, blockID)
+	if !ok || block.Type != string(BlockTask) {
+		return taskCompletionHistoryRecord{}, false
+	}
+	completedAt, ok := taskCompletions(block.Metadata)[request.ScheduledAt].(string)
+	if !ok {
+		return taskCompletionHistoryRecord{}, false
+	}
+	scheduledAt := request.ScheduledAt
+	return taskCompletionHistoryRecord{
+		scheduledAt: &scheduledAt,
+		hasTime:     boolMetadata(block.Metadata, "hasTime"),
+		completedAt: completedAt,
+	}, true
+}
+
+func documentBlock(document *Document, blockID string) (Block, bool) {
+	for _, block := range document.Blocks {
+		if block.ID == blockID {
+			return block, true
+		}
+	}
+	return Block{}, false
+}
+
+func cloneTaskMetadata(metadata map[string]any) map[string]any {
+	clone := make(map[string]any, len(metadata))
+	for key, value := range metadata {
+		clone[key] = value
+	}
+	return clone
 }
 
 func validateAndTransform(

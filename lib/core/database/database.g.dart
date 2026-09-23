@@ -5600,6 +5600,19 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     requiredDuringInsert: false,
     defaultValue: const Constant('{}'),
   );
+  static const VerificationMeta _completionHistoryMeta = const VerificationMeta(
+    'completionHistory',
+  );
+  @override
+  late final GeneratedColumn<String> completionHistory =
+      GeneratedColumn<String>(
+        'completion_history',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
   static const VerificationMeta _isCompletedMeta = const VerificationMeta(
     'isCompleted',
   );
@@ -5693,6 +5706,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     recurrenceRule,
     reminder,
     completions,
+    completionHistory,
     isCompleted,
     lastCompletedAt,
     revision,
@@ -5770,6 +5784,15 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         completions.isAcceptableOrUnknown(
           data['completions']!,
           _completionsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('completion_history')) {
+      context.handle(
+        _completionHistoryMeta,
+        completionHistory.isAcceptableOrUnknown(
+          data['completion_history']!,
+          _completionHistoryMeta,
         ),
       );
     }
@@ -5869,6 +5892,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         DriftSqlType.string,
         data['${effectivePrefix}completions'],
       )!,
+      completionHistory: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}completion_history'],
+      )!,
       isCompleted: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_completed'],
@@ -5917,6 +5944,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
 
   /// Canonical JSON object containing scheduledAt -> completedAt entries.
   final String completions;
+  final String completionHistory;
   final bool isCompleted;
   final DateTime? lastCompletedAt;
   final int revision;
@@ -5933,6 +5961,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     this.recurrenceRule,
     this.reminder,
     required this.completions,
+    required this.completionHistory,
     required this.isCompleted,
     this.lastCompletedAt,
     required this.revision,
@@ -5958,6 +5987,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       map['reminder'] = Variable<String>(reminder);
     }
     map['completions'] = Variable<String>(completions);
+    map['completion_history'] = Variable<String>(completionHistory);
     map['is_completed'] = Variable<bool>(isCompleted);
     if (!nullToAbsent || lastCompletedAt != null) {
       map['last_completed_at'] = Variable<DateTime>(lastCompletedAt);
@@ -5988,6 +6018,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ? const Value.absent()
           : Value(reminder),
       completions: Value(completions),
+      completionHistory: Value(completionHistory),
       isCompleted: Value(isCompleted),
       lastCompletedAt: lastCompletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -6016,6 +6047,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       recurrenceRule: serializer.fromJson<String?>(json['recurrenceRule']),
       reminder: serializer.fromJson<String?>(json['reminder']),
       completions: serializer.fromJson<String>(json['completions']),
+      completionHistory: serializer.fromJson<String>(json['completionHistory']),
       isCompleted: serializer.fromJson<bool>(json['isCompleted']),
       lastCompletedAt: serializer.fromJson<DateTime?>(json['lastCompletedAt']),
       revision: serializer.fromJson<int>(json['revision']),
@@ -6037,6 +6069,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'recurrenceRule': serializer.toJson<String?>(recurrenceRule),
       'reminder': serializer.toJson<String?>(reminder),
       'completions': serializer.toJson<String>(completions),
+      'completionHistory': serializer.toJson<String>(completionHistory),
       'isCompleted': serializer.toJson<bool>(isCompleted),
       'lastCompletedAt': serializer.toJson<DateTime?>(lastCompletedAt),
       'revision': serializer.toJson<int>(revision),
@@ -6056,6 +6089,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     Value<String?> recurrenceRule = const Value.absent(),
     Value<String?> reminder = const Value.absent(),
     String? completions,
+    String? completionHistory,
     bool? isCompleted,
     Value<DateTime?> lastCompletedAt = const Value.absent(),
     int? revision,
@@ -6074,6 +6108,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
         : this.recurrenceRule,
     reminder: reminder.present ? reminder.value : this.reminder,
     completions: completions ?? this.completions,
+    completionHistory: completionHistory ?? this.completionHistory,
     isCompleted: isCompleted ?? this.isCompleted,
     lastCompletedAt: lastCompletedAt.present
         ? lastCompletedAt.value
@@ -6100,6 +6135,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       completions: data.completions.present
           ? data.completions.value
           : this.completions,
+      completionHistory: data.completionHistory.present
+          ? data.completionHistory.value
+          : this.completionHistory,
       isCompleted: data.isCompleted.present
           ? data.isCompleted.value
           : this.isCompleted,
@@ -6127,6 +6165,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ..write('recurrenceRule: $recurrenceRule, ')
           ..write('reminder: $reminder, ')
           ..write('completions: $completions, ')
+          ..write('completionHistory: $completionHistory, ')
           ..write('isCompleted: $isCompleted, ')
           ..write('lastCompletedAt: $lastCompletedAt, ')
           ..write('revision: $revision, ')
@@ -6148,6 +6187,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     recurrenceRule,
     reminder,
     completions,
+    completionHistory,
     isCompleted,
     lastCompletedAt,
     revision,
@@ -6168,6 +6208,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           other.recurrenceRule == this.recurrenceRule &&
           other.reminder == this.reminder &&
           other.completions == this.completions &&
+          other.completionHistory == this.completionHistory &&
           other.isCompleted == this.isCompleted &&
           other.lastCompletedAt == this.lastCompletedAt &&
           other.revision == this.revision &&
@@ -6186,6 +6227,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<String?> recurrenceRule;
   final Value<String?> reminder;
   final Value<String> completions;
+  final Value<String> completionHistory;
   final Value<bool> isCompleted;
   final Value<DateTime?> lastCompletedAt;
   final Value<int> revision;
@@ -6203,6 +6245,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.recurrenceRule = const Value.absent(),
     this.reminder = const Value.absent(),
     this.completions = const Value.absent(),
+    this.completionHistory = const Value.absent(),
     this.isCompleted = const Value.absent(),
     this.lastCompletedAt = const Value.absent(),
     this.revision = const Value.absent(),
@@ -6221,6 +6264,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.recurrenceRule = const Value.absent(),
     this.reminder = const Value.absent(),
     this.completions = const Value.absent(),
+    this.completionHistory = const Value.absent(),
     this.isCompleted = const Value.absent(),
     this.lastCompletedAt = const Value.absent(),
     this.revision = const Value.absent(),
@@ -6243,6 +6287,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<String>? recurrenceRule,
     Expression<String>? reminder,
     Expression<String>? completions,
+    Expression<String>? completionHistory,
     Expression<bool>? isCompleted,
     Expression<DateTime>? lastCompletedAt,
     Expression<int>? revision,
@@ -6261,6 +6306,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
       if (reminder != null) 'reminder': reminder,
       if (completions != null) 'completions': completions,
+      if (completionHistory != null) 'completion_history': completionHistory,
       if (isCompleted != null) 'is_completed': isCompleted,
       if (lastCompletedAt != null) 'last_completed_at': lastCompletedAt,
       if (revision != null) 'revision': revision,
@@ -6281,6 +6327,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Value<String?>? recurrenceRule,
     Value<String?>? reminder,
     Value<String>? completions,
+    Value<String>? completionHistory,
     Value<bool>? isCompleted,
     Value<DateTime?>? lastCompletedAt,
     Value<int>? revision,
@@ -6299,6 +6346,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       recurrenceRule: recurrenceRule ?? this.recurrenceRule,
       reminder: reminder ?? this.reminder,
       completions: completions ?? this.completions,
+      completionHistory: completionHistory ?? this.completionHistory,
       isCompleted: isCompleted ?? this.isCompleted,
       lastCompletedAt: lastCompletedAt ?? this.lastCompletedAt,
       revision: revision ?? this.revision,
@@ -6336,6 +6384,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     }
     if (completions.present) {
       map['completions'] = Variable<String>(completions.value);
+    }
+    if (completionHistory.present) {
+      map['completion_history'] = Variable<String>(completionHistory.value);
     }
     if (isCompleted.present) {
       map['is_completed'] = Variable<bool>(isCompleted.value);
@@ -6375,6 +6426,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
           ..write('recurrenceRule: $recurrenceRule, ')
           ..write('reminder: $reminder, ')
           ..write('completions: $completions, ')
+          ..write('completionHistory: $completionHistory, ')
           ..write('isCompleted: $isCompleted, ')
           ..write('lastCompletedAt: $lastCompletedAt, ')
           ..write('revision: $revision, ')
@@ -10232,6 +10284,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       Value<String?> recurrenceRule,
       Value<String?> reminder,
       Value<String> completions,
+      Value<String> completionHistory,
       Value<bool> isCompleted,
       Value<DateTime?> lastCompletedAt,
       Value<int> revision,
@@ -10251,6 +10304,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<String?> recurrenceRule,
       Value<String?> reminder,
       Value<String> completions,
+      Value<String> completionHistory,
       Value<bool> isCompleted,
       Value<DateTime?> lastCompletedAt,
       Value<int> revision,
@@ -10306,6 +10360,11 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<String> get completions => $composableBuilder(
     column: $table.completions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get completionHistory => $composableBuilder(
+    column: $table.completionHistory,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10394,6 +10453,11 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get completionHistory => $composableBuilder(
+    column: $table.completionHistory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isCompleted => $composableBuilder(
     column: $table.isCompleted,
     builder: (column) => ColumnOrderings(column),
@@ -10469,6 +10533,11 @@ class $$TasksTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get completionHistory => $composableBuilder(
+    column: $table.completionHistory,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get isCompleted => $composableBuilder(
     column: $table.isCompleted,
     builder: (column) => column,
@@ -10533,6 +10602,7 @@ class $$TasksTableTableManager
                 Value<String?> recurrenceRule = const Value.absent(),
                 Value<String?> reminder = const Value.absent(),
                 Value<String> completions = const Value.absent(),
+                Value<String> completionHistory = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),
                 Value<DateTime?> lastCompletedAt = const Value.absent(),
                 Value<int> revision = const Value.absent(),
@@ -10550,6 +10620,7 @@ class $$TasksTableTableManager
                 recurrenceRule: recurrenceRule,
                 reminder: reminder,
                 completions: completions,
+                completionHistory: completionHistory,
                 isCompleted: isCompleted,
                 lastCompletedAt: lastCompletedAt,
                 revision: revision,
@@ -10569,6 +10640,7 @@ class $$TasksTableTableManager
                 Value<String?> recurrenceRule = const Value.absent(),
                 Value<String?> reminder = const Value.absent(),
                 Value<String> completions = const Value.absent(),
+                Value<String> completionHistory = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),
                 Value<DateTime?> lastCompletedAt = const Value.absent(),
                 Value<int> revision = const Value.absent(),
@@ -10586,6 +10658,7 @@ class $$TasksTableTableManager
                 recurrenceRule: recurrenceRule,
                 reminder: reminder,
                 completions: completions,
+                completionHistory: completionHistory,
                 isCompleted: isCompleted,
                 lastCompletedAt: lastCompletedAt,
                 revision: revision,

@@ -44,6 +44,19 @@ class NoteTaskController {
     // outbox/session worker.
     await session.flushNow();
   }
+
+  /// Reopens the current occurrence through the note document operation log.
+  Future<void> reopen(NoteTask task, {DateTime? scheduledAt}) async {
+    final session = await _readSession(task.noteId);
+    if (!session.captureLocalOperations) {
+      throw StateError('Esta nota não permite reabrir a tarefa.');
+    }
+    session.controller.reopenTaskInEditor(
+      task.blockId,
+      scheduledAt: scheduledAt,
+    );
+    await session.flushNow();
+  }
 }
 
 /// Provides note-owned task mutations to the global task list.

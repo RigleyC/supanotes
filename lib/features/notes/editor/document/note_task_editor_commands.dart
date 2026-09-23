@@ -1,4 +1,5 @@
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
+import 'package:supanotes/features/tasks/domain/task_completion_record.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 import 'package:super_editor/super_editor.dart';
@@ -52,7 +53,6 @@ final class NoteTaskEditorCommands {
       metadata['lastCompletedAt'] = result.completedAt
           .toUtc()
           .toIso8601String();
-      metadata.remove('dueDate');
     } else if (result.scheduledAt != null) {
       final completions = _completions(metadata);
       final key = scheduledAtKey(result.scheduledAt!, hasTime: hasTime);
@@ -93,6 +93,7 @@ final class NoteTaskEditorCommands {
       });
       metadata['completions'] = completions;
     }
+    metadata.remove('lastCompletedAt');
     return node.copyTaskWith(isComplete: false, metadata: metadata);
   }
 
@@ -151,8 +152,25 @@ final class NoteTaskEditorCommands {
     } else if (reminder != null) {
       metadata['reminder'] = reminder;
     }
-    if (scheduleChanged) metadata.remove('completions');
-    return node.copyTaskWith(metadata: metadata);
+    if (scheduleChanged) {
+      final lastCompletedAt = metadata['lastCompletedAt'] is String
+          ? DateTime.tryParse(metadata['lastCompletedAt'] as String)
+          : null;
+      metadata['completionHistory'] = archiveTaskCompletionHistory(
+        history: parseTaskCompletionHistory(metadata['completionHistory']),
+        completions: _completions(metadata),
+        scheduledAt: previousDueDate,
+        hasTime: previousHasTime,
+        isCompleted: node.isComplete,
+        lastCompletedAt: lastCompletedAt,
+      ).map((record) => record.toJson()).toList(growable: false);
+      metadata.remove('completions');
+      metadata.remove('lastCompletedAt');
+    }
+    return node.copyTaskWith(
+      isComplete: scheduleChanged ? false : null,
+      metadata: metadata,
+    );
   }
 
   Map<String, dynamic> _completions(Map<String, dynamic> metadata) =>
