@@ -8,6 +8,7 @@ import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badg
 import 'package:supanotes/features/tasks/presentation/widgets/task_source_label.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_task_checkbox.dart';
+import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 import 'package:supanotes/shared/widgets/task_exit_animator.dart';
 
 class TaskListTile extends StatefulWidget {
@@ -15,6 +16,7 @@ class TaskListTile extends StatefulWidget {
     required this.item,
     required this.onTap,
     this.onToggle,
+    this.onDelete,
     this.checked = false,
     this.completedAt,
     super.key,
@@ -23,6 +25,7 @@ class TaskListTile extends StatefulWidget {
   final TaskListItem item;
   final VoidCallback onTap;
   final Future<void> Function()? onToggle;
+  final Future<void> Function()? onDelete;
   final bool checked;
   final DateTime? completedAt;
 
@@ -71,7 +74,7 @@ class _TaskListTileState extends State<TaskListTile> {
     final reminder = item.isStandalone && item.task?.reminder != null;
     final hasMetadata = item.dueDate != null || recurrence != null || reminder;
 
-    return TaskExitAnimator(
+    final tile = TaskExitAnimator(
       hideCompleted: false,
       isComplete: _optimisticChecked ?? widget.checked,
       onAnimationComplete: null,
@@ -139,6 +142,38 @@ class _TaskListTileState extends State<TaskListTile> {
           ],
         ),
       ),
+    );
+
+    if (widget.onDelete == null) return tile;
+
+    return Dismissible(
+      key: ValueKey('task-dismiss-${item.uiKey}'),
+      direction: DismissDirection.endToStart,
+      background: const SizedBox.shrink(),
+      secondaryBackground: ColoredBox(
+        color: Theme.of(context).colorScheme.errorContainer,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.lg),
+            child: Icon(
+              Icons.delete_outline_rounded,
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+        ),
+      ),
+      confirmDismiss: (_) async {
+        return showConfirmDialog(
+          context: context,
+          title: 'Excluir task?',
+          message: 'Essa task será removida da sua lista.',
+          confirmLabel: 'Excluir',
+          destructive: true,
+        );
+      },
+      onDismissed: (_) => unawaited(widget.onDelete!()),
+      child: tile,
     );
   }
 }

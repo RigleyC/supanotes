@@ -95,6 +95,23 @@ class NoteEditorController extends ChangeNotifier {
     ]);
   }
 
+  /// Deletes a task node while keeping the note's required editable block.
+  void deleteTaskInEditor(String nodeId) {
+    _assertCanMutate?.call();
+    final node = document.getNodeById(nodeId);
+    if (node is! TaskNode) return;
+    if (document.nodeCount == 1) {
+      editor.execute([
+        ReplaceNodeRequest(
+          existingNodeId: nodeId,
+          newNode: ParagraphNode(id: nodeId, text: AttributedText()),
+        ),
+      ]);
+      return;
+    }
+    editor.execute([DeleteNodeRequest(nodeId: nodeId)]);
+  }
+
   void updateTaskMetadataInEditor(
     String nodeId, {
     DateTime? dueDate,

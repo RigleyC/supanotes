@@ -57,6 +57,16 @@ class NoteTaskController {
     );
     await session.flushNow();
   }
+
+  /// Deletes a note-owned task through the canonical note document operation.
+  Future<void> delete(NoteTask task) async {
+    final session = await _readSession(task.noteId);
+    if (!session.captureLocalOperations) {
+      throw StateError('Esta nota não permite excluir a tarefa.');
+    }
+    session.controller.deleteTaskInEditor(task.blockId);
+    await session.flushNow();
+  }
 }
 
 /// Provides note-owned task mutations to the global task list.

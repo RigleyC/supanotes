@@ -1,5 +1,17 @@
 # Implementation plan — local-first note persistence
 
+## Swipe to delete tasks and show the recurring schedule anchor
+
+Status: complete.
+
+- [x] Add confirmed swipe-to-delete to the global Tasks list for standalone and
+  note-owned tasks, preserving each task's storage authority.
+- [x] Remove a note task through the canonical note document mutation; preserve
+  an editable paragraph when deleting the note's only block.
+- [x] Show the stored recurrence anchor in the metadata editor instead of
+  substituting the latest occurrence and labeling an old anchor overdue.
+- [x] Verify formatting, targeted analysis, Android debug build, and diff.
+
 ## Open timed recurring occurrences at the start of their calendar day
 
 Status: complete.

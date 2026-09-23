@@ -289,3 +289,21 @@ diagnostics only. The debug build emitted existing Gradle/AGP/Kotlin deprecation
 and Java source/target warnings. Tests were not run because project
 `AGENTS.md` prohibits unit tests. Device behavior and the iOS build were not
 verified here.
+
+## Task list swipe deletion and recurring metadata date (2026-09-23)
+
+The global Tasks list now supports end-to-start swipe deletion with a
+confirmation. Standalone tasks use the task repository; note-owned tasks use
+the note editor's canonical document operation and are flushed through the
+note session. If the note task is the document's only block, it becomes an
+empty paragraph so the note remains editable.
+
+The task metadata editor now shows the persisted schedule anchor for recurring
+tasks. The global list remains responsible for showing the current occurrence,
+so a past recurrence anchor is no longer presented as the current overdue
+occurrence inside the editor.
+
+Verification: targeted Flutter analysis reported infos only, the Android debug
+APK build passed, and `git diff --check` passed. No unit tests were run per the
+repository instructions. The swipe interaction has not been exercised on a
+physical device.

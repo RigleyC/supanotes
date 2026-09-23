@@ -1,5 +1,16 @@
 # Task — iOS task text selection
 
+## Task list swipe deletion and recurring metadata date (2026-09-23)
+
+- [x] Add a confirmation and swipe-to-delete interaction in the Tasks list.
+- [x] Route standalone deletion through `TaskController` and note task deletion
+  through the canonical note editor document operation.
+- [x] Keep one editable paragraph when the deleted task is the note's only
+  block.
+- [x] Display the recurring schedule anchor in its metadata editor without an
+  overdue label; keep current-occurrence labels in the task list.
+- [x] Verify analyzer/build/diff; no unit tests per repository instructions.
+
 ## Timed recurring tasks open at local midnight (2026-09-23)
 
 - [x] Make today's timed occurrence current from the start of its local date.

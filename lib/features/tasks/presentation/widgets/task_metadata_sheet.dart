@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supanotes/core/utils/date_time_extensions.dart';
 import 'package:supanotes/features/tasks/domain/task_date_format.dart';
-import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
@@ -104,15 +103,12 @@ class _TaskMetadataSheetBodyState extends State<TaskMetadataSheetBody> {
             title: state.scheduleAnchor == null
                 ? 'Adicionar data'
                 : formatDueDate(
-                    state.recurrence == null
-                        ? state.scheduleAnchor!
-                        : TaskOccurrencePolicy().currentScheduledAt(
-                            anchor: state.scheduleAnchor,
-                            recurrence: state.recurrence,
-                            hasTime: state.hasTime,
-                            completedAtByScheduledAt: state.completions,
-                          )!,
+                    state.scheduleAnchor!,
                     hasTime: state.hasTime,
+                    // A recurring task's anchor can be in the past by design.
+                    // The list shows its current occurrence; this editor shows
+                    // the date being edited without mislabeling it overdue.
+                    isCompleted: state.recurrence != null,
                   ),
             leading: const Icon(Icons.calendar_today_rounded, size: 20),
             trailing: state.scheduleAnchor == null

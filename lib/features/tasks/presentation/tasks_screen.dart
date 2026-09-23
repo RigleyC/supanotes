@@ -30,6 +30,7 @@ class TasksScreen extends ConsumerStatefulWidget {
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
   bool _includeNoteTasks = false;
+  final Set<String> _dismissedTaskKeys = {};
 
   @override
   Widget build(BuildContext context) {
@@ -88,10 +89,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               ),
             ),
             data: (tasks) {
-              final openTasks = tasks
+              final visibleTasks = tasks
+                  .where((task) => !_dismissedTaskKeys.contains(task.uiKey))
+                  .toList();
+              final openTasks = visibleTasks
                   .where((task) => !task.isCompleted)
                   .toList();
-              final completedTasks = tasks
+              final completedTasks = visibleTasks
                   .where((task) => task.isCompleted)
                   .toList();
               if (openTasks.isEmpty && completedTasks.isEmpty) {
@@ -165,6 +169,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         completedAt: item.completedAt,
                         onTap: () => unawaited(_openTask(context, item)),
                         onToggle: () => _toggleTask(item),
+                        onDelete: () => _deleteTask(item),
                       ),
                     );
                   },
@@ -225,6 +230,22 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         AppMessenger.showError('Não foi possível concluir a task: $error');
       }
       rethrow;
+    }
+  }
+
+  Future<void> _deleteTask(TaskListItem item) async {
+    setState(() => _dismissedTaskKeys.add(item.uiKey));
+    try {
+      if (item.isStandalone) {
+        await ref.read(taskControllerProvider).delete(item.task!.id);
+      } else {
+        await ref.read(noteTaskControllerProvider).delete(item.note!);
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _dismissedTaskKeys.remove(item.uiKey));
+        AppMessenger.showError('Não foi possível excluir a task: $error');
+      }
     }
   }
 }
