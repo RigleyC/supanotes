@@ -18,7 +18,6 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:supanotes/shared/widgets/app_tile.dart';
 import 'package:supanotes/shared/widgets/empty_state.dart';
 
 class TasksScreen extends ConsumerStatefulWidget {
@@ -37,8 +36,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     final tasksAsync = ref.watch(
       taskListProvider(includeNoteTasks: _includeNoteTasks),
     );
-    final bottomContentPadding =
-        MediaQuery.paddingOf(context).bottom + AppSpacing.lg;
     final sourceFilterMenu = TaskSourceFilterMenu(
       key: const ValueKey('task-source-filter-menu'),
       includeNoteTasks: _includeNoteTasks,
@@ -61,16 +58,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               elevation: 0,
               actions: [sourceFilterMenu],
             ),
-      floatingActionButton: Padding(
-        padding: NavigationBarInsets.scrollPadding(context),
-        child: AppButton(
-          heroTag: 'tasks-add-fab',
-          variant: AppButtonVariant.fab,
-          onPressed: () => unawaited(showTaskEditorSheet(context: context)),
-          icon: const Icon(Icons.add_rounded),
-        ),
+      bottomNavigationBar: _TasksFooter(
+        bottomInset: NavigationBarInsets.scrollPadding(context).bottom + 80,
+        onAdd: () => unawaited(showTaskEditorSheet(context: context)),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: CustomScrollView(
         slivers: [
           tasksAsync.when(
@@ -95,33 +86,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               final openTasks = visibleTasks
                   .where((task) => !task.isCompleted)
                   .toList();
-              final completedTasks = visibleTasks
-                  .where((task) => task.isCompleted)
-                  .toList();
-              if (openTasks.isEmpty && completedTasks.isEmpty) {
-                return SliverFillRemaining(
+              if (openTasks.isEmpty) {
+                return const SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Column(
-                    children: [
-                      const Expanded(
-                        child: Center(
-                          child: EmptyState(
-                            icon: Icons.check_circle_outline_rounded,
-                            title: 'Tudo em dia',
-                            subtitle: 'Adicione uma task para começar.',
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          AppSpacing.md,
-                          AppSpacing.md,
-                          AppSpacing.md,
-                          bottomContentPadding + 112,
-                        ),
-                        child: const _CompletedTasksEntry(),
-                      ),
-                    ],
+                  child: Center(
+                    child: EmptyState(
+                      icon: Icons.check_circle_outline_rounded,
+                      title: 'Tudo em dia',
+                      subtitle: 'Adicione uma task para come\u00e7ar.',
+                    ),
                   ),
                 );
               }
@@ -131,36 +104,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   AppSpacing.md,
                   0,
                   AppSpacing.md,
-                  112,
+                  AppSpacing.md,
                 ),
                 sliver: SliverList.builder(
-                  itemCount:
-                      openTasks.length +
-                      completedTasks.length +
-                      (completedTasks.isEmpty ? 0 : 1) +
-                      1,
+                  itemCount: openTasks.length,
                   itemBuilder: (context, index) {
-                    if (completedTasks.isNotEmpty &&
-                        index == openTasks.length) {
-                      return const Padding(
-                        padding: EdgeInsets.only(
-                          top: AppSpacing.lg,
-                          bottom: AppSpacing.sm,
-                        ),
-                        child: Text(
-                          'Concluídas',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      );
-                    }
-                    final completedStart =
-                        openTasks.length + (completedTasks.isEmpty ? 0 : 1);
-                    if (index == completedStart + completedTasks.length) {
-                      return const _CompletedTasksEntry();
-                    }
-                    final item = index < openTasks.length
-                        ? openTasks[index]
-                        : completedTasks[index - completedStart];
+                    final item = openTasks[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: TaskListTile(
@@ -250,18 +199,44 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   }
 }
 
-class _CompletedTasksEntry extends StatelessWidget {
-  const _CompletedTasksEntry();
+class _TasksFooter extends StatelessWidget {
+  const _TasksFooter({required this.bottomInset, required this.onAdd});
+
+  final double bottomInset;
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    return AppTile(
-      key: const ValueKey('completed-tasks-entry'),
-      title: 'Concluídas',
-      subtitle: 'Histórico de tasks concluídas',
-      leading: const Icon(Icons.task_alt_rounded),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => context.push(AppRoutes.completedTasks),
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.sm + bottomInset,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: AppButton(
+                key: const ValueKey('completed-tasks-entry'),
+                variant: AppButtonVariant.secondary,
+                text: 'Concluídas',
+                icon: const Icon(Icons.task_alt_rounded),
+                onPressed: () => context.push(AppRoutes.completedTasks),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            AppButton(
+              heroTag: 'tasks-add-fab',
+              variant: AppButtonVariant.fab,
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

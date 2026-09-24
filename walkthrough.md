@@ -1,5 +1,19 @@
 # Walkthrough — atomic local note hydration
 
+## Tasks home list and footer
+
+The Tasks home screen now renders open tasks only. Completed occurrences stay
+available through the existing history route, opened by a fixed “Concluídas”
+button in the screen footer. The add action sits beside it; bottom padding keeps
+both controls clear of the app navigation and device safe area.
+
+The empty state remains visible when the open-task list is empty. The history
+route and task completion behavior are unchanged.
+
+Verification: `dart format` passed and targeted `flutter analyze` reported no
+errors or warnings (two existing documentation infos). `git diff --check`
+passed. No device preview was available in this pass.
+
 Ticket 01 is complete.
 
 Remote hydration now computes the content, excerpt, and task projection first, then saves the canonical document, catalog row, content projection, and task projection in one Drift transaction. A failure rolls back the complete aggregate, so an offline restart cannot see an orphan document or an empty catalog note.

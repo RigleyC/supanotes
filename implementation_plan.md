@@ -1,5 +1,15 @@
 # Implementation plan — local-first note persistence
 
+## Keep completed tasks in history, outside the Tasks home list
+
+Status: implemented.
+
+- [x] Show only open tasks on the Tasks home screen; keep “Tudo em dia” when
+  there are no open tasks.
+- [x] Keep a fixed footer with the “Concluídas” history button and add action,
+  above the app's bottom navigation.
+- [x] Verify formatting, targeted analyzer, and diff.
+
 ## Display today's completed occurrence in a note task badge
 
 Status: complete.

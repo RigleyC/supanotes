@@ -175,3 +175,10 @@ dead-code audit.
 Verification notes (2026-09-23): targeted `flutter analyze --no-pub` completed with 78 infos and no errors/warnings; Go `go test ./...` passed (462 tests/29 packages), `go build ./...` and `git diff --check` passed. The focused task/editor Flutter battery passed (76 tests). The full Flutter suite completed with 866 passes and one unrelated failure reproduced in isolation: `test/shared/widgets/confirm_dialog_test.dart`, “showConfirmDialog emits a control tap for Cancelar and Confirmar” expects one haptic but receives two. Existing task/editor expectations were updated to the approved occurrence contract; no tests were added. TaskNode completion timestamps now come from the resolved occurrence instead of an exact `DateTime` map lookup.
 
 Release audit: the backend accepts the legacy one-off completion operation that removes `dueDate`. Older clients still receive a sync error if they edit a schedule while active completions would be lost; the updated Flutter client archives them atomically. Android CI generates artifacts but does not publish an app update. The user requested a staged backend release and will generate the APK/IPA.
+
+## Tasks home completed-history entry
+
+- [x] Remove completed task rows from the Tasks home list.
+- [x] Keep the completed-history button and add action in a fixed footer.
+- [x] Run formatting, targeted analysis, and diff checks.
+- [ ] Review footer placement on device.
