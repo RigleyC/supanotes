@@ -179,6 +179,7 @@ Release audit: the backend accepts the legacy one-off completion operation that 
 ## Tasks home completed-history entry
 
 - [x] Remove completed task rows from the Tasks home list.
-- [x] Keep the completed-history button and add action in a fixed footer.
+- [x] Keep the completed-history button as the final scroll-list item, aligned
+  to the bottom when space remains; preserve the add FAB.
 - [x] Run formatting, targeted analysis, and diff checks.
 - [ ] Review footer placement on device.

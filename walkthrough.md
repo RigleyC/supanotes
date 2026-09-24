@@ -3,16 +3,18 @@
 ## Tasks home list and footer
 
 The Tasks home screen now renders open tasks only. Completed occurrences stay
-available through the existing history route, opened by a fixed “Concluídas”
-button in the screen footer. The add action sits beside it; bottom padding keeps
-both controls clear of the app navigation and device safe area.
+available through the existing history route, opened by a “Concluídas” button
+as the final item in the same scroll view. `SliverMainAxisGroup` and
+`SliverFillRemaining` align the button to the bottom when the open-task list is
+short; longer lists scroll naturally to it. The add action remains the screen's
+FAB.
 
 The empty state remains visible when the open-task list is empty. The history
 route and task completion behavior are unchanged.
 
-Verification: `dart format` passed and targeted `flutter analyze` reported no
-errors or warnings (two existing documentation infos). `git diff --check`
-passed. No device preview was available in this pass.
+Verification: `dart format`, targeted `flutter analyze`, and `git diff --check`
+passed. Analysis reports existing documentation infos only. No device preview
+was available in this pass.
 
 Ticket 01 is complete.
 

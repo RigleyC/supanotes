@@ -6,8 +6,8 @@ Status: implemented.
 
 - [x] Show only open tasks on the Tasks home screen; keep “Tudo em dia” when
   there are no open tasks.
-- [x] Keep a fixed footer with the “Concluídas” history button and add action,
-  above the app's bottom navigation.
+- [x] Keep the “Concluídas” history button as the final item in the scroll view;
+  align it to the bottom when the open-task list is short.
 - [x] Verify formatting, targeted analyzer, and diff.
 
 ## Display today's completed occurrence in a note task badge
