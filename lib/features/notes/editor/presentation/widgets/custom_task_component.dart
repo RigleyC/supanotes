@@ -405,6 +405,15 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final colorScheme = Theme.of(context).colorScheme;
     final semantics = Theme.of(context).extension<AppSemanticColors>();
     final taskColor = semantics?.task ?? AppColors.taskAccent;
+    final metadata = widget.taskMetadata;
+    final resolvedOccurrenceDate = metadata == null
+        ? null
+        : TaskOccurrencePolicy().currentScheduledAt(
+            anchor: metadata.scheduleAnchor,
+            recurrence: metadata.recurrence,
+            hasTime: metadata.hasTime,
+            completedAtByScheduledAt: metadata.completions,
+          );
     final textStyle = widget.viewModel.textStyleBuilder({});
     final textLineHeight = MediaQuery.textScalerOf(
       context,
@@ -495,6 +504,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                       const SizedBox(height: 4),
                       TaskMetadataBadges(
                         dueDate: widget.taskMetadata?.scheduleAnchor,
+                        resolvedOccurrenceDate: resolvedOccurrenceDate,
                         recurrence: widget.taskMetadata?.recurrence,
                         hasReminder: widget.taskMetadata?.reminder != null,
                         hasTime: widget.taskMetadata?.hasTime ?? false,

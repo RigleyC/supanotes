@@ -1,5 +1,12 @@
 # Task — iOS task text selection
 
+## Note recurring task badge shows the anchor after completion (2026-09-24)
+
+- [x] Trace whether day 21 was anchor, scheduled occurrence, or completion time.
+- [x] Pass the resolved current occurrence to the note task badge while
+  retaining the anchor for metadata editing and recurrence math.
+- [x] Verify targeted analyzer/build/diff; no unit tests per repository rule.
+
 ## Task list swipe deletion and recurring metadata date (2026-09-23)
 
 - [x] Add a confirmation and swipe-to-delete interaction in the Tasks list.

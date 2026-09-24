@@ -1,5 +1,14 @@
 # Implementation plan — local-first note persistence
 
+## Display today's completed occurrence in a note task badge
+
+Status: complete.
+
+- [x] Keep the recurring schedule anchor for edits and recurrence calculations.
+- [x] Pass the resolved current occurrence to the note editor badge, so a task
+  started on an earlier date shows today's occurrence after completion.
+- [x] Verify formatting, targeted analysis, Android debug build, and diff.
+
 ## Swipe to delete tasks and show the recurring schedule anchor
 
 Status: complete.

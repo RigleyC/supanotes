@@ -10,6 +10,7 @@ class TaskMetadataBadges extends StatelessWidget {
   const TaskMetadataBadges({
     super.key,
     this.dueDate,
+    this.resolvedOccurrenceDate,
     this.recurrence,
     this.hasReminder = false,
     this.isCompleted = false,
@@ -19,6 +20,7 @@ class TaskMetadataBadges extends StatelessWidget {
   });
 
   final DateTime? dueDate;
+  final DateTime? resolvedOccurrenceDate;
   final TaskRecurrence? recurrence;
   final bool hasReminder;
   final bool isCompleted;
@@ -28,6 +30,7 @@ class TaskMetadataBadges extends StatelessWidget {
 
   bool get _hasRecurrence => recurrence != null;
   DateTime? get _effectiveDueDate {
+    if (resolvedOccurrenceDate != null) return resolvedOccurrenceDate;
     if (dueDate == null || recurrence == null || isCompleted) return dueDate;
     return TaskOccurrencePolicy(
       clock: now == null ? null : () => now!,

@@ -307,3 +307,16 @@ Verification: targeted Flutter analysis reported infos only, the Android debug
 APK build passed, and `git diff --check` passed. No unit tests were run per the
 repository instructions. The swipe interaction has not been exercised on a
 physical device.
+
+## Note recurring task badge shows the anchor after completion (2026-09-24)
+
+The note editor previously passed the recurring series anchor to the task date
+badge. The badge suppresses its own occurrence calculation for completed
+tasks, so a series anchored on the 21st kept showing the 21st after today's
+occurrence was completed. The editor now passes the resolved current occurrence
+separately; recurrence metadata and completion identity continue to use the
+original anchor and today's scheduled occurrence respectively.
+
+Verification: targeted Flutter analysis reported existing infos only, the
+Android debug APK build passed, and `git diff --check` passed. Unit tests were
+not run per repository instructions; device behavior remains unverified.
