@@ -5,6 +5,7 @@ import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
+import 'package:supanotes/features/tasks/domain/task_completion_state.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
@@ -20,6 +21,29 @@ const double _taskCheckboxFallbackTopInset = 2;
 const double _taskCheckboxTextGap = noteEditorMarkerTextGap;
 const double _taskTopSpacing = 14;
 const double _taskCheckboxTouchHeight = 44;
+
+const _occurrencePolicy = TaskOccurrencePolicy();
+
+/// Slack that keeps cache pruning rare while still bounding entries for task
+/// blocks that no longer exist in the document.
+const int _occurrenceCacheSlack = 16;
+
+int _localDayKey() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+}
+
+final class _TaskOccurrenceMemo {
+  const _TaskOccurrenceMemo({
+    required this.metadata,
+    required this.day,
+    required this.occurrence,
+  });
+
+  final TaskMetadataDraft metadata;
+  final int day;
+  final TaskOccurrence? occurrence;
+}
 
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
@@ -37,6 +61,8 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final Future<void> Function(String taskId, DateTime? scheduledAt)?
   onTaskReopen;
 
+  final Map<String, _TaskOccurrenceMemo> _occurrenceByNodeId = {};
+
   @override
   TaskComponentViewModel? createViewModel(
     Document document,
@@ -45,21 +71,17 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     if (node is! TaskNode) return null;
 
     final metadata = TaskMetadataDraft.fromTaskNode(node);
-    final isRecurring = isRecurringTaskNode(node);
-    final occurrence = TaskOccurrencePolicy().resolveCurrent(
-      taskId: node.id,
-      anchor: metadata.scheduleAnchor,
+    final isRecurring = metadata.recurrence != null;
+    final occurrence = _resolveOccurrence(document, node.id, metadata);
+    final isComplete = isTaskOccurrenceCompleted(
+      isComplete: node.isComplete,
       recurrence: metadata.recurrence,
-      hasTime: metadata.hasTime,
-      completedAtByScheduledAt: metadata.completions,
+      occurrence: occurrence,
     );
-    final isComplete = isRecurring
-        ? occurrence?.isCompleted ?? false
-        : node.isComplete || occurrence?.isCompleted == true;
 
     Future<void> updateCompletion(bool isComplete) async {
       if (readOnly) return;
-      AppHaptics.taskCompletion();
+      unawaited(AppHaptics.taskCompletion());
       if (isComplete) {
         await onTaskComplete?.call(node.id);
       } else {
@@ -83,7 +105,50 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       recurrence: metadata.recurrence,
       taskMetadata: metadata,
       isRecurring: isRecurring,
+      resolvedOccurrenceDate: occurrence?.scheduledAt,
       onCompletionChange: updateCompletion,
+    );
+  }
+
+  /// Resolving an occurrence walks every date between the task anchor and
+  /// today, and the view model layer runs for each visible block on every
+  /// document change. Task metadata is the only input that can change the
+  /// result besides the local day boundary, so both key the cache.
+  TaskOccurrence? _resolveOccurrence(
+    Document document,
+    String nodeId,
+    TaskMetadataDraft metadata,
+  ) {
+    final day = _localDayKey();
+    final cached = _occurrenceByNodeId[nodeId];
+    if (cached != null && cached.day == day && cached.metadata == metadata) {
+      return cached.occurrence;
+    }
+
+    _pruneOccurrenceCache(document);
+    final occurrence = _occurrencePolicy.resolveCurrent(
+      taskId: nodeId,
+      anchor: metadata.scheduleAnchor,
+      recurrence: metadata.recurrence,
+      hasTime: metadata.hasTime,
+      completedAtByScheduledAt: metadata.completions,
+    );
+    _occurrenceByNodeId[nodeId] = _TaskOccurrenceMemo(
+      metadata: metadata,
+      day: day,
+      occurrence: occurrence,
+    );
+    return occurrence;
+  }
+
+  void _pruneOccurrenceCache(Document document) {
+    if (_occurrenceByNodeId.length <=
+        document.nodeCount + _occurrenceCacheSlack) {
+      return;
+    }
+    final liveNodeIds = {for (final node in document) node.id};
+    _occurrenceByNodeId.removeWhere(
+      (nodeId, _) => !liveNodeIds.contains(nodeId),
     );
   }
 
@@ -92,19 +157,12 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
     SingleColumnDocumentComponentContext componentContext,
     SingleColumnLayoutComponentViewModel componentViewModel,
   ) {
-    if (componentViewModel is! TaskComponentViewModel) return null;
-
-    final customViewModel = componentViewModel is CustomTaskComponentViewModel
-        ? componentViewModel
-        : null;
+    if (componentViewModel is! CustomTaskComponentViewModel) return null;
 
     return CustomTaskComponent(
       key: componentContext.componentKey,
       viewModel: componentViewModel,
-      taskMetadata: customViewModel?.taskMetadata,
-      isRecurring: customViewModel?.isRecurring ?? false,
       isReadOnly: readOnly,
-      onCompletionChange: customViewModel?.onCompletionChange,
       hideCompleted: hideCompleted,
       onLongPress: readOnly || onTaskLongPress == null
           ? null
@@ -113,14 +171,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
             },
     );
   }
-}
-
-bool isRecurringTaskNode(TaskNode node) {
-  final recurrenceRule = node.metadata['recurrenceRule'];
-  return TaskRecurrence.parse(
-        recurrenceRule is String ? recurrenceRule : null,
-      ) !=
-      null;
 }
 
 class CustomTaskComponentViewModel extends TaskComponentViewModel {
@@ -137,17 +187,22 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     required super.textStyleBuilder,
     required super.selectionColor,
     required this.taskMetadata,
+    required this.isRecurring,
+    required this.onCompletionChange,
     super.opacity = 1.0,
     this.dueDate,
     this.recurrence,
-    required this.isRecurring,
-    required this.onCompletionChange,
+    this.resolvedOccurrenceDate,
   });
 
   final DateTime? dueDate;
   final TaskRecurrence? recurrence;
   final TaskMetadataDraft taskMetadata;
   final bool isRecurring;
+
+  /// Scheduled date of the occurrence that is current when this view model is
+  /// built, so the component does not resolve recurrence on every paint.
+  final DateTime? resolvedOccurrenceDate;
   final Future<void> Function(bool isComplete)? onCompletionChange;
 
   @override
@@ -170,6 +225,7 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
             recurrence: recurrence,
             taskMetadata: taskMetadata,
             isRecurring: isRecurring,
+            resolvedOccurrenceDate: resolvedOccurrenceDate,
             onCompletionChange: onCompletionChange,
           ),
         )
@@ -184,7 +240,8 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     return dueDate == other.dueDate &&
         recurrence == other.recurrence &&
         taskMetadata == other.taskMetadata &&
-        isRecurring == other.isRecurring;
+        isRecurring == other.isRecurring &&
+        resolvedOccurrenceDate == other.resolvedOccurrenceDate;
   }
 
   @override
@@ -194,6 +251,7 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
     recurrence,
     taskMetadata,
     isRecurring,
+    resolvedOccurrenceDate,
   );
 }
 
@@ -202,20 +260,14 @@ class CustomTaskComponent extends StatefulWidget {
     required this.viewModel,
     super.key,
     this.isReadOnly = false,
-    this.isRecurring = false,
-    this.taskMetadata,
     this.hideCompleted = false,
     this.onLongPress,
-    this.onCompletionChange,
   });
 
-  final TaskComponentViewModel viewModel;
+  final CustomTaskComponentViewModel viewModel;
   final bool isReadOnly;
-  final bool isRecurring;
-  final TaskMetadataDraft? taskMetadata;
   final bool hideCompleted;
   final VoidCallback? onLongPress;
-  final Future<void> Function(bool isComplete)? onCompletionChange;
 
   @override
   State<CustomTaskComponent> createState() => _CustomTaskComponentState();
@@ -226,6 +278,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   final GlobalKey<State<StatefulWidget>> _textKey = GlobalKey();
 
   late bool _isComplete;
+  late DateTime? _resolvedOccurrenceDate;
   bool _isAnimating = false;
   bool _isUpdatingCompletion = false;
   Timer? _occurrenceBoundaryTimer;
@@ -236,6 +289,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   void initState() {
     super.initState();
     _isComplete = widget.viewModel.isComplete;
+    _resolvedOccurrenceDate = widget.viewModel.resolvedOccurrenceDate;
     _scheduleOccurrenceRefresh();
   }
 
@@ -245,6 +299,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     if (widget.viewModel.isComplete != oldWidget.viewModel.isComplete) {
       _isComplete = widget.viewModel.isComplete;
     }
+    _resolvedOccurrenceDate = widget.viewModel.resolvedOccurrenceDate;
     _scheduleOccurrenceRefresh();
   }
 
@@ -256,20 +311,13 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
 
   void _scheduleOccurrenceRefresh() {
     _occurrenceBoundaryTimer?.cancel();
-    final metadata = widget.taskMetadata;
-    final anchor = metadata?.scheduleAnchor;
-    final recurrence = metadata?.recurrence;
-    if (anchor == null || recurrence == null) return;
-    final current = TaskOccurrencePolicy().resolveCurrent(
-      taskId: widget.viewModel.nodeId,
-      anchor: anchor,
-      recurrence: recurrence,
-      hasTime: metadata!.hasTime,
-      completedAtByScheduledAt: metadata.completions,
-    );
-    if (current == null) return;
+    final metadata = widget.viewModel.taskMetadata;
+    final anchor = metadata.scheduleAnchor;
+    final recurrence = metadata.recurrence;
+    final scheduledAt = _resolvedOccurrenceDate;
+    if (anchor == null || recurrence == null || scheduledAt == null) return;
     final next = nextDueDate(
-      from: current.scheduledAt,
+      from: scheduledAt,
       recurrence: recurrence,
       anchorDay: anchor.day,
     );
@@ -278,12 +326,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     // Visibility changes at the next local date boundary; an open occurrence
     // also changes from pending to overdue at its scheduled wall-clock time.
     final boundaries = <DateTime>[
-      current.scheduledAt,
-      DateTime(
-        current.scheduledAt.year,
-        current.scheduledAt.month,
-        current.scheduledAt.day,
-      ),
+      scheduledAt,
+      DateTime(scheduledAt.year, scheduledAt.month, scheduledAt.day),
       DateTime(next.year, next.month, next.day),
     ].where((boundary) => boundary.isAfter(now));
     if (boundaries.isEmpty) return;
@@ -296,19 +340,27 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
   }
 
   void _refreshOccurrence() {
-    final metadata = widget.taskMetadata;
-    if (!mounted || metadata == null) return;
-    final occurrence = TaskOccurrencePolicy().resolveCurrent(
+    if (!mounted) return;
+    final metadata = widget.viewModel.taskMetadata;
+    final occurrence = _occurrencePolicy.resolveCurrent(
       taskId: widget.viewModel.nodeId,
       anchor: metadata.scheduleAnchor,
       recurrence: metadata.recurrence,
       hasTime: metadata.hasTime,
       completedAtByScheduledAt: metadata.completions,
     );
-    final completed = metadata.recurrence == null
-        ? widget.viewModel.isComplete || occurrence?.isCompleted == true
-        : occurrence?.isCompleted == true;
-    if (completed != _isComplete) setState(() => _isComplete = completed);
+    final completed = isTaskOccurrenceCompleted(
+      isComplete: widget.viewModel.isComplete,
+      recurrence: metadata.recurrence,
+      occurrence: occurrence,
+    );
+    final resolvedDate = occurrence?.scheduledAt;
+    if (completed != _isComplete || resolvedDate != _resolvedOccurrenceDate) {
+      setState(() {
+        _isComplete = completed;
+        _resolvedOccurrenceDate = resolvedDate;
+      });
+    }
     _scheduleOccurrenceRefresh();
   }
 
@@ -327,8 +379,8 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
       }
     });
     try {
-      if (widget.onCompletionChange != null) {
-        await widget.onCompletionChange!(newComplete);
+      if (widget.viewModel.onCompletionChange != null) {
+        await widget.viewModel.onCompletionChange!(newComplete);
       } else {
         widget.viewModel.setComplete?.call(newComplete);
       }
@@ -405,15 +457,7 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
     final colorScheme = Theme.of(context).colorScheme;
     final semantics = Theme.of(context).extension<AppSemanticColors>();
     final taskColor = semantics?.task ?? AppColors.taskAccent;
-    final metadata = widget.taskMetadata;
-    final resolvedOccurrenceDate = metadata == null
-        ? null
-        : TaskOccurrencePolicy().currentScheduledAt(
-            anchor: metadata.scheduleAnchor,
-            recurrence: metadata.recurrence,
-            hasTime: metadata.hasTime,
-            completedAtByScheduledAt: metadata.completions,
-          );
+    final metadata = widget.viewModel.taskMetadata;
     final textStyle = widget.viewModel.textStyleBuilder({});
     final textLineHeight = MediaQuery.textScalerOf(
       context,
@@ -498,18 +542,17 @@ class _CustomTaskComponentState extends State<CustomTaskComponent>
                       highlightWhenEmpty: widget.viewModel.highlightWhenEmpty,
                       underlines: widget.viewModel.createUnderlines(),
                     ),
-                    if (widget.taskMetadata?.scheduleAnchor != null ||
-                        widget.taskMetadata?.recurrence != null ||
-                        widget.taskMetadata?.reminder != null) ...[
+                    if (metadata.scheduleAnchor != null ||
+                        metadata.recurrence != null ||
+                        metadata.reminder != null) ...[
                       const SizedBox(height: 4),
                       TaskMetadataBadges(
-                        dueDate: widget.taskMetadata?.scheduleAnchor,
-                        resolvedOccurrenceDate: resolvedOccurrenceDate,
-                        recurrence: widget.taskMetadata?.recurrence,
-                        hasReminder: widget.taskMetadata?.reminder != null,
-                        hasTime: widget.taskMetadata?.hasTime ?? false,
-                        completions:
-                            widget.taskMetadata?.completions ?? const {},
+                        dueDate: metadata.scheduleAnchor,
+                        resolvedOccurrenceDate: _resolvedOccurrenceDate,
+                        recurrence: metadata.recurrence,
+                        hasReminder: metadata.reminder != null,
+                        hasTime: metadata.hasTime,
+                        completions: metadata.completions,
                         isCompleted: _isComplete,
                       ),
                       const SizedBox(height: 4),

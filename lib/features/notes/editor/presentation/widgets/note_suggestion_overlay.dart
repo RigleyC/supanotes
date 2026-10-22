@@ -1,27 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/editor/application/note_suggestion_provider.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_handler.dart';
+import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_choice_chip.dart';
 import 'package:super_editor/super_editor.dart';
-
-final noteSuggestionsProvider = Provider.family
-    .autoDispose<AsyncValue<List<NoteModel>>, ({String query, String currentNoteId})>((
-      ref,
-      params,
-    ) {
-      return ref.watch(activeNotesProvider).whenData((notes) {
-        final lowercaseQuery = params.query.toLowerCase();
-        return notes
-            .where(
-              (n) =>
-                  n.id != params.currentNoteId &&
-                  n.title.toLowerCase().contains(lowercaseQuery),
-            )
-            .toList()
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      });
-    });
 
 class NoteSuggestionOverlay extends ConsumerStatefulWidget {
   const NoteSuggestionOverlay({
@@ -147,26 +131,10 @@ class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
 
         final chips = suggestions.take(10).map((note) {
           return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Material(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(20),
-              child: InkWell(
-                onTap: () => _onNoteSelected(note),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    note.title,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
+            child: AppChoiceChip(
+              label: note.title,
+              onTap: () => _onNoteSelected(note),
             ),
           );
         }).toList();
@@ -175,7 +143,7 @@ class _NoteSuggestionOverlayState extends ConsumerState<NoteSuggestionOverlay> {
           height: 44,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             itemCount: chips.length,
             itemBuilder: (_, i) => chips[i],
           ),

@@ -1,26 +1,26 @@
 // Compact contextual toolbar for the note editor.
 //
-// The toolbar derives its content from the editor selection and active nodes.
-// A paragraph-level interaction shows block-format controls; selecting text or
-// placing the caret in a list/task shows inline and block conversion controls.
-// The toolbar shell keeps a single position and height - only its action
-// content animates between the two modes.
+// The toolbar derives its content from the editor selection and active nodes
+// (see NoteToolbarState). A paragraph-level interaction shows block-format
+// controls; selecting text or placing the caret in a list/task shows inline and
+// block conversion controls. The toolbar shell keeps a single position and
+// height - only its action content animates between the two modes.
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:motor/motor.dart';
 import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_interaction.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_state.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/selection_formatting.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_state.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/glass/glass_surface.dart';
 import 'package:super_editor/super_editor.dart';
 
 export 'note_editor_interaction.dart' show noteEditorToolbarTapRegionGroup;
 
-enum _ToolbarMode { normal, contextual }
+/// Corner radius of the floating toolbar shell.
+const _shellRadius = 30.0;
 
 class NoteToolbar extends StatefulWidget {
   const NoteToolbar({
@@ -41,16 +41,14 @@ class NoteToolbar extends StatefulWidget {
 }
 
 class _NoteToolbarState extends State<NoteToolbar> {
-  List<DocumentNode> _selected = const [];
-  String? _lastSignature;
+  late NoteToolbarState _state;
 
   @override
   void initState() {
     super.initState();
+    _state = _readState();
     widget.composer.selectionNotifier.addListener(_onStateChange);
     widget.editor.context.document.addListener(_onStateChange);
-    _lastSignature = _toolbarSignature();
-    _refreshSelected();
   }
 
   @override
@@ -74,86 +72,17 @@ class _NoteToolbarState extends State<NoteToolbar> {
     super.dispose();
   }
 
+  NoteToolbarState _readState() => NoteToolbarState.from(
+    widget.editor.context.document,
+    widget.composer.selection,
+  );
+
   void _onStateChange([DocumentChangeLog? _]) {
     if (!mounted) return;
-    final signature = _toolbarSignature();
-    if (signature == _lastSignature) return;
-    _lastSignature = signature;
-    setState(_refreshSelected);
+    final next = _readState();
+    if (next == _state) return;
+    setState(() => _state = next);
   }
-
-  String _toolbarSignature() {
-    final selection = widget.composer.selection;
-    final buffer = StringBuffer(
-      selection == null
-          ? 'hasSelection=false'
-          : 'hasSelection=true;collapsed=${selection.isCollapsed};node=${selection.extent.nodeId}',
-    );
-    for (final node in editorSelectionNodes(
-      widget.editor.context.document,
-      selection,
-    )) {
-      buffer
-        ..write(';')
-        ..write(node.id)
-        ..write('/')
-        ..write(node.runtimeType);
-      if (node is ParagraphNode) {
-        buffer
-          ..write('(blockType=')
-          ..write(node.getMetadataValue('blockType'))
-          ..write(')');
-      } else if (node is ListItemNode) {
-        buffer
-          ..write('(listType=')
-          ..write(node.type)
-          ..write(')');
-      }
-    }
-    if (selection != null && !selection.isCollapsed) {
-      for (final attribution in const [
-        boldAttribution,
-        italicsAttribution,
-        strikethroughAttribution,
-      ]) {
-        if (hasAttributionInEditorSelection(
-          widget.editor.context.document,
-          selection,
-          attribution,
-        )) {
-          buffer
-            ..write(';attribution=')
-            ..write(attribution.id);
-        }
-      }
-    }
-    return buffer.toString();
-  }
-
-  void _refreshSelected() {
-    _selected = editorSelectionNodes(
-      widget.editor.context.document,
-      widget.composer.selection,
-    );
-  }
-
-  bool get _isContextual {
-    final selection = widget.composer.selection;
-    if (selection == null) return false;
-    if (!selection.isCollapsed) return true;
-    final node = widget.editor.context.document.getNodeById(
-      selection.extent.nodeId,
-    );
-    return node is ListItemNode || node is TaskNode;
-  }
-
-  bool get _hasTextSelection {
-    final selection = widget.composer.selection;
-    return selection != null && !selection.isCollapsed;
-  }
-
-  bool get _hasListOrTask =>
-      _selected.any((node) => node is ListItemNode || node is TaskNode);
 
   @override
   Widget build(BuildContext context) {
@@ -161,203 +90,36 @@ class _NoteToolbarState extends State<NoteToolbar> {
       groupId: noteEditorToolbarTapRegionGroup,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: GlassSurface(
+          key: const ValueKey('note-toolbar-shell'),
+          radius: _shellRadius,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: 8,
+            ),
             child: _ContextualToolbarContent(
-              mode: _isContextual
-                  ? _ToolbarMode.contextual
-                  : _ToolbarMode.normal,
-              normalRow: _buildNormalRow(),
-              contextualRow: _buildContextualRow(),
+              mode: _state.mode,
+              normalActions: _NormalActions(
+                state: _state,
+                onSetBlockType: _setBlockType,
+                onConvertToTask: _convertToTask,
+                onInsertDivider: _insertDivider,
+                onAttachImage: widget.onAttachImage,
+                onAttachFile: widget.onAttachFile,
+              ),
+              contextualActions: _ContextualActions(
+                state: _state,
+                onToggleInline: _toggleInline,
+                onConvertToList: _convertToList,
+                onConvertToTask: _convertToTask,
+                onUnindent: _unindentSelectedBlocks,
+                onIndent: _indentSelectedBlocks,
+              ),
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildNormalRow() {
-    final blockType = _selectedBlockType();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ToolbarButton(
-          svgAsset: 'assets/icons/h1_icon.svg',
-
-          isActive: blockType == header1Attribution,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => _setBlockType(header1Attribution),
-          semanticLabel: 'Título 1',
-        ),
-        ToolbarButton(
-          svgAsset: 'assets/icons/h2_icon.svg',
-
-          isActive: blockType == header2Attribution,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => _setBlockType(header2Attribution),
-          semanticLabel: 'Título 2',
-        ),
-        ToolbarButton(
-          svgAsset: 'assets/icons/h3_icon.svg',
-
-          isActive: blockType == header3Attribution,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => _setBlockType(header3Attribution),
-          semanticLabel: 'Título 3',
-        ),
-        ToolbarButton(
-          icon: Icons.format_quote,
-
-          isActive: blockType == blockquoteAttribution,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => _setBlockType(blockquoteAttribution),
-          semanticLabel: 'Citação',
-        ),
-        ToolbarButton(
-          svgAsset: 'assets/icons/checkbox.svg',
-
-          isActive:
-              _selected.isNotEmpty &&
-              _selected.every((node) => node is TaskNode),
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: _convertToTask,
-          semanticLabel: 'Task',
-        ),
-        const ToolbarDivider(),
-        ToolbarButton(
-          icon: Icons.horizontal_rule,
-
-          isActive: false,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: _insertDivider,
-          semanticLabel: 'Inserir divisor',
-        ),
-        const ToolbarDivider(),
-        ToolbarButton(
-          icon: Icons.image,
-
-          isActive: false,
-          haptic: ToolbarHaptic.controlTap,
-          onPressed: widget.onAttachImage,
-          semanticLabel: 'Inserir imagem',
-        ),
-        ToolbarButton(
-          icon: Icons.attach_file,
-
-          isActive: false,
-          haptic: ToolbarHaptic.controlTap,
-          onPressed: widget.onAttachFile,
-          semanticLabel: 'Anexar arquivo',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildContextualRow() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ToolbarButton(
-          icon: Icons.format_bold,
-
-          isActive: _hasAttribution(boldAttribution),
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: _hasTextSelection
-              ? () => _toggleInline(boldAttribution)
-              : null,
-          semanticLabel: 'Negrito',
-        ),
-        ToolbarButton(
-          icon: Icons.format_italic,
-
-          isActive: _hasAttribution(italicsAttribution),
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: _hasTextSelection
-              ? () => _toggleInline(italicsAttribution)
-              : null,
-          semanticLabel: 'Itálico',
-        ),
-        ToolbarButton(
-          icon: Icons.format_strikethrough,
-
-          isActive: _hasAttribution(strikethroughAttribution),
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: _hasTextSelection
-              ? () => _toggleInline(strikethroughAttribution)
-              : null,
-          semanticLabel: 'Tachado',
-        ),
-        const ToolbarDivider(),
-        ToolbarButton(
-          icon: Icons.format_list_bulleted,
-
-          isActive: _selectedListType() == ListItemType.unordered,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => _convertToList(ListItemType.unordered),
-          semanticLabel: 'Lista com marcadores',
-        ),
-        ToolbarButton(
-          icon: Icons.format_list_numbered,
-
-          isActive: _selectedListType() == ListItemType.ordered,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => _convertToList(ListItemType.ordered),
-          semanticLabel: 'Lista numerada',
-        ),
-        ToolbarButton(
-          svgAsset: 'assets/icons/checkbox.svg',
-
-          isActive:
-              _selected.isNotEmpty &&
-              _selected.every((node) => node is TaskNode),
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: _convertToTask,
-          semanticLabel: 'Task',
-        ),
-        const ToolbarDivider(),
-        ToolbarButton(
-          icon: Icons.format_indent_decrease,
-
-          isActive: false,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: _hasListOrTask ? _unindentSelectedBlocks : null,
-          semanticLabel: 'Diminuir recuo',
-        ),
-        ToolbarButton(
-          icon: Icons.format_indent_increase,
-
-          isActive: false,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: _hasListOrTask ? _indentSelectedBlocks : null,
-          semanticLabel: 'Aumentar recuo',
-        ),
-      ],
-    );
-  }
-
-  Attribution? _selectedBlockType() {
-    return resolveSelectedBlockType(_selected);
-  }
-
-  ListItemType? _selectedListType() {
-    final nodes = _selected;
-    if (nodes.isEmpty || nodes.any((node) => node is! ListItemNode)) {
-      return null;
-    }
-    final listTypes = nodes
-        .cast<ListItemNode>()
-        .map((node) => node.type)
-        .toSet();
-    return listTypes.length == 1 ? listTypes.single : null;
-  }
-
-  bool _hasAttribution(Attribution attribution) {
-    return hasAttributionInEditorSelection(
-      widget.editor.context.document,
-      widget.composer.selection,
-      attribution,
     );
   }
 
@@ -394,26 +156,199 @@ class _NoteToolbarState extends State<NoteToolbar> {
   }
 
   void _insertDivider() {
-    final selection = widget.composer.selection;
-    if (selection == null ||
-        !isEditorSelectionValid(widget.editor.context.document, selection)) {
-      NoteEditorCommands.insertDividerAtEnd(widget.editor, dividerCount: 35);
-      return;
-    }
-    NoteEditorCommands.insertDivider(widget.editor, dividerCount: 35);
+    NoteEditorCommands.insertDividerAtSelection(
+      widget.editor,
+      widget.composer,
+    );
+  }
+}
+
+class _NormalActions extends StatelessWidget {
+  const _NormalActions({
+    required this.state,
+    required this.onSetBlockType,
+    required this.onConvertToTask,
+    required this.onInsertDivider,
+    required this.onAttachImage,
+    required this.onAttachFile,
+  });
+
+  final NoteToolbarState state;
+  final ValueChanged<Attribution> onSetBlockType;
+  final VoidCallback onConvertToTask;
+  final VoidCallback onInsertDivider;
+  final VoidCallback? onAttachImage;
+  final VoidCallback? onAttachFile;
+
+  @override
+  Widget build(BuildContext context) {
+    final blockType = state.blockType;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ToolbarButton(
+          svgAsset: 'assets/icons/h1_icon.svg',
+          isActive: blockType == header1Attribution,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: () => onSetBlockType(header1Attribution),
+          semanticLabel: 'Título 1',
+        ),
+        ToolbarButton(
+          svgAsset: 'assets/icons/h2_icon.svg',
+          isActive: blockType == header2Attribution,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: () => onSetBlockType(header2Attribution),
+          semanticLabel: 'Título 2',
+        ),
+        ToolbarButton(
+          svgAsset: 'assets/icons/h3_icon.svg',
+          isActive: blockType == header3Attribution,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: () => onSetBlockType(header3Attribution),
+          semanticLabel: 'Título 3',
+        ),
+        ToolbarButton(
+          icon: Icons.format_quote,
+          isActive: blockType == blockquoteAttribution,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: () => onSetBlockType(blockquoteAttribution),
+          semanticLabel: 'Citação',
+        ),
+        ToolbarButton(
+          svgAsset: 'assets/icons/checkbox.svg',
+          isActive: state.allTasks,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: onConvertToTask,
+          semanticLabel: 'Task',
+        ),
+        const ToolbarDivider(),
+        ToolbarButton(
+          icon: Icons.horizontal_rule,
+          isActive: false,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: onInsertDivider,
+          semanticLabel: 'Inserir divisor',
+        ),
+        const ToolbarDivider(),
+        ToolbarButton(
+          icon: Icons.image,
+          isActive: false,
+          haptic: ToolbarHaptic.controlTap,
+          onPressed: onAttachImage,
+          semanticLabel: 'Inserir imagem',
+        ),
+        ToolbarButton(
+          icon: Icons.attach_file,
+          isActive: false,
+          haptic: ToolbarHaptic.controlTap,
+          onPressed: onAttachFile,
+          semanticLabel: 'Anexar arquivo',
+        ),
+      ],
+    );
+  }
+}
+
+class _ContextualActions extends StatelessWidget {
+  const _ContextualActions({
+    required this.state,
+    required this.onToggleInline,
+    required this.onConvertToList,
+    required this.onConvertToTask,
+    required this.onUnindent,
+    required this.onIndent,
+  });
+
+  final NoteToolbarState state;
+  final ValueChanged<Attribution> onToggleInline;
+  final ValueChanged<ListItemType> onConvertToList;
+  final VoidCallback onConvertToTask;
+  final VoidCallback onUnindent;
+  final VoidCallback onIndent;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasText = state.hasTextSelection;
+    final hasListOrTask = state.hasListOrTask;
+    final activeAttributions = state.activeAttributions;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ToolbarButton(
+          icon: Icons.format_bold,
+          isActive: activeAttributions.contains(boldAttribution),
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: hasText ? () => onToggleInline(boldAttribution) : null,
+          semanticLabel: 'Negrito',
+        ),
+        ToolbarButton(
+          icon: Icons.format_italic,
+          isActive: activeAttributions.contains(italicsAttribution),
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: hasText ? () => onToggleInline(italicsAttribution) : null,
+          semanticLabel: 'Itálico',
+        ),
+        ToolbarButton(
+          icon: Icons.format_strikethrough,
+          isActive: activeAttributions.contains(strikethroughAttribution),
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: hasText
+              ? () => onToggleInline(strikethroughAttribution)
+              : null,
+          semanticLabel: 'Tachado',
+        ),
+        const ToolbarDivider(),
+        ToolbarButton(
+          icon: Icons.format_list_bulleted,
+          isActive: state.listType == ListItemType.unordered,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: () => onConvertToList(ListItemType.unordered),
+          semanticLabel: 'Lista com marcadores',
+        ),
+        ToolbarButton(
+          icon: Icons.format_list_numbered,
+          isActive: state.listType == ListItemType.ordered,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: () => onConvertToList(ListItemType.ordered),
+          semanticLabel: 'Lista numerada',
+        ),
+        ToolbarButton(
+          svgAsset: 'assets/icons/checkbox.svg',
+          isActive: state.allTasks,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: onConvertToTask,
+          semanticLabel: 'Task',
+        ),
+        const ToolbarDivider(),
+        ToolbarButton(
+          icon: Icons.format_indent_decrease,
+          isActive: false,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: hasListOrTask ? onUnindent : null,
+          semanticLabel: 'Diminuir recuo',
+        ),
+        ToolbarButton(
+          icon: Icons.format_indent_increase,
+          isActive: false,
+          haptic: ToolbarHaptic.selectionChange,
+          onPressed: hasListOrTask ? onIndent : null,
+          semanticLabel: 'Aumentar recuo',
+        ),
+      ],
+    );
   }
 }
 
 class _ContextualToolbarContent extends StatefulWidget {
   const _ContextualToolbarContent({
     required this.mode,
-    required this.normalRow,
-    required this.contextualRow,
+    required this.normalActions,
+    required this.contextualActions,
   });
 
-  final _ToolbarMode mode;
-  final Widget normalRow;
-  final Widget contextualRow;
+  final NoteToolbarMode mode;
+  final Widget normalActions;
+  final Widget contextualActions;
 
   @override
   State<_ContextualToolbarContent> createState() =>
@@ -423,6 +358,9 @@ class _ContextualToolbarContent extends StatefulWidget {
 class _ContextualToolbarContentState extends State<_ContextualToolbarContent>
     with TickerProviderStateMixin {
   late final SingleMotionController _motion;
+
+  /// Fades the leaving row out as the motion runs from 0 to 1.
+  late final Animation<double> _outgoingOpacity;
   bool _animationsDisabled = false;
 
   @override
@@ -433,6 +371,7 @@ class _ContextualToolbarContentState extends State<_ContextualToolbarContent>
       vsync: this,
       initialValue: 1,
     );
+    _outgoingOpacity = ReverseAnimation(_motion);
   }
 
   @override
@@ -470,50 +409,32 @@ class _ContextualToolbarContentState extends State<_ContextualToolbarContent>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final incoming = widget.mode == _ToolbarMode.normal
-        ? widget.normalRow
-        : widget.contextualRow;
-    final outgoing = widget.mode == _ToolbarMode.normal
-        ? widget.contextualRow
-        : widget.normalRow;
+    final showingNormal = widget.mode == NoteToolbarMode.normal;
+    final incoming = showingNormal
+        ? widget.normalActions
+        : widget.contextualActions;
+    final outgoing = showingNormal
+        ? widget.contextualActions
+        : widget.normalActions;
 
-    return Container(
-      key: const ValueKey('note-toolbar-shell'),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: 8,
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: AnimatedBuilder(
-          animation: _motion,
-          builder: (_, _) {
-            final progress = _motion.value.clamp(0.0, 1.0);
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: AnimatedBuilder(
+        animation: _motion,
+        builder: (_, _) {
+          final progress = _motion.value.clamp(0.0, 1.0);
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // The leaving row is removed from the tree once its fade ends.
+              if (progress < 1)
                 Positioned(
                   left: 0,
                   top: 0,
                   child: ExcludeSemantics(
                     child: IgnorePointer(
-                      child: Opacity(
-                        opacity: 1 - progress,
+                      child: FadeTransition(
+                        opacity: _outgoingOpacity,
                         child: Transform.translate(
                           offset: Offset(-(1 - progress) * 8, 0),
                           child: Transform.scale(
@@ -526,21 +447,20 @@ class _ContextualToolbarContentState extends State<_ContextualToolbarContent>
                     ),
                   ),
                 ),
-                Opacity(
-                  opacity: 0.35 + 0.65 * progress,
-                  child: Transform.translate(
-                    offset: Offset((1 - progress) * 8, 0),
-                    child: Transform.scale(
-                      scale: 0.96 + 0.04 * progress,
-                      alignment: Alignment.centerLeft,
-                      child: incoming,
-                    ),
+              Opacity(
+                opacity: 0.35 + 0.65 * progress,
+                child: Transform.translate(
+                  offset: Offset((1 - progress) * 8, 0),
+                  child: Transform.scale(
+                    scale: 0.96 + 0.04 * progress,
+                    alignment: Alignment.centerLeft,
+                    child: incoming,
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

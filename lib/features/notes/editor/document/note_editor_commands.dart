@@ -1,11 +1,15 @@
 import 'dart:math' as math;
 
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart' show NoteToolbar;
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart'
+    show NoteToolbar;
 import 'package:super_editor/super_editor.dart';
 
 /// Pure document-editing helpers used by [NoteToolbar].
 class NoteEditorCommands {
   const NoteEditorCommands();
+
+  /// Number of divider styles. Each new divider picks one at random.
+  static const int dividerStyleCount = 35;
 
   /// Returns the selected nodes, or just the node at the caret if collapsed.
   static List<DocumentNode> selectedNodes(
@@ -356,11 +360,31 @@ class NoteEditorCommands {
       ),
     ]);
   }
+
+  /// Inserts a divider at the caret, or at the document end when the
+  /// selection no longer points at existing nodes.
+  static void insertDividerAtSelection(
+    Editor editor,
+    DocumentComposer composer,
+  ) {
+    final selection = composer.selection;
+    final document = editor.context.document;
+    final isAnchored =
+        selection != null &&
+        document.getNodeById(selection.start.nodeId) != null &&
+        document.getNodeById(selection.end.nodeId) != null;
+    if (!isAnchored) {
+      insertDividerAtEnd(editor, dividerCount: dividerStyleCount);
+      return;
+    }
+    insertDivider(editor, dividerCount: dividerStyleCount);
+  }
 }
 
 class RandomDividerConversionReaction extends EditReaction {
-
-  const RandomDividerConversionReaction({this.dividerCount = 35});
+  const RandomDividerConversionReaction({
+    this.dividerCount = NoteEditorCommands.dividerStyleCount,
+  });
   static final _hrPattern = RegExp(r'^(---|—-)\s');
 
   final int dividerCount;

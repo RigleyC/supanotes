@@ -236,7 +236,7 @@ class NoteOperationsSyncService {
   }
 
   Future<LocalNoteDocumentData?> getConfirmedDocument(String noteId) {
-    return _dao.watchNoteDocument(noteId).first;
+    return _dao.getNoteDocument(noteId);
   }
 
   Future<List<PendingNoteOperationData>> getPendingOperations(String noteId) {
@@ -317,7 +317,7 @@ class NoteOperationsSyncService {
     }
 
     final inFlightIds = ops.map((o) => o.operationId).toSet();
-    final doc = await _dao.watchNoteDocument(noteId).first;
+    final doc = await _dao.getNoteDocument(noteId);
     final knownRevision = doc?.revision ?? 0;
 
     await _persistence.startSession(
@@ -476,7 +476,7 @@ class NoteOperationsSyncService {
   }
 
   Future<SyncResult> _pollAndReconcileWithoutSessionGate(String noteId) async {
-    final confirmed = await _dao.watchNoteDocument(noteId).first;
+    final confirmed = await _dao.getNoteDocument(noteId);
     if (confirmed == null) {
       return SyncResult.empty();
     }

@@ -11,6 +11,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart' show Dio;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/api/api_client.dart';
@@ -364,6 +365,27 @@ final noteSessionActivityTrackerProvider = Provider<NoteSessionActivityTracker>(
     return NoteSessionActivityTracker();
   },
 );
+
+// ---------------------------------------------------------------------------
+// App lifecycle
+// ---------------------------------------------------------------------------
+
+/// Broadcasts app lifecycle transitions to services that pause in background.
+///
+/// The observer belongs to the app, not to each editor session: sessions stay
+/// constructible in plain tests that never initialize a `WidgetsBinding`, and
+/// one listener serves every open surface.
+final appLifecycleStateStreamProvider = Provider<Stream<AppLifecycleState>>((
+  ref,
+) {
+  final controller = StreamController<AppLifecycleState>.broadcast();
+  final listener = AppLifecycleListener(onStateChange: controller.add);
+  ref.onDispose(() {
+    listener.dispose();
+    unawaited(controller.close());
+  });
+  return controller.stream;
+});
 
 // ---------------------------------------------------------------------------
 // Shared preferences

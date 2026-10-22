@@ -70,5 +70,7 @@
 		<false/>
 		<key>UIViewControllerBasedStatusBarAppearance</key>
 		<false/>
+		<key>FLTEnableFlutterGPU</key>
+		<true/>
 	</dict>
 </plist>

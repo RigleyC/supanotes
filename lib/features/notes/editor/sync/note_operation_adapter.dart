@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as dev;
 
+import 'package:flutter/foundation.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
@@ -65,12 +66,16 @@ class NoteOperationAdapter {
   LocalNoteDocumentData? _confirmedDocument;
   final List<OperationRequest> _pendingOps = [];
   Timer? _debounceTimer;
+  Timer? _materializedTimer;
+  bool _materializedDirty = false;
 
-  final StreamController<List<PendingNoteOperationData>> _pendingOpsController =
-      StreamController<List<PendingNoteOperationData>>.broadcast();
+  static const _opsFlushDelay = Duration(milliseconds: 50);
 
-  Stream<List<PendingNoteOperationData>> get pendingOperationsStream =>
-      _pendingOpsController.stream;
+  /// The materialized document is a projection of the same edits carried by
+  /// the operations. Encoding and writing the whole document on every 50 ms
+  /// batch would serialize it several times per typed word, so it follows its
+  /// own slower debounce and is force-saved by [flushNow].
+  static const _materializedSaveDelay = Duration(milliseconds: 1200);
 
   int get confirmedRevision => _confirmedRevision;
   bool get captureLocalOperations => _captureLocalOperations;
@@ -190,20 +195,22 @@ class NoteOperationAdapter {
 
   void _onOperationsCaptured(List<OperationRequestData> requests) {
     if (_disposed) return;
-    NoteSyncDebug.log(
-      'adapter.captured',
-      noteId: _noteId,
-      fields: {
-        'confirmedRevision': _confirmedRevision,
-        'count': requests.length,
-        'operations': requests
-            .map(
-              (request) =>
-                  '${request.operationId}:${request.kind}:${request.blockId}',
-            )
-            .join('|'),
-      },
-    );
+    if (kDebugMode) {
+      NoteSyncDebug.log(
+        'adapter.captured',
+        noteId: _noteId,
+        fields: {
+          'confirmedRevision': _confirmedRevision,
+          'count': requests.length,
+          'operations': requests
+              .map(
+                (request) =>
+                    '${request.operationId}:${request.kind}:${request.blockId}',
+              )
+              .join('|'),
+        },
+      );
+    }
     for (final req in requests) {
       final contractError = NoteOperationContract.validate(
         kind: req.kind,
@@ -232,14 +239,54 @@ class NoteOperationAdapter {
       _hasCapturedLocalOperations = true;
     }
     _scheduleDebounceFlush();
+    _scheduleMaterializedSave();
   }
 
   void _scheduleDebounceFlush() {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 50), () {
+    _debounceTimer = Timer(_opsFlushDelay, () {
       if (_disposed) return;
       unawaited(_queueFlush(propagateErrors: false));
     });
+  }
+
+  void _scheduleMaterializedSave() {
+    if (_disposed) return;
+    _materializedDirty = true;
+    _materializedTimer?.cancel();
+    _materializedTimer = Timer(_materializedSaveDelay, () {
+      _materializedTimer = null;
+      unawaited(_saveMaterializedDocumentSafely());
+    });
+  }
+
+  Future<void> _saveMaterializedDocumentSafely() async {
+    try {
+      await _saveMaterializedDocument();
+    } on Object catch (_) {
+      // Already reported. The next edit or explicit flush retries the write.
+    }
+  }
+
+  Future<void> _saveMaterializedDocument() async {
+    if (_disposed || !_materializedDirty) return;
+    _materializedTimer?.cancel();
+    _materializedTimer = null;
+    _materializedDirty = false;
+    try {
+      await _syncService.storeMaterializedDocument(
+        noteId: _noteId,
+        documentJson: _encodeCurrentDocument(),
+      );
+    } catch (error, stackTrace) {
+      _materializedDirty = true;
+      dev.log(
+        'Materialized document save failed for $_noteId',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      rethrow;
+    }
   }
 
   Future<void> _flushTail = Future<void>.value();
@@ -250,7 +297,8 @@ class NoteOperationAdapter {
       (_) {},
       onError: (Object error, StackTrace stackTrace) {
         dev.log(
-          'Local operation flush failed for $_noteId; keeping operations in memory',
+          'Local operation flush failed for $_noteId; '
+          'keeping operations in memory',
           error: error,
           stackTrace: stackTrace,
         );
@@ -265,39 +313,37 @@ class NoteOperationAdapter {
     _pendingOps.clear();
     var persisted = false;
     try {
-      NoteSyncDebug.log(
-        'adapter.flush.begin',
-        noteId: _noteId,
-        fields: {
-          'confirmedRevision': _confirmedRevision,
-          'operationCount': ops.length,
-        },
-      );
-
-      for (final op in ops) {
+      if (kDebugMode) {
         NoteSyncDebug.log(
-          'adapter.flush.enqueue',
+          'adapter.flush.begin',
           noteId: _noteId,
           fields: {
-            'operationId': op.operationId,
-            'baseRevision': op.baseRevision,
-            'kind': op.kind,
-            'blockId': op.blockId,
-            'payload': NoteSyncDebug.payloadSummary(op.payload),
+            'confirmedRevision': _confirmedRevision,
+            'operationCount': ops.length,
           },
         );
+        for (final op in ops) {
+          NoteSyncDebug.log(
+            'adapter.flush.enqueue',
+            noteId: _noteId,
+            fields: {
+              'operationId': op.operationId,
+              'baseRevision': op.baseRevision,
+              'kind': op.kind,
+              'blockId': op.blockId,
+              'payload': NoteSyncDebug.payloadSummary(op.payload),
+            },
+          );
+        }
       }
 
-      await _syncService.enqueueOperations(
-        _noteId,
-        ops,
-        materializedDocumentJson: _encodeCurrentDocument(),
-      );
+      // Operations are the durable record of the edit. The materialized
+      // document is written by its own slower debounce, so this hot path does
+      // not encode the whole document on every keystroke batch.
+      await _syncService.enqueueOperations(_noteId, ops);
       persisted = true;
 
       onLocalOperations?.call(ops);
-      final pending = await _syncService.getPendingOperations(_noteId);
-      _pendingOpsController.add(pending);
     } catch (error, stackTrace) {
       if (!persisted) {
         _pendingOps.insertAll(0, ops);
@@ -317,8 +363,9 @@ class NoteOperationAdapter {
     _debounceTimer?.cancel();
     while (true) {
       await _queueFlush(propagateErrors: true);
-      if (_pendingOps.isEmpty) return;
+      if (_pendingOps.isEmpty) break;
     }
+    await _saveMaterializedDocument();
   }
 
   Future<void> reconcile(SyncResult result) async {
@@ -330,24 +377,28 @@ class NoteOperationAdapter {
     if (_disposed) return;
     final rebasedOps = await _syncService.getPendingOperations(_noteId);
     if (_disposed) return;
-    NoteSyncDebug.log(
-      'adapter.reconcile',
-      noteId: _noteId,
-      fields: {
-        'revision': result.finalRevision,
-        'accepted': result.acceptedCount,
-        'remoteOperations': result.remoteOperations.length,
-        'rebasedOperations': rebasedOps.length,
-        'canonical': NoteSyncDebug.documentSummary(canonical.document),
-      },
-    );
+    if (kDebugMode) {
+      NoteSyncDebug.log(
+        'adapter.reconcile',
+        noteId: _noteId,
+        fields: {
+          'revision': result.finalRevision,
+          'accepted': result.acceptedCount,
+          'remoteOperations': result.remoteOperations.length,
+          'rebasedOperations': rebasedOps.length,
+          'canonical': NoteSyncDebug.documentSummary(canonical.document),
+        },
+      );
+    }
 
     if (result.remoteOperations.isEmpty && rebasedOps.isEmpty) {
-      NoteSyncDebug.log(
-        'adapter.reconcile.skip_local_ack',
-        noteId: _noteId,
-        fields: {'rebasedOperations': rebasedOps.length},
-      );
+      if (kDebugMode) {
+        NoteSyncDebug.log(
+          'adapter.reconcile.skip_local_ack',
+          noteId: _noteId,
+          fields: {'rebasedOperations': rebasedOps.length},
+        );
+      }
       return;
     }
 
@@ -397,14 +448,16 @@ class NoteOperationAdapter {
       rebasedOps = _mergeInMemoryOps(rebasedOps);
     }
 
-    NoteSyncDebug.log(
-      'adapter.rebuild.begin',
-      noteId: _noteId,
-      fields: {
-        'pendingOperations': rebasedOps?.length ?? 0,
-        'snapshot': NoteSyncDebug.documentSummary(snapshot),
-      },
-    );
+    if (kDebugMode) {
+      NoteSyncDebug.log(
+        'adapter.rebuild.begin',
+        noteId: _noteId,
+        fields: {
+          'pendingOperations': rebasedOps?.length ?? 0,
+          'snapshot': NoteSyncDebug.documentSummary(snapshot),
+        },
+      );
+    }
 
     await _applier.rebuildFromSnapshot(
       snapshot: snapshot,
@@ -424,11 +477,11 @@ class NoteOperationAdapter {
     if (_disposed) return;
     _disposed = true;
     _debounceTimer?.cancel();
+    _materializedTimer?.cancel();
     _pendingRebuild = null;
     _editor.maybeComposer?.composingRegion.removeListener(
       _onComposingRegionChanged,
     );
     _capture.stop();
-    _pendingOpsController.close();
   }
 }

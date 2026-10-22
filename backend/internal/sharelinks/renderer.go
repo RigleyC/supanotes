@@ -25,7 +25,7 @@ type RenderOptions struct {
 }
 
 func RenderDocument(data []byte, options RenderOptions) (RenderedPage, error) {
-	doc, err := noteoperations.DecodeCanonicalDocument(data)
+	doc, err := noteoperations.DecodeReadableDocument(data)
 	if err != nil {
 		return RenderedPage{}, fmt.Errorf("decode document: %w", err)
 	}

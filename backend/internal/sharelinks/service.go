@@ -159,7 +159,7 @@ func (s *Service) PublicDocument(ctx context.Context, token string) (PublicDocum
 	if err != nil {
 		return PublicDocument{}, err
 	}
-	document, err := noteoperations.DecodeCanonicalDocument(note.Document)
+	document, err := noteoperations.DecodeReadableDocument(note.Document)
 	if err != nil {
 		return PublicDocument{}, fmt.Errorf("decode public note: %w", err)
 	}

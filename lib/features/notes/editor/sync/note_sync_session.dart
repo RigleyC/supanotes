@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
@@ -16,6 +17,7 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     required Editor editor,
     bool captureLocalOperations = true,
     this.networkCoalescingWindow = const Duration(milliseconds: 350),
+    this.appLifecycleStates,
     this.onTransientError,
     this.onProtocolError,
   }) : adapter = NoteOperationAdapter(
@@ -32,12 +34,23 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   final NoteOperationAdapter adapter;
   final MutableDocument document;
   final Duration networkCoalescingWindow;
+
+  /// App-level lifecycle signal used to pause polling while the app is not in
+  /// the foreground. Optional so sessions stay constructible without a binding.
+  final Stream<AppLifecycleState>? appLifecycleStates;
   bool _captureLocalOperations;
   final void Function(Object error)? onTransientError;
   final void Function(Object error)? onProtocolError;
 
+  static const _pollBaseInterval = Duration(seconds: 2);
+  static const _pollMaxInterval = Duration(seconds: 30);
+
   Timer? _pollTimer;
   Timer? _networkSyncTimer;
+  StreamSubscription<AppLifecycleState>? _lifecycleSubscription;
+  Duration _pollInterval = _pollBaseInterval;
+  bool _pollingEnabled = false;
+  bool _pollingPaused = false;
   bool _isClosing = false;
   bool _isPolling = false;
   bool _disposed = false;
@@ -111,6 +124,9 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     try {
       await adapter.start();
       if (_isClosing || _disposed) return;
+      _lifecycleSubscription = appLifecycleStates?.listen(
+        _handleLifecycleState,
+      );
       _startPolling();
       if (_status == NoteSessionStatus.opening) {
         _setStatus(NoteSessionStatus.ready);
@@ -130,11 +146,16 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   void _handleLocalOperations(List<OperationRequest> _) {
     if (_isClosing || _disposed || !_captureLocalOperations) return;
+    // A local edit is a strong signal that the open note is active, so the
+    // next poll uses the base interval again.
+    _pollInterval = _pollBaseInterval;
     _scheduleNetworkSync();
   }
 
   void _scheduleNetworkSync() {
-    if (_isClosing || _disposed || !_captureLocalOperations) return;
+    if (_isClosing || _disposed || _pollingPaused || !_captureLocalOperations) {
+      return;
+    }
     _networkSyncTimer?.cancel();
     _networkSyncTimer = Timer(networkCoalescingWindow, () {
       _networkSyncTimer = null;
@@ -164,14 +185,57 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   }
 
   void _startPolling() {
-    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+    _pollingEnabled = true;
+    _scheduleNextPoll();
+  }
+
+  void _scheduleNextPoll() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (_isClosing || _disposed || _protocolFailed || _pollingPaused) return;
+    _pollTimer = Timer(_pollInterval, () {
+      _pollTimer = null;
       unawaited(pollNow());
     });
   }
 
+  void _handleLifecycleState(AppLifecycleState state) {
+    if (_isClosing || _disposed) return;
+    final shouldPause = state != AppLifecycleState.resumed;
+    if (shouldPause == _pollingPaused) return;
+    _pollingPaused = shouldPause;
+    if (shouldPause) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      _cancelScheduledNetworkSync();
+      return;
+    }
+    // Coming back to the foreground is the best moment to accept remote work,
+    // so the first poll runs immediately and the cadence restarts at its base.
+    _pollInterval = _pollBaseInterval;
+    unawaited(pollNow());
+  }
+
+  void _updatePollInterval({required bool hasChanges}) {
+    if (hasChanges) {
+      _pollInterval = _pollBaseInterval;
+      return;
+    }
+    if (_pollInterval >= _pollMaxInterval) return;
+    final next = _pollInterval * 2;
+    _pollInterval = next > _pollMaxInterval ? _pollMaxInterval : next;
+  }
+
   Future<void> pollNow() async {
-    if (_isClosing || _disposed || _protocolFailed || _isPolling) return;
+    if (_isClosing ||
+        _disposed ||
+        _protocolFailed ||
+        _isPolling ||
+        _pollingPaused) {
+      return;
+    }
     _isPolling = true;
+    var hasChanges = false;
     try {
       // Polling is already an explicit network opportunity. Consume a pending
       // debounce so it cannot fire again immediately after this pass.
@@ -183,17 +247,21 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         }
         final result = pendingResult;
         if (result?.hasReconciliationPayload ?? false) {
+          hasChanges = true;
           return;
         }
         await syncService.pollAndReconcile(
           noteId,
           onReconcile: (result) async {
+            hasChanges = true;
             await _handleSyncResult(result);
           },
         );
       });
     } finally {
       _isPolling = false;
+      _updatePollInterval(hasChanges: hasChanges);
+      if (_pollingEnabled) _scheduleNextPoll();
     }
   }
 
@@ -279,9 +347,11 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     if (_disposed) return;
     _isClosing = true;
     _setStatus(NoteSessionStatus.closing);
-    final restartPollingOnFailure = _pollTimer != null;
+    final restartPollingOnFailure = _pollingEnabled;
+    _pollingEnabled = false;
     _pollTimer?.cancel();
     _cancelScheduledNetworkSync();
+    unawaited(_lifecycleSubscription?.cancel());
     adapter.setCaptureLocalOperations(false);
     adapter.onLocalOperations = null;
     try {

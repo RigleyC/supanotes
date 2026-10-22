@@ -29,6 +29,16 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.noteId.equals(noteId))).watchSingleOrNull();
   }
 
+  /// Single-shot read for callers that need the current row, not updates.
+  ///
+  /// `watchNoteDocument(...).first` opens a query stream that is cancelled
+  /// immediately afterwards, which costs a stream lifecycle per read.
+  Future<LocalNoteDocumentData?> getNoteDocument(String noteId) {
+    return (select(
+      localNoteDocuments,
+    )..where((t) => t.noteId.equals(noteId))).getSingleOrNull();
+  }
+
   Stream<List<LocalNoteDocumentData>> watchMaterializedDocuments() {
     final query =
         select(localNoteDocuments).join([

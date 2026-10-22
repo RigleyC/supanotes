@@ -45,6 +45,42 @@ func DecodeCanonicalDocument(data []byte) (Document, error) {
 	return document, nil
 }
 
+// DecodeReadableDocument is the read-side decoder for stored snapshots. Older
+// task blocks can keep a reminder or recurrenceRule after their dueDate was
+// removed. Those orphaned keys are dropped from the returned document, while
+// the stored snapshot is left untouched. Writes keep using DecodeCanonicalDocument.
+func DecodeReadableDocument(data []byte) (Document, error) {
+	readable, err := withoutOrphanTaskSchedule(data)
+	if err != nil {
+		return Document{}, err
+	}
+	return DecodeCanonicalDocument(readable)
+}
+
+func withoutOrphanTaskSchedule(data []byte) ([]byte, error) {
+	var envelope map[string]any
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return nil, err
+	}
+	rawBlocks, ok := envelope["blocks"].([]any)
+	if !ok {
+		return data, nil
+	}
+	for _, rawBlock := range rawBlocks {
+		block, ok := rawBlock.(map[string]any)
+		if !ok || block["type"] != string(BlockTask) {
+			continue
+		}
+		metadata, ok := block["metadata"].(map[string]any)
+		if !ok || metadata["dueDate"] != nil {
+			continue
+		}
+		delete(metadata, "reminder")
+		delete(metadata, "recurrenceRule")
+	}
+	return json.Marshal(envelope)
+}
+
 func validateCanonicalBlocks(rawBlocks []json.RawMessage) error {
 	for _, rawBlock := range rawBlocks {
 		var block map[string]any

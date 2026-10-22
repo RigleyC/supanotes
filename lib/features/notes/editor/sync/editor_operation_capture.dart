@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supanotes/core/debug/note_sync_debug.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/document/note_editor_operation_builder.dart';
@@ -71,23 +72,18 @@ final class EditorOperationCapture {
     );
   }
 
-  void _onDocumentChanged(DocumentChangeLog _) {
+  void _onDocumentChanged(DocumentChangeLog changeLog) {
     if (_suppress) {
-      NoteSyncDebug.log(
-        'capture.suppressed',
-        fields: {'nodeCount': _document.nodeCount},
-      );
+      if (kDebugMode) {
+        NoteSyncDebug.log(
+          'capture.suppressed',
+          fields: {'nodeCount': _document.nodeCount},
+        );
+      }
       return;
     }
 
-    final current = NoteEditorDocumentSnapshot.fromDocument(
-      _document,
-      _builder.codec,
-    );
-    if (current.hasComposingText) {
-      NoteSyncDebug.log('capture.deferred_composing');
-      return;
-    }
+    final current = _snapshotAfterChange(changeLog);
 
     final operations = _builder.build(before: _mirror, after: current);
     _mirror = current;
@@ -104,18 +100,54 @@ final class EditorOperationCapture {
         )
         .toList(growable: false);
 
-    NoteSyncDebug.log(
-      'capture.operations',
-      fields: {
-        'nodeCount': current.blocks.length,
-        'operations': requests
-            .map(
-              (request) =>
-                  '${request.kind}:${request.blockId}:${NoteSyncDebug.payloadSummary(request.payload)}',
-            )
-            .join('|'),
-      },
-    );
+    if (kDebugMode) {
+      NoteSyncDebug.log(
+        'capture.operations',
+        fields: {
+          'nodeCount': current.blocks.length,
+          'operations': requests
+              .map(
+                (request) =>
+                    '${request.kind}:${request.blockId}:${NoteSyncDebug.payloadSummary(request.payload)}',
+              )
+              .join('|'),
+        },
+      );
+    }
     _onOperationsCaptured(requests);
+  }
+
+  /// Builds the post-change snapshot from the change log.
+  ///
+  /// Typing only produces [NodeChangeEvent] entries, so re-reading the changed
+  /// nodes keeps the cost proportional to the edit instead of re-encoding the
+  /// whole document on every keystroke. Insert, move and remove events change
+  /// the block order, which the diff needs in full.
+  NoteEditorDocumentSnapshot _snapshotAfterChange(
+    DocumentChangeLog changeLog,
+  ) {
+    final changedNodeIds = <String>{};
+    var requiresFullRebuild = changeLog.changes.isEmpty;
+    for (final change in changeLog.changes) {
+      if (change is! NodeChangeEvent) {
+        requiresFullRebuild = true;
+        break;
+      }
+      changedNodeIds.add(change.nodeId);
+    }
+
+    if (!requiresFullRebuild) {
+      final updated = _mirror.withUpdatedBlocks(
+        document: _document,
+        codec: _builder.codec,
+        changedNodeIds: changedNodeIds,
+      );
+      if (updated != null) return updated;
+    }
+
+    return NoteEditorDocumentSnapshot.fromDocument(
+      _document,
+      _builder.codec,
+    );
   }
 }

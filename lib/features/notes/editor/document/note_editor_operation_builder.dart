@@ -67,13 +67,30 @@ final class NoteEditorDocumentSnapshot {
 
   final List<NoteEditorBlockSnapshot> blocks;
 
-  bool get hasComposingText => blocks.any(
-    (block) => block.text.spans.markers.any(
-      (marker) =>
-          marker.markerType == SpanMarkerType.start &&
-          marker.attribution.id == 'composing',
-    ),
-  );
+  /// Re-reads only [changedNodeIds] from [document].
+  ///
+  /// Returns `null` when a changed id is no longer in [blocks] or no longer
+  /// exists in the document: both mean the structural shape changed, and the
+  /// caller must rebuild the whole snapshot instead of patching it.
+  NoteEditorDocumentSnapshot? withUpdatedBlocks({
+    required Document document,
+    required NoteDocumentCodec codec,
+    required Set<String> changedNodeIds,
+  }) {
+    final updated = List<NoteEditorBlockSnapshot>.of(blocks);
+    final indexById = <String, int>{
+      for (var index = 0; index < updated.length; index++)
+        updated[index].id: index,
+    };
+    for (final nodeId in changedNodeIds) {
+      final index = indexById[nodeId];
+      if (index == null) return null;
+      final node = document.getNodeById(nodeId);
+      if (node == null) return null;
+      updated[index] = NoteEditorBlockSnapshot.fromNode(node, codec);
+    }
+    return NoteEditorDocumentSnapshot(updated);
+  }
 }
 
 final class NoteEditorOperation {

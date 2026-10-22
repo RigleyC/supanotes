@@ -603,7 +603,7 @@ void main() {
       );
     });
 
-    test('captures a move deferred while text is composing', () {
+    test('captures a move with a legacy composing text attribution', () {
       const composingAttribution = NamedAttribution('composing');
       final composingSpans = AttributedSpans()
         ..addAttribution(
@@ -629,24 +629,10 @@ void main() {
         onOperationsCaptured: capturedOps.addAll,
       ).start();
 
+      // Composition deferral belongs to the adapter, which reads
+      // `composer.composingRegion`. A text attribution must not swallow the
+      // structural change.
       editor.execute([const MoveNodeRequest(nodeId: 'p2', newIndex: 0)]);
-      expect(capturedOps, isEmpty);
-
-      editor.execute([
-        RemoveTextAttributionsRequest(
-          documentRange: const DocumentRange(
-            start: DocumentPosition(
-              nodeId: 'p1',
-              nodePosition: TextNodePosition(offset: 0),
-            ),
-            end: DocumentPosition(
-              nodeId: 'p1',
-              nodePosition: TextNodePosition(offset: 1),
-            ),
-          ),
-          attributions: {composingAttribution},
-        ),
-      ]);
 
       final move = capturedOps.firstWhere(
         (operation) =>

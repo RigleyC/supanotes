@@ -432,7 +432,7 @@ func (s *Service) GetOperationsSince(ctx context.Context, noteID pgtype.UUID, us
 }
 
 func canonicalDocumentJSON(data []byte) ([]byte, error) {
-	document, err := DecodeCanonicalDocument(data)
+	document, err := DecodeReadableDocument(data)
 	if err != nil {
 		return nil, err
 	}
