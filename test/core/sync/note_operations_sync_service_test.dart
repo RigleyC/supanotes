@@ -72,8 +72,8 @@ void main() {
       ),
     ).thenAnswer((_) async => []);
     when(
-      () => mockDao.watchNoteDocument(any()),
-    ).thenAnswer((_) => Stream.value(null));
+      () => mockDao.getNoteDocument(any()),
+    ).thenAnswer((_) async => null);
     when(
       () =>
           mockDao.getSyncSession(any(), ownerUserId: any(named: 'ownerUserId')),
@@ -232,14 +232,12 @@ void main() {
       when(
         () => mockDao.getPendingOperations('note-1', ownerUserId: 'test-actor'),
       ).thenAnswer((_) async => []);
-      when(() => mockDao.watchNoteDocument('note-1')).thenAnswer(
-        (_) => Stream.value(
-          LocalNoteDocumentData(
-            noteId: 'note-1',
-            revision: 7,
-            documentJson: '{"blocks":[]}',
-            updatedAt: DateTime.utc(2026, 7, 20),
-          ),
+      when(() => mockDao.getNoteDocument('note-1')).thenAnswer(
+        (_) async => LocalNoteDocumentData(
+          noteId: 'note-1',
+          revision: 7,
+          documentJson: '{"blocks":[]}',
+          updatedAt: DateTime.utc(2026, 7, 20),
         ),
       );
       when(
@@ -382,8 +380,8 @@ void main() {
       updatedAt: DateTime.utc(2026, 7, 20),
     );
     when(
-      () => mockDao.watchNoteDocument('note-1'),
-    ).thenAnswer((_) => Stream.value(doc));
+      () => mockDao.getNoteDocument('note-1'),
+    ).thenAnswer((_) async => doc);
 
     final result = await service.getConfirmedDocument('note-1');
 

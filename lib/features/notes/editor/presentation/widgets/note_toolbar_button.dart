@@ -3,12 +3,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:motor/motor.dart';
 import 'package:supanotes/core/utils/app_haptics.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_press_scale.dart';
 
 enum ToolbarHaptic { none, controlTap, selectionChange }
 
 class ToolbarButton extends StatefulWidget {
   const ToolbarButton({
-    required this.isActive, super.key,
+    required this.isActive,
+    super.key,
     this.icon,
     this.svgAsset,
     this.semanticLabel,
@@ -37,6 +39,7 @@ class _ToolbarButtonState extends State<ToolbarButton>
   late final SingleMotionController _activeMotion;
   late final SingleMotionController _iconMotion;
   late final Listenable _motion;
+  bool _pressed = false;
 
   @override
   void initState() {
@@ -89,18 +92,31 @@ class _ToolbarButtonState extends State<ToolbarButton>
     }
   }
 
+  void _setPressed(bool pressed) {
+    if (_pressed == pressed) return;
+    setState(() => _pressed = pressed);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _motion,
-      builder: (_, _) => _ToolbarButtonVisual(
-        icon: widget.icon,
-        svgAsset: widget.svgAsset,
-        semanticLabel: widget.semanticLabel,
-        spacious: widget.spacious,
-        onPressed: _onPressed,
-        activeProgress: _activeMotion.value.clamp(0.0, 1.0),
-        iconProgress: _iconMotion.value.clamp(0.0, 1.0),
+    final onPressed = _onPressed;
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => _setPressed(true),
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: AnimatedBuilder(
+        animation: _motion,
+        builder: (_, _) => _ToolbarButtonVisual(
+          icon: widget.icon,
+          svgAsset: widget.svgAsset,
+          semanticLabel: widget.semanticLabel,
+          spacious: widget.spacious,
+          onPressed: onPressed,
+          pressed: _pressed && onPressed != null,
+          activeProgress: _activeMotion.value.clamp(0.0, 1.0),
+          iconProgress: _iconMotion.value.clamp(0.0, 1.0),
+        ),
       ),
     );
   }
@@ -128,6 +144,7 @@ class _ToolbarButtonVisual extends StatelessWidget {
     required this.semanticLabel,
     required this.spacious,
     required this.onPressed,
+    required this.pressed,
     required this.activeProgress,
     required this.iconProgress,
   });
@@ -137,6 +154,7 @@ class _ToolbarButtonVisual extends StatelessWidget {
   final String? semanticLabel;
   final bool spacious;
   final VoidCallback? onPressed;
+  final bool pressed;
   final double activeProgress;
   final double iconProgress;
 
@@ -167,27 +185,30 @@ class _ToolbarButtonVisual extends StatelessWidget {
       button: true,
       enabled: onPressed != null,
       label: semanticLabel,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onPressed,
-        child: Container(
-          constraints: BoxConstraints(
-            minWidth: spacious ? 44 : 36,
-            minHeight: spacious ? 44 : 36,
-          ),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.all(AppSpacing.xs),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          ),
-          child: Transform.scale(
-            scale: 0.96 + (0.04 * activeProgress),
-            child: Opacity(
-              opacity: 0.7 + (0.3 * iconProgress),
-              child: Transform.scale(
-                scale: 0.9 + (0.1 * iconProgress),
-                child: buttonIcon,
+        child: AppPressScale(
+          pressed: pressed,
+          child: Container(
+            constraints: BoxConstraints(
+              minWidth: spacious ? 44 : 36,
+              minHeight: spacious ? 44 : 36,
+            ),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.all(AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            ),
+            child: Transform.scale(
+              scale: 0.96 + (0.04 * activeProgress),
+              child: Opacity(
+                opacity: 0.7 + (0.3 * iconProgress),
+                child: Transform.scale(
+                  scale: 0.9 + (0.1 * iconProgress),
+                  child: buttonIcon,
+                ),
               ),
             ),
           ),

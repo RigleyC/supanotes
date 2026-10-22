@@ -14,7 +14,7 @@ import 'package:supanotes/features/notes/editor/document/note_task_editor_comman
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:super_editor/super_editor.dart';
 
-class NoteEditorController extends ChangeNotifier {
+class NoteEditorController {
   NoteEditorController({
     required this.userId,
     required String noteId,
@@ -35,7 +35,6 @@ class NoteEditorController extends ChangeNotifier {
   late final Editor editor;
   late final MutableDocumentComposer composer;
   final FocusNode focusNode = FocusNode();
-  void Function(bool)? onHasContentChanged;
   void Function()? _assertCanMutate;
   late final HiddenTaskEditingGuard _hiddenTaskEditingGuard;
   final String _noteId;
@@ -242,15 +241,12 @@ class NoteEditorController extends ChangeNotifier {
         });
   }
 
-  @override
   Future<void> dispose() async {
     _disposed = true;
-    onHasContentChanged = null;
     document.removeListener(_clearSelectionIfHidden);
     editor.dispose();
     document.dispose();
     composer.dispose();
     focusNode.dispose();
-    super.dispose();
   }
 }

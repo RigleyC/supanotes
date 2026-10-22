@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
@@ -18,6 +16,7 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
+import 'package:supanotes/features/tasks/domain/task_completion_state.dart';
 import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -34,6 +33,7 @@ class NoteEditor extends StatefulWidget {
     this.collapseImages = false,
     this.attachmentDelivery,
     this.requestInitialFocus = false,
+    this.isReadOnly = false,
   });
   final String noteId;
   final NoteEditorSession session;
@@ -43,6 +43,10 @@ class NoteEditor extends StatefulWidget {
   final bool requestInitialFocus;
   final NoteEditorDelegate delegate;
   final AttachmentUploader attachmentUploader;
+
+  /// Write access is owned by the screen, which already watches the session
+  /// capability stream. The editor only renders the resulting mode.
+  final bool isReadOnly;
 
   @override
   State<NoteEditor> createState() => _NoteEditorState();
@@ -62,10 +66,9 @@ class _NoteEditorState extends State<NoteEditor> {
   CustomTaskComponentBuilder? _taskComponentBuilder;
   List<ComponentBuilder>? _componentBuilders;
   List<SuperEditorContentTapDelegateFactory>? _contentTapDelegateFactories;
-  StreamSubscription<bool>? _captureSubscription;
   NoteEditorSession? _attachedSession;
 
-  bool get _isReadOnly => !widget.session.captureLocalOperations;
+  bool get _isReadOnly => widget.isReadOnly;
 
   @override
   void initState() {
@@ -77,29 +80,12 @@ class _NoteEditorState extends State<NoteEditor> {
   }
 
   void _attachSession(NoteEditorSession session) {
-    final controller = session.controller;
     if (identical(_attachedSession, session)) return;
     _controller?.focusNode.removeListener(_syncToolbarVisibility);
-    _controller?.onHasContentChanged = null;
-    unawaited(_captureSubscription?.cancel());
     _attachedSession = session;
-    _controller = controller;
+    _controller = session.controller;
     _controller!.focusNode.addListener(_syncToolbarVisibility);
     _scheduleInitialToolbarSync();
-    _captureSubscription = session.captureLocalOperationsChanges.listen((_) {
-      if (!mounted) return;
-      if (_isReadOnly) {
-        _controls?.dispose();
-        _controls = null;
-      }
-      _componentBuilders = null;
-      _contentTapDelegateFactories = null;
-      _taskComponentBuilder = null;
-      setState(() {});
-    });
-    _controller!.onHasContentChanged = (hasContent) {
-      widget.delegate.onHasContentChanged?.call(hasContent);
-    };
     _configureHiddenTaskEditing();
   }
 
@@ -175,16 +161,18 @@ class _NoteEditorState extends State<NoteEditor> {
   bool _isHiddenTask(TaskNode node) {
     if (!widget.hideCompleted) return false;
     final metadata = TaskMetadataDraft.fromTaskNode(node);
-    final occurrence = TaskOccurrencePolicy().resolveCurrent(
+    final occurrence = const TaskOccurrencePolicy().resolveCurrent(
       taskId: node.id,
       anchor: metadata.scheduleAnchor,
       recurrence: metadata.recurrence,
       hasTime: metadata.hasTime,
       completedAtByScheduledAt: metadata.completions,
     );
-    return metadata.recurrence == null
-        ? node.isComplete || occurrence?.isCompleted == true
-        : occurrence?.isCompleted == true;
+    return isTaskOccurrenceCompleted(
+      isComplete: node.isComplete,
+      recurrence: metadata.recurrence,
+      occurrence: occurrence,
+    );
   }
 
   Future<void> _attachFile({bool imageOnly = false}) async {
@@ -213,6 +201,7 @@ class _NoteEditorState extends State<NoteEditor> {
     super.didUpdateWidget(oldWidget);
 
     _handleSessionUpdate(oldWidget);
+    _handleReadOnlyUpdate(oldWidget);
     _handleHiddenTaskUpdate(oldWidget);
     _handleBuilderUpdate(oldWidget);
   }
@@ -224,6 +213,16 @@ class _NoteEditorState extends State<NoteEditor> {
     _controls = null;
     _resetStableBuilders();
     _attachSession(widget.session);
+  }
+
+  void _handleReadOnlyUpdate(NoteEditor oldWidget) {
+    if (widget.isReadOnly == oldWidget.isReadOnly) return;
+    if (widget.isReadOnly) {
+      _controls?.dispose();
+      _controls = null;
+    }
+    _resetStableBuilders();
+    _configureHiddenTaskEditing();
   }
 
   void _handleHiddenTaskUpdate(NoteEditor oldWidget) {
@@ -282,8 +281,6 @@ class _NoteEditorState extends State<NoteEditor> {
   @override
   void dispose() {
     _controller?.focusNode.removeListener(_syncToolbarVisibility);
-    _controller?.onHasContentChanged = null;
-    unawaited(_captureSubscription?.cancel());
     _softwareKeyboardController.detach();
     _keyboardPanelController.dispose();
     _isImeConnected.dispose();

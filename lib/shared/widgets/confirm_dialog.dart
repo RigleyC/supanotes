@@ -73,20 +73,14 @@ Future<bool> showConfirmDialog({
               AppButton(
                 text: cancelLabel,
                 variant: AppButtonVariant.text,
-                onPressed: () {
-                  AppHaptics.controlTap();
-                  Navigator.pop(dialogContext, false);
-                },
+                onPressed: () => Navigator.pop(dialogContext, false),
               ),
               AppButton(
                 text: confirmLabel,
                 variant: destructive
                     ? AppButtonVariant.danger
                     : AppButtonVariant.text,
-                onPressed: () {
-                  AppHaptics.controlTap();
-                  Navigator.pop(dialogContext, true);
-                },
+                onPressed: () => Navigator.pop(dialogContext, true),
               ),
             ],
           ),

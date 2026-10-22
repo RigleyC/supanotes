@@ -2,12 +2,14 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
+import 'package:supanotes/shared/widgets/app_icon_button.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AttachmentUploadingCapsule extends StatelessWidget {
   const AttachmentUploadingCapsule({
-    required this.fileName, super.key,
+    required this.fileName,
+    super.key,
     this.onCancel,
   });
 
@@ -70,10 +72,9 @@ class AttachmentUploadingCapsule extends StatelessWidget {
           ),
           if (onCancel != null) ...[
             const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.close),
+            AppIconButton(
+              icon: Icon(Icons.close, color: cs.outline),
               onPressed: onCancel,
-              color: cs.outline,
               tooltip: 'Cancelar envio',
             ),
           ],
@@ -85,7 +86,8 @@ class AttachmentUploadingCapsule extends StatelessWidget {
 
 class AttachmentFailedCapsule extends StatelessWidget {
   const AttachmentFailedCapsule({
-    required this.fileName, super.key,
+    required this.fileName,
+    super.key,
     this.onDelete,
   });
 
@@ -141,10 +143,9 @@ class AttachmentFailedCapsule extends StatelessWidget {
           ),
           if (onDelete != null) ...[
             const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.close),
+            AppIconButton(
+              icon: Icon(Icons.close, color: cs.error),
               onPressed: onDelete,
-              color: cs.error,
               tooltip: 'Remover',
             ),
           ],
@@ -156,7 +157,11 @@ class AttachmentFailedCapsule extends StatelessWidget {
 
 class AttachmentFilePill extends StatelessWidget {
   const AttachmentFilePill({
-    required this.fileName, required this.subtitle, required this.icon, required this.onTap, super.key,
+    required this.fileName,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+    super.key,
   });
 
   final String fileName;
@@ -229,25 +234,29 @@ class AttachmentExpandedImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget imageWidget;
-    final file = localPath != null ? File(localPath!) : null;
-    if (file != null && file.existsSync()) {
-      imageWidget = Image.file(
-        file,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _buildNetworkImage(context),
-      );
-    } else {
-      imageWidget = _buildNetworkImage(context);
-    }
+    final localFile = localPath == null ? null : File(localPath!);
+    final imageWidget = localFile != null && localFile.existsSync()
+        ? Image.file(
+            localFile,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _AttachmentNetworkImage(url: url),
+          )
+        : _AttachmentNetworkImage(url: url);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: imageWidget,
     );
   }
+}
 
-  Widget _buildNetworkImage(BuildContext context) {
+class _AttachmentNetworkImage extends StatelessWidget {
+  const _AttachmentNetworkImage({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Image.network(
       url,
@@ -282,7 +291,10 @@ class AttachmentExpandedImage extends StatelessWidget {
 
 class AttachmentRichLinkCard extends StatelessWidget {
   const AttachmentRichLinkCard({
-    required this.componentKey, required this.node, required this.selectionColor, super.key,
+    required this.componentKey,
+    required this.node,
+    required this.selectionColor,
+    super.key,
     this.selection,
     this.allowInternalNoteLinks = true,
   });

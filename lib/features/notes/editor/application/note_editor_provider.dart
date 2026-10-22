@@ -23,6 +23,7 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
   final sessionCoordinator = ref.read(noteSessionCoordinatorProvider);
   final notesRepository = ref.watch(notesRepositoryProvider);
   final lifecycleStore = ref.watch(noteLifecycleStoreProvider);
+  final appLifecycleStates = ref.watch(appLifecycleStateStreamProvider);
 
   var isDisposed = false;
   StreamSubscription<NoteModel?>? permissionSubscription;
@@ -72,6 +73,7 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
       document: controller.document,
       editor: controller.editor,
       captureLocalOperations: _canCaptureLocalOperations(note),
+      appLifecycleStates: appLifecycleStates,
     );
 
     return NoteEditorSession(

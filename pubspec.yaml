@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.10.0 <4.0.0"
+  sdk: ">=3.13.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -99,6 +99,7 @@ dependencies:
   unicode_emojis: ^0.5.1
   share_plus: ^12.0.2
   package_info_plus: ^8.3.1
+  liquid_glass_renderer: ^1.0.0-dev.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

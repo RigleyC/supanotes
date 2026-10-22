@@ -20,6 +20,7 @@ import 'package:supanotes/features/notes/sharing/presentation/share_note_sheet.d
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_snackbar_helper.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_sheet.dart';
+import 'package:supanotes/shared/widgets/app_banner.dart';
 import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
@@ -61,69 +62,100 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final noteAsync = ref.watch(noteProvider(widget.noteId));
-    final note = noteAsync.when(
-      data: (note) => note,
-      loading: () => null,
-      error: (_, _) => null,
+    final chromeAsync = ref.watch(
+      noteProvider(widget.noteId).select(
+        (note) =>
+            note.whenData((note) => note == null ? null : _chromeFor(note)),
+      ),
     );
     final sessionAsync = ref.watch(noteEditorSessionProvider(widget.noteId));
     final captureAsync = ref.watch(noteEditorCaptureProvider(widget.noteId));
-    final screenIsReadOnly = captureAsync.when(
+    final isReadOnly = captureAsync.when(
       data: (capture) => !capture,
-      loading: () => note?.isReadOnly ?? true,
+      loading: () => chromeAsync.when(
+        data: (chrome) => chrome?.isReadOnly ?? true,
+        loading: () => true,
+        error: (_, _) => true,
+      ),
       error: (_, _) => true,
     );
     return KeyboardScaffoldSafeArea(
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        appBar: _NoteEditorAppBar(
-          noteId: widget.noteId,
-          note: note,
-          screenIsReadOnly: screenIsReadOnly,
-          sessionAsync: sessionAsync,
-        ),
-        body: noteAsync.when(
-          data: (note) {
-            if (note == null) {
-              return const Center(child: Text(NoteStrings.errorNotFound));
-            }
-            return sessionAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) =>
-                  const AppErrorView(title: NoteStrings.editorErrorTitle),
-              data: (session) => _NoteEditorWithSession(
-                noteId: widget.noteId,
-                blockId: widget.blockId,
-                note: note,
-                attachmentDelivery: widget.attachmentDelivery,
-                attachmentUploader: ref.read(attachmentsRepositoryProvider),
-                session: session,
-                taskForMetadata: _taskForMetadata,
-                readSession: _readSession,
-              ),
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, _) =>
-              const AppErrorView(title: NoteStrings.editorErrorTitle),
+      // Glass surfaces on this screen (the editor toolbar) share one backdrop
+      // copy through this group, as the liquid_glass_renderer guide recommends.
+      child: BackdropGroup(
+        child: Scaffold(
+          resizeToAvoidBottomInset: false,
+          appBar: _NoteEditorAppBar(
+            noteId: widget.noteId,
+            chromeAsync: chromeAsync,
+            isReadOnly: isReadOnly,
+            sessionAsync: sessionAsync,
+          ),
+          body: chromeAsync.when(
+            data: (chrome) {
+              if (chrome == null) {
+                return const Center(child: Text(NoteStrings.errorNotFound));
+              }
+              return sessionAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, _) =>
+                    const AppErrorView(title: NoteStrings.editorErrorTitle),
+                data: (session) => _NoteEditorWithSession(
+                  noteId: widget.noteId,
+                  blockId: widget.blockId,
+                  chrome: chrome,
+                  isReadOnly: isReadOnly,
+                  attachmentDelivery: widget.attachmentDelivery,
+                  attachmentUploader: ref.read(attachmentsRepositoryProvider),
+                  session: session,
+                  taskForMetadata: _taskForMetadata,
+                  readSession: _readSession,
+                ),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, _) =>
+                const AppErrorView(title: NoteStrings.editorErrorTitle),
+          ),
         ),
       ),
     );
   }
 }
 
+/// The note fields the editor chrome renders.
+///
+/// Watching the projection keeps the screen from rebuilding the editor when
+/// unrelated note fields, like the document content, change.
+typedef _NoteEditorChrome = ({
+  String? sharedByEmail,
+  bool isOwner,
+  bool hideCompleted,
+  bool collapseImages,
+  bool shouldAutofocus,
+  bool isReadOnly,
+});
+
+_NoteEditorChrome _chromeFor(NoteModel note) => (
+  sharedByEmail: note.sharedByEmail,
+  isOwner: note.isOwner,
+  hideCompleted: note.hideCompleted,
+  collapseImages: note.collapseImages,
+  shouldAutofocus: note.shouldAutofocus,
+  isReadOnly: note.isReadOnly,
+);
+
 class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
   const _NoteEditorAppBar({
     required this.noteId,
-    required this.note,
-    required this.screenIsReadOnly,
+    required this.chromeAsync,
+    required this.isReadOnly,
     required this.sessionAsync,
   });
 
   final String noteId;
-  final NoteModel? note;
-  final bool screenIsReadOnly;
+  final AsyncValue<_NoteEditorChrome?> chromeAsync;
+  final bool isReadOnly;
   final AsyncValue<NoteEditorSession> sessionAsync;
 
   @override
@@ -131,8 +163,6 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentNote = note;
-
     return AppBar(
       automaticallyImplyLeading: false,
       backgroundColor: Colors.transparent,
@@ -148,27 +178,35 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
           }
         },
       ),
-      title: screenIsReadOnly && currentNote?.sharedByEmail != null
-          ? Text('${NoteStrings.sharedByPrefix} ${currentNote!.sharedByEmail}')
-          : null,
-      actions: currentNote == null || screenIsReadOnly
-          ? const []
-          : [
-              _NoteEditorMenuButton(noteId: noteId, note: currentNote),
-              const SizedBox(width: AppSpacing.xs),
-              _NoteEditorPreferenceStatus(noteId: noteId),
-              const SizedBox(width: AppSpacing.xs),
-              _NoteEditorKeyboardButton(sessionAsync: sessionAsync),
-            ],
+      title: chromeAsync.when(
+        data: (chrome) => isReadOnly && chrome?.sharedByEmail != null
+            ? Text('${NoteStrings.sharedByPrefix} ${chrome!.sharedByEmail}')
+            : null,
+        loading: () => null,
+        error: (_, _) => const Text(NoteStrings.editorErrorTitle),
+      ),
+      actions: chromeAsync.when(
+        data: (chrome) => chrome == null || isReadOnly
+            ? const <Widget>[]
+            : [
+                _NoteEditorMenuButton(noteId: noteId, chrome: chrome),
+                const SizedBox(width: AppSpacing.xs),
+                _NoteEditorPreferenceStatus(noteId: noteId),
+                const SizedBox(width: AppSpacing.xs),
+                _NoteEditorKeyboardButton(sessionAsync: sessionAsync),
+              ],
+        loading: () => const <Widget>[],
+        error: (_, _) => const <Widget>[],
+      ),
     );
   }
 }
 
 class _NoteEditorMenuButton extends ConsumerWidget {
-  const _NoteEditorMenuButton({required this.noteId, required this.note});
+  const _NoteEditorMenuButton({required this.noteId, required this.chrome});
 
   final String noteId;
-  final NoteModel note;
+  final _NoteEditorChrome chrome;
 
   Future<void> _handleSelection(
     BuildContext context,
@@ -177,6 +215,15 @@ class _NoteEditorMenuButton extends ConsumerWidget {
   ) async {
     final session = ref.read(noteEditorSessionProvider(noteId)).value;
     if (session == null || !session.captureLocalOperations) return;
+
+    final note = ref
+        .read(noteProvider(noteId))
+        .when(
+          data: (note) => note,
+          loading: () => null,
+          error: (_, _) => null,
+        );
+    if (note == null) return;
 
     final mutationController = ref.read(
       notePreferenceMutationControllerProvider(noteId).notifier,
@@ -203,7 +250,7 @@ class _NoteEditorMenuButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = [
-      if (note.isOwner)
+      if (chrome.isOwner)
         (
           value: 'share',
           label: NoteStrings.shareLabel,
@@ -212,18 +259,20 @@ class _NoteEditorMenuButton extends ConsumerWidget {
         ),
       (
         value: 'hide_completed',
-        label: note.hideCompleted
+        label: chrome.hideCompleted
             ? NoteStrings.showCompleted
             : NoteStrings.hideCompleted,
-        symbol: note.hideCompleted ? 'eye' : 'eye.slash',
-        icon: note.hideCompleted
+        symbol: chrome.hideCompleted ? 'eye' : 'eye.slash',
+        icon: chrome.hideCompleted
             ? Icons.visibility_outlined
             : Icons.visibility_off_outlined,
       ),
-      if (note.isOwner)
+      if (chrome.isOwner)
         (
           value: 'collapse_images',
-          label: note.collapseImages ? 'Expandir imagens' : 'Colapsar imagens',
+          label: chrome.collapseImages
+              ? 'Expandir imagens'
+              : 'Colapsar imagens',
           symbol: 'photo',
           icon: Icons.image_outlined,
         ),
@@ -312,7 +361,8 @@ class _NoteEditorWithSession extends StatefulWidget {
   const _NoteEditorWithSession({
     required this.noteId,
     required this.blockId,
-    required this.note,
+    required this.chrome,
+    required this.isReadOnly,
     required this.attachmentDelivery,
     required this.attachmentUploader,
     required this.session,
@@ -322,7 +372,8 @@ class _NoteEditorWithSession extends StatefulWidget {
 
   final String noteId;
   final String? blockId;
-  final NoteModel note;
+  final _NoteEditorChrome chrome;
+  final bool isReadOnly;
   final AttachmentDelivery? attachmentDelivery;
   final AttachmentUploader attachmentUploader;
   final NoteEditorSession session;
@@ -395,14 +446,15 @@ class _NoteEditorWithSessionState extends State<_NoteEditorWithSession> {
       context: context,
       taskForMetadata: widget.taskForMetadata,
       readSession: widget.readSession,
-      isReadOnly: !widget.session.captureLocalOperations,
+      isReadOnly: widget.isReadOnly,
     );
     final editor = NoteEditor(
       noteId: widget.noteId,
       session: widget.session,
-      requestInitialFocus: widget.note.shouldAutofocus,
-      hideCompleted: widget.note.hideCompleted,
-      collapseImages: widget.note.collapseImages,
+      requestInitialFocus: widget.chrome.shouldAutofocus,
+      hideCompleted: widget.chrome.hideCompleted,
+      collapseImages: widget.chrome.collapseImages,
+      isReadOnly: widget.isReadOnly,
       attachmentDelivery: widget.attachmentDelivery,
       attachmentUploader: widget.attachmentUploader,
       delegate: taskDelegate.create(),
@@ -411,17 +463,16 @@ class _NoteEditorWithSessionState extends State<_NoteEditorWithSession> {
 
     return Column(
       children: [
-        MaterialBanner(
+        AppBanner(
           key: ValueKey('missing-block:${widget.blockId}'),
-          content: const Text('Esta tarefa não está disponível nesta nota.'),
-          actions: [
-            AppButton(
-              text: 'Tentar novamente',
-              variant: AppButtonVariant.text,
-              width: 160,
-              onPressed: _retryBlockTarget,
-            ),
-          ],
+          message: 'Esta tarefa não está disponível nesta nota.',
+          icon: Icons.search_off,
+          action: AppButton(
+            text: 'Tentar novamente',
+            variant: AppButtonVariant.text,
+            width: 160,
+            onPressed: _retryBlockTarget,
+          ),
         ),
         Expanded(child: editor),
       ],
