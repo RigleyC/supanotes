@@ -17,6 +17,13 @@ dependencies:
   fractional_indexing_dart: ^1.0.7
 
 
+  # AppFlowy editor: lazy (virtualized) block editor. Pinned to upstream main
+  # because the 6.2.0 release does not compile on Flutter 3.47.
+  appflowy_editor:
+    git:
+      url: https://github.com/AppFlowy-IO/appflowy-editor.git
+      ref: 01eccc6ee36bd07698bd80915289fe7070478cd2
+
   # Super Editor and clipboard.
   super_editor:
     git:
@@ -78,7 +85,7 @@ dependencies:
   flutter_streaming_text_markdown: ^1.9.0
   url_launcher: ^6.3.0
   app_links: ^6.4.1
-  file_picker: ^8.0.0
+  file_picker: ^10.3.10
   flutter_markdown_plus: ^1.0.7
   super_clipboard: ^0.9.1
   window_manager: ^0.4.3

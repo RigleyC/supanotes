@@ -4,35 +4,56 @@ import 'dart:developer' as dev;
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
+import 'package:supanotes/features/notes/editor/sync/note_document_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:super_editor/super_editor.dart';
 
 class NoteSyncSession implements NoteEditorSyncHandle {
+  /// Session for the super_editor document model.
   NoteSyncSession({
+    required String noteId,
+    required NoteOperationsSyncService syncService,
+    required MutableDocument document,
+    required Editor editor,
+    bool captureLocalOperations = true,
+    Duration networkCoalescingWindow = const Duration(milliseconds: 350),
+    Stream<AppLifecycleState>? appLifecycleStates,
+    void Function(Object error)? onTransientError,
+    void Function(Object error)? onProtocolError,
+  }) : this.withAdapter(
+         noteId: noteId,
+         syncService: syncService,
+         adapter: NoteOperationAdapter(
+           document: document,
+           syncService: syncService,
+           noteId: noteId,
+           editor: editor,
+           captureLocalOperations: captureLocalOperations,
+         ),
+         captureLocalOperations: captureLocalOperations,
+         networkCoalescingWindow: networkCoalescingWindow,
+         appLifecycleStates: appLifecycleStates,
+         onTransientError: onTransientError,
+         onProtocolError: onProtocolError,
+       );
+
+  /// Session for any editor, through its [NoteDocumentAdapter].
+  NoteSyncSession.withAdapter({
     required this.noteId,
     required this.syncService,
-    required this.document,
-    required Editor editor,
+    required this.adapter,
     bool captureLocalOperations = true,
     this.networkCoalescingWindow = const Duration(milliseconds: 350),
     this.appLifecycleStates,
     this.onTransientError,
     this.onProtocolError,
-  }) : adapter = NoteOperationAdapter(
-         document: document,
-         syncService: syncService,
-         noteId: noteId,
-         editor: editor,
-         captureLocalOperations: captureLocalOperations,
-       ),
-       _captureLocalOperations = captureLocalOperations;
+  }) : _captureLocalOperations = captureLocalOperations;
 
   final String noteId;
   final NoteOperationsSyncService syncService;
-  final NoteOperationAdapter adapter;
-  final MutableDocument document;
+  final NoteDocumentAdapter adapter;
   final Duration networkCoalescingWindow;
 
   /// App-level lifecycle signal used to pause polling while the app is not in

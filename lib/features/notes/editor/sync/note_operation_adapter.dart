@@ -9,6 +9,7 @@ import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/document/document_projection_applier.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/sync/editor_operation_capture.dart';
+import 'package:supanotes/features/notes/editor/sync/note_document_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:super_editor/super_editor.dart';
@@ -19,7 +20,7 @@ class _RebuildRequest {
   final List<PendingNoteOperationData>? ops;
 }
 
-class NoteOperationAdapter {
+class NoteOperationAdapter implements NoteDocumentAdapter {
   NoteOperationAdapter({
     required MutableDocument document,
     required NoteOperationsSyncService syncService,
@@ -81,6 +82,7 @@ class NoteOperationAdapter {
   bool get captureLocalOperations => _captureLocalOperations;
   bool get hasCapturedLocalOperations => _hasCapturedLocalOperations;
 
+  @override
   void Function(List<OperationRequest> ops)? onLocalOperations;
 
   bool _disposed = false;
@@ -119,6 +121,7 @@ class NoteOperationAdapter {
     );
   }
 
+  @override
   Future<void> start() async {
     if (_disposed) return;
     _capture.setSuppress(true);
@@ -138,6 +141,7 @@ class NoteOperationAdapter {
     _capture.setSuppress(!_captureLocalOperations);
   }
 
+  @override
   void setCaptureLocalOperations(bool captureLocalOperations) {
     if (_disposed || _captureLocalOperations == captureLocalOperations) return;
     _captureLocalOperations = captureLocalOperations;
@@ -359,6 +363,7 @@ class NoteOperationAdapter {
     });
   }
 
+  @override
   Future<void> flushNow() async {
     _debounceTimer?.cancel();
     while (true) {
@@ -368,6 +373,7 @@ class NoteOperationAdapter {
     await _saveMaterializedDocument();
   }
 
+  @override
   Future<void> reconcile(SyncResult result) async {
     if (_disposed) return;
     final canonical = result.canonicalDocument;
@@ -473,6 +479,7 @@ class NoteOperationAdapter {
     );
   }
 
+  @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;
