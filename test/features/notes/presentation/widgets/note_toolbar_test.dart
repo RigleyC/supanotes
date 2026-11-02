@@ -107,7 +107,7 @@ void main() {
 
     expect(_codec.toBlocks(editorState.document).single.delta.single, {
       'insert': 'negrito',
-      'attributes': {'bold': true, 'italic': true},
+      'attributes': {'bold': true, 'italics': true},
     });
     expect(_button(tester, 'Negrito').isActive, isTrue);
     // A paragraph cannot be indented.

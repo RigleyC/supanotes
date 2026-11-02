@@ -5,7 +5,6 @@ import 'package:supanotes/features/notes/editor/presentation/widgets/rich_keyboa
 import 'package:super_editor/super_editor.dart';
 
 class EditorControls {
-
   EditorControls({
     required this.richOps,
     required this.iosController,

@@ -14,7 +14,9 @@ NoteBlock _b(
 ]) => NoteBlock(
   id: id,
   type: type,
-  delta: [if (text.isNotEmpty) {'insert': text}],
+  delta: [
+    if (text.isNotEmpty) {'insert': text},
+  ],
   metadata: metadata,
 );
 
@@ -24,9 +26,10 @@ EditorState _editor(List<NoteBlock> blocks) =>
 List<NoteBlock> _blocks(EditorState editorState) =>
     _codec.toBlocks(editorState.document);
 
-String _shape(EditorState editorState) => _blocks(editorState)
-    .map((block) => '${block.id}:${block.type}:${block.indent}')
-    .join(' ');
+String _shape(EditorState editorState) =>
+    _blocks(editorState)
+        .map((block) => '${block.id}:${block.type}:${block.indent}')
+        .join(' ');
 
 Path _pathOf(EditorState editorState, String id) {
   Node? find(Iterable<Node> nodes) {
@@ -62,27 +65,30 @@ void main() {
     expect(_blocks(editor).single.text, 'Mercado');
   });
 
-  test('leaving a task drops its schedule; entering keeps the indent', () async {
-    final editor = _editor([
-      _b('l', 'bulletList', 'Lista'),
-      _b('t', 'task', 'Leite', {
-        'indent': 1,
-        'dueDate': '2026-09-16T09:00:00.000',
-      }),
-    ]);
-    _caret(editor, 't');
+  test(
+    'leaving a task drops its schedule; entering keeps the indent',
+    () async {
+      final editor = _editor([
+        _b('l', 'bulletList', 'Lista'),
+        _b('t', 'task', 'Leite', {
+          'indent': 1,
+          'dueDate': '2026-09-16T09:00:00.000',
+        }),
+      ]);
+      _caret(editor, 't');
 
-    await editor.toggleNoteBlockStyle(NoteBlockStyle.bulletList);
-    expect(_shape(editor), 'l:bulletList:0 t:bulletList:1');
-    expect(_blocks(editor).last.metadata, {'indent': 1});
+      await editor.toggleNoteBlockStyle(NoteBlockStyle.bulletList);
+      expect(_shape(editor), 'l:bulletList:0 t:bulletList:1');
+      expect(_blocks(editor).last.metadata, {'indent': 1});
 
-    await editor.toggleNoteBlockStyle(NoteBlockStyle.task);
-    expect(_shape(editor), 'l:bulletList:0 t:task:1');
+      await editor.toggleNoteBlockStyle(NoteBlockStyle.task);
+      expect(_shape(editor), 'l:bulletList:0 t:task:1');
 
-    await editor.toggleNoteBlockStyle(NoteBlockStyle.task);
-    // Paragraphs carry no indent.
-    expect(_shape(editor), 'l:bulletList:0 t:paragraph:0');
-  });
+      await editor.toggleNoteBlockStyle(NoteBlockStyle.task);
+      // Paragraphs carry no indent.
+      expect(_shape(editor), 'l:bulletList:0 t:paragraph:0');
+    },
+  );
 
   test('mixed selection becomes tasks; all tasks toggle off', () async {
     final editor = _editor([
@@ -138,22 +144,25 @@ void main() {
     expect(_shape(editor), 'a:task:0 x:task:0 y:task:1');
   });
 
-  test('a divider goes after the caret block, then a line to type on', () async {
-    final editor = _editor([_b('a', 'paragraph', 'texto')]);
-    _caret(editor, 'a', 5);
+  test(
+    'a divider goes after the caret block, then a line to type on',
+    () async {
+      final editor = _editor([_b('a', 'paragraph', 'texto')]);
+      _caret(editor, 'a', 5);
 
-    await editor.insertNoteDivider();
+      await editor.insertNoteDivider();
 
-    final blocks = _blocks(editor);
-    expect(blocks.map((block) => block.type), [
-      'paragraph',
-      'divider',
-      'paragraph',
-    ]);
-    final index = blocks[1].metadata['dividerIndex'] as int;
-    expect(index, inInclusiveRange(1, 35));
-    expect(editor.selection!.end.path, [2]);
-  });
+      final blocks = _blocks(editor);
+      expect(blocks.map((block) => block.type), [
+        'paragraph',
+        'divider',
+        'paragraph',
+      ]);
+      final index = blocks[1].metadata['dividerIndex'] as int;
+      expect(index, inInclusiveRange(1, 35));
+      expect(editor.selection!.end.path, [2]);
+    },
+  );
 
   test('a divider replaces an empty line', () async {
     final editor = _editor([

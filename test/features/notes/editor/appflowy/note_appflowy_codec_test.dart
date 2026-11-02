@@ -142,4 +142,25 @@ void main() {
       {'insert': 'abc'},
     ]);
   });
+
+  test('italic keeps the stored name existing notes use', () {
+    const codec = NoteAppFlowyCodec();
+    final stored = NoteBlock(
+      id: 'p',
+      type: 'paragraph',
+      delta: const [
+        {
+          'insert': 'ênfase',
+          'attributes': {'italics': true, 'link': 'https://a.dev'},
+        },
+      ],
+    );
+
+    final node = codec.toDocument([stored]).root.children.single;
+    expect((node.delta!.toJson().single as Map)['attributes'], {
+      'italic': true,
+      'href': 'https://a.dev',
+    });
+    expect(codec.toBlocks(Document(root: node.parent!)).single, stored);
+  });
 }
