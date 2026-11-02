@@ -306,9 +306,52 @@ class AttachmentRichLinkCard extends StatelessWidget {
   final bool allowInternalNoteLinks;
 
   @override
+  Widget build(BuildContext context) => SelectableBox(
+    selection: selection,
+    selectionColor: selectionColor,
+    child: BoxComponent(
+      key: componentKey,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: RichLinkCard(
+          url: node.url,
+          title: node.title,
+          description: node.description,
+          imageUrl: node.imageUrl,
+          domain: node.domain,
+          siteName: node.siteName,
+          allowInternalNoteLinks: allowInternalNoteLinks,
+        ),
+      ),
+    ),
+  );
+}
+
+/// A link preview card (image, title, description, site).
+class RichLinkCard extends StatelessWidget {
+  const RichLinkCard({
+    super.key,
+    this.url,
+    this.title,
+    this.description,
+    this.imageUrl,
+    this.domain,
+    this.siteName,
+    this.allowInternalNoteLinks = true,
+  });
+
+  final String? url;
+  final String? title;
+  final String? description;
+  final String? imageUrl;
+  final String? domain;
+  final String? siteName;
+  final bool allowInternalNoteLinks;
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final linkUrl = node.url ?? '';
+    final linkUrl = url ?? '';
     final parsedLink = Uri.tryParse(linkUrl);
     final canOpenLink =
         parsedLink != null &&
@@ -316,106 +359,96 @@ class AttachmentRichLinkCard extends StatelessWidget {
             parsedLink.scheme == 'https' ||
             (allowInternalNoteLinks && parsedLink.scheme == 'note'));
 
-    return SelectableBox(
-      selection: selection,
-      selectionColor: selectionColor,
-      child: BoxComponent(
-        key: componentKey,
+    return InkWell(
+      onTap: canOpenLink ? () => launchUrl(parsedLink) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: cs.outlineVariant.withValues(alpha: 0.4),
+          ),
+        ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: InkWell(
-            onTap: canOpenLink ? () => launchUrl(parsedLink) : null,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: cs.outlineVariant.withValues(alpha: 0.4),
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (imageUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    imageUrl!,
+                    height: 88,
+                    width: 88,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      height: 88,
+                      width: 88,
+                      color: cs.surfaceContainer,
+                      child: Icon(Icons.link, color: cs.onSurfaceVariant),
+                    ),
+                  ),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (node.imageUrl != null) ...[
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          node.imageUrl!,
-                          height: 88,
-                          width: 88,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            height: 88,
-                            width: 88,
-                            color: cs.surfaceContainer,
-                            child: Icon(Icons.link, color: cs.onSurfaceVariant),
+                    if (title != null) ...[
+                      Text(
+                        title!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      if (description != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
                           ),
                         ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          siteName ?? domain ?? linkUrl,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: cs.outline),
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                    ] else ...[
+                      Text(
+                        domain ?? linkUrl,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      if (domain != null && linkUrl.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            linkUrl,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ),
                     ],
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (node.title != null) ...[
-                            Text(
-                              node.title!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            if (node.description != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  node.description!,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: cs.onSurfaceVariant),
-                                ),
-                              ),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Text(
-                                node.siteName ?? node.domain ?? linkUrl,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(color: cs.outline),
-                              ),
-                            ),
-                          ] else ...[
-                            Text(
-                              node.domain ?? linkUrl,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            if (node.domain != null && linkUrl.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  linkUrl,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: cs.onSurfaceVariant),
-                                ),
-                              ),
-                          ],
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),

@@ -11,6 +11,9 @@ final class NoteTaskCompletion {
   final TaskCompletionResult result;
 }
 
+/// A task block's editable state, independent of the editor's node type.
+typedef NoteTaskState = ({bool isComplete, Map<String, dynamic> metadata});
+
 /// Applies task-domain transitions to a note block and returns a new block.
 ///
 /// Metadata is an edge representation of the task domain. Keeping its parsing
@@ -26,6 +29,27 @@ final class NoteTaskEditorCommands {
     DateTime? now,
     DateTime? scheduledAt,
   }) {
+    final (state, result) = completeState(
+      (isComplete: node.isComplete, metadata: node.metadata),
+      now: now,
+      scheduledAt: scheduledAt,
+    );
+    return NoteTaskCompletion(
+      node: node.copyTaskWith(
+        isComplete: state.isComplete,
+        metadata: state.metadata,
+      ),
+      result: result,
+    );
+  }
+
+  /// Completes the current occurrence of a task in [state].
+  (NoteTaskState, TaskCompletionResult) completeState(
+    NoteTaskState state, {
+    DateTime? now,
+    DateTime? scheduledAt,
+  }) {
+    final node = state;
     final hasTime = node.metadata['hasTime'] as bool? ?? false;
     final result =
         TaskCompletionCommand(
@@ -65,17 +89,25 @@ final class NoteTaskEditorCommands {
       metadata['completions'] = completions;
     }
 
-    return NoteTaskCompletion(
-      node: node.copyTaskWith(
-        isComplete: result.completed,
-        metadata: metadata,
-      ),
-      result: result,
-    );
+    return ((isComplete: result.completed, metadata: metadata), result);
   }
 
   TaskNode reopen(
     TaskNode node, {
+    DateTime? previousDue,
+    DateTime? scheduledAt,
+  }) {
+    final state = reopenState(
+      (isComplete: node.isComplete, metadata: node.metadata),
+      previousDue: previousDue,
+      scheduledAt: scheduledAt,
+    );
+    return node.copyTaskWith(isComplete: false, metadata: state.metadata);
+  }
+
+  /// Reopens a task (or one occurrence of a recurring task) in [state].
+  NoteTaskState reopenState(
+    NoteTaskState node, {
     DateTime? previousDue,
     DateTime? scheduledAt,
   }) {
@@ -94,11 +126,40 @@ final class NoteTaskEditorCommands {
       metadata['completions'] = completions;
     }
     metadata.remove('lastCompletedAt');
-    return node.copyTaskWith(isComplete: false, metadata: metadata);
+    return (isComplete: false, metadata: metadata);
   }
 
   TaskNode updateMetadata(
     TaskNode node, {
+    DateTime? dueDate,
+    String? recurrence,
+    bool clearDueDate = false,
+    bool clearRecurrence = false,
+    bool? hasTime,
+    String? reminder,
+    bool clearReminder = false,
+  }) {
+    final state = updateMetadataState(
+      (isComplete: node.isComplete, metadata: node.metadata),
+      dueDate: dueDate,
+      recurrence: recurrence,
+      clearDueDate: clearDueDate,
+      clearRecurrence: clearRecurrence,
+      hasTime: hasTime,
+      reminder: reminder,
+      clearReminder: clearReminder,
+    );
+    if (state == null) return node;
+    return node.copyTaskWith(
+      isComplete: state.isComplete,
+      metadata: state.metadata,
+    );
+  }
+
+  /// Changes a task's schedule or reminder in [node]; `null` when nothing
+  /// changes. A schedule change archives completions and reopens the task.
+  NoteTaskState? updateMetadataState(
+    NoteTaskState node, {
     DateTime? dueDate,
     String? recurrence,
     bool clearDueDate = false,
@@ -133,7 +194,7 @@ final class NoteTaskEditorCommands {
         dueDateChanged ||
         nextRecurrence != previousRecurrence ||
         nextHasTime != previousHasTime;
-    if (nextReminder == previousReminder && !scheduleChanged) return node;
+    if (nextReminder == previousReminder && !scheduleChanged) return null;
 
     if (clearDueDate) {
       metadata.remove('dueDate');
@@ -167,8 +228,8 @@ final class NoteTaskEditorCommands {
       metadata.remove('completions');
       metadata.remove('lastCompletedAt');
     }
-    return node.copyTaskWith(
-      isComplete: scheduleChanged ? false : null,
+    return (
+      isComplete: scheduleChanged ? false : node.isComplete,
       metadata: metadata,
     );
   }

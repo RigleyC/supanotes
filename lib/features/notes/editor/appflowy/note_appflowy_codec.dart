@@ -21,6 +21,16 @@ abstract final class NoteNodeKeys {
   static const metadata = 'noteMeta';
 }
 
+/// Inline attributes the synced document stores; editor-only styles such as
+/// inline code or colors (from paste or shortcuts) are dropped.
+const _storedAttributes = {
+  'bold',
+  'italic',
+  'strikethrough',
+  'underline',
+  'link',
+};
+
 const _nestableTypes = {
   BulletedListBlockKeys.type,
   NumberedListBlockKeys.type,
@@ -230,7 +240,9 @@ final class NoteAppFlowyCodec {
       final cleaned = attributes is Map
           ? {
               for (final entry in attributes.entries)
-                if (entry.value != null) entry.key as String: entry.value,
+                if (entry.value != null &&
+                    _storedAttributes.contains(entry.key))
+                  entry.key as String: entry.value,
             }
           : const <String, dynamic>{};
       final text = renamed['insert'] as String;

@@ -12,12 +12,19 @@ import 'package:supanotes/shared/widgets/app_snackbar.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-typedef _OpenAttachmentCallback =
-    Future<void> Function(String? url, {AttachmentReference? attachment});
+typedef _OpenAttachmentCallback = Future<void> Function(
+  String? url, {
+  AttachmentReference? attachment,
+});
 
 class DocumentAttachmentWidget extends StatelessWidget {
   const DocumentAttachmentWidget({
-    required this.componentKey, required this.nodeId, required this.attachmentId, required this.collapseImages, required this.selectionColor, super.key,
+    required this.componentKey,
+    required this.nodeId,
+    required this.attachmentId,
+    required this.collapseImages,
+    required this.selectionColor,
+    super.key,
     this.onDelete,
     this.fallbackAttachment,
     this.deliveryPreference = AttachmentDeliveryPreference.localFirst,
@@ -44,7 +51,7 @@ class DocumentAttachmentWidget extends StatelessWidget {
       key: componentKey,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: _DocumentAttachmentContent(
+        child: DocumentAttachmentContent(
           attachmentId: attachmentId,
           onDelete: onDelete,
           collapseImages: collapseImages,
@@ -57,8 +64,11 @@ class DocumentAttachmentWidget extends StatelessWidget {
   );
 }
 
-class _DocumentAttachmentContent extends ConsumerWidget {
-  const _DocumentAttachmentContent({
+/// The attachment itself (image, file pill, upload state), independent of
+/// the editor that hosts it.
+class DocumentAttachmentContent extends ConsumerWidget {
+  const DocumentAttachmentContent({
+    super.key,
     required this.attachmentId,
     required this.collapseImages,
     required this.deliveryPreference,
