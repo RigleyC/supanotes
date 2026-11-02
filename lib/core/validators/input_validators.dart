@@ -48,12 +48,3 @@ class ConfirmPasswordValidator {
     return null;
   }
 }
-
-class NonEmptyValidator {
-  static String? validate(String? value, {required String fieldName}) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName é obrigatório';
-    }
-    return null;
-  }
-}

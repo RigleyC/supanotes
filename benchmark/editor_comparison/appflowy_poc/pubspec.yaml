@@ -1,0 +1,20 @@
+name: appflowy_poc
+publish_to: none
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  appflowy_editor: ^6.2.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  editor_harness:
+    path: ../harness
+dependency_overrides:
+  # The 6.2.0 release does not compile on Flutter 3.47 (missing
+  # TextInputClient.onFocusReceived); upstream main has the fix.
+  appflowy_editor:
+    git:
+      url: https://github.com/AppFlowy-IO/appflowy-editor.git
+      ref: 01eccc6ee36bd07698bd80915289fe7070478cd2

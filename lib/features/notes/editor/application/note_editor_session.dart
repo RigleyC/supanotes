@@ -39,6 +39,9 @@ class NoteEditorSession implements NoteEditorSyncHandle {
   Future<void> flushNow() => syncSession.flushNow();
 
   @override
+  Future<bool> reconcileRemote() => syncSession.reconcileRemote();
+
+  @override
   Future<void> dispose() async {
     await syncSession.dispose();
     controller.dispose();

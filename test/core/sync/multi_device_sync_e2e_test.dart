@@ -97,6 +97,7 @@ NoteRemoteSyncCoordinator _buildCoordinator({
     ),
     noteApplier: NoteRemoteSyncNoteApplier(
       isActive: (_) => false,
+      reconcileActive: (_) async => false,
       syncPending: (_) async {},
       confirmedRevision: (_) async =>
           (await database.noteOperationsDao

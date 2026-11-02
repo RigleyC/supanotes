@@ -391,15 +391,6 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.noteId.equals(noteId))).go();
   }
 
-  Future<void> deleteStalePendingOps(String noteId, int minBaseRevision) async {
-    await (delete(pendingNoteOperations)..where(
-          (t) =>
-              t.noteId.equals(noteId) &
-              t.baseRevision.isSmallerThanValue(minBaseRevision),
-        ))
-        .go();
-  }
-
   Future<void> incrementAttempt(String operationId) async {
     final op = await (select(
       pendingNoteOperations,

@@ -118,9 +118,3 @@ class RenderListenableTransform extends RenderProxyBox {
     transform.multiply(_matrix);
   }
 }
-
-/// Scales by [scaleX] and [scaleY] (default [scaleX]) about [center].
-Matrix4 scaleAbout(Offset center, double scaleX, [double? scaleY]) =>
-    Matrix4.translationValues(center.dx, center.dy, 0)
-      ..scaleByDouble(scaleX, scaleY ?? scaleX, 1, 1)
-      ..translateByDouble(-center.dx, -center.dy, 0, 1);

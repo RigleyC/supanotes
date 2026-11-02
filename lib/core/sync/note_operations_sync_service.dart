@@ -243,11 +243,6 @@ class NoteOperationsSyncService {
     return _dao.getPendingOperations(noteId, ownerUserId: _actorId);
   }
 
-  /// Compatibility name retained for the integration sync harness.
-  Future<List<PendingNoteOperationData>> loadPendingProjection(String noteId) {
-    return getPendingOperations(noteId);
-  }
-
   Future<NoteSyncTelemetrySnapshot> telemetrySnapshot(String noteId) async {
     await _prepareAccountScope(noteId);
     final outboxCount = await _dao.getProjectedOutboxOperationCount(

@@ -48,7 +48,7 @@ class TaskOccurrenceTransition {
 /// Resolves the current occurrence and recurring completion transitions.
 ///
 /// Date arithmetic remains in [nextDueDate] and
-/// [advanceRecurringDueDate]. This module owns the meaning of the current
+/// [latestOccurrenceOnOrBefore]. This module owns the meaning of the current
 /// occurrence so editor actions and read projections use the same policy.
 class TaskOccurrencePolicy {
   const TaskOccurrencePolicy({this.clock});
@@ -271,41 +271,6 @@ class TaskOccurrencePolicy {
     final current = canonicalScheduledAt(now.toLocal(), hasTime: hasTime);
     return !scheduled.isAfter(current);
   }
-}
-
-List<TaskOccurrence> buildOccurrences({
-  required String taskId,
-  required DateTime? anchor,
-  required TaskRecurrence? recurrence,
-  required bool hasTime,
-  required DateTime now,
-  required Set<DateTime> completedScheduledAts,
-  int maxCount = 365,
-}) {
-  if (maxCount <= 0) return [];
-
-  final occurrence = TaskOccurrencePolicy(clock: () => now).resolveCurrent(
-    taskId: taskId,
-    anchor: anchor,
-    recurrence: recurrence,
-    hasTime: hasTime,
-    completedAtByScheduledAt: {
-      for (final scheduledAt in completedScheduledAts) scheduledAt: scheduledAt,
-    },
-  );
-  return occurrence == null ? [] : [occurrence];
-}
-
-DateTime nextOccurrenceDate({
-  required DateTime from,
-  required TaskRecurrence recurrence,
-  DateTime? anchor,
-}) {
-  return nextDueDate(
-    from: from,
-    recurrence: recurrence,
-    anchorDay: anchor?.day ?? from.day,
-  )!;
 }
 
 DateTime? _findCompletion(

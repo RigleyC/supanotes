@@ -623,6 +623,11 @@ void main() {
       expect(timers.single.delay, expectedBoundary.difference(now));
       expect(timers.single.delay, const Duration(minutes: 30));
     },
+    // The 2018-11-04 transition skipped local midnight only in Brazil's
+    // America/Sao_Paulo zone; elsewhere the scenario does not exist.
+    skip: DateTime(2018, 11, 4).hour == 1
+        ? false
+        : 'Requires the America/Sao_Paulo time zone (TZ=America/Sao_Paulo)',
   );
 
   test(

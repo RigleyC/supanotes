@@ -113,6 +113,9 @@ class _FakeNoteSyncHandle implements NoteEditorSyncHandle {
   Future<void> start() async {}
 
   @override
+  Future<bool> reconcileRemote() async => true;
+
+  @override
   Future<void> flushNow() async {
     flushCalls++;
   }

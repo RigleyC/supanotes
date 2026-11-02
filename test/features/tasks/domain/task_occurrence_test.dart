@@ -5,9 +5,9 @@ import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 void main() {
   final now = DateTime(2026, 7, 21, 10);
 
-  group('buildOccurrences - non-recurring', () {
+  group('current occurrence - non-recurring', () {
     test('returns single pending occurrence when dueDate is in future', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7, 25),
         recurrence: null,
@@ -22,7 +22,7 @@ void main() {
     });
 
     test('returns single overdue occurrence when dueDate is past', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7, 15),
         recurrence: null,
@@ -36,7 +36,7 @@ void main() {
     });
 
     test('returns completed occurrence when anchor matches a completion', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7, 15),
         recurrence: null,
@@ -50,7 +50,7 @@ void main() {
     });
 
     test('returns empty when anchor is null', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: null,
         recurrence: TaskRecurrence.daily,
@@ -63,9 +63,9 @@ void main() {
     });
   });
 
-  group('buildOccurrences - daily recurrence', () {
+  group('current occurrence - daily recurrence', () {
     test('advances missed occurrences to the current day', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
@@ -80,7 +80,7 @@ void main() {
     });
 
     test('does not keep missed completion history as overdue occurrences', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
@@ -96,7 +96,7 @@ void main() {
 
     test('keeps the current occurrence completed after early completion', () {
       final currentOccurrence = DateTime(2026, 7, 21);
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.daily,
@@ -111,7 +111,7 @@ void main() {
     });
 
     test('respects hasTime in date comparison', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7, 21, 14),
         recurrence: TaskRecurrence.daily,
@@ -131,9 +131,9 @@ void main() {
     });
   });
 
-  group('buildOccurrences - weekly recurrence', () {
+  group('current occurrence - weekly recurrence', () {
     test('keeps only the latest reached occurrence', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.weekly,
@@ -148,7 +148,7 @@ void main() {
     });
 
     test('does not show earlier missed weeks when the current week starts', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7, 7),
         recurrence: TaskRecurrence.weekly,
@@ -165,7 +165,7 @@ void main() {
     test(
       'a completion from a missed week does not reopen an old occurrence',
       () {
-        final result = buildOccurrences(
+        final result = _currentOccurrence(
           taskId: 't1',
           anchor: DateTime(2026, 7, 7),
           recurrence: TaskRecurrence.weekly,
@@ -181,9 +181,9 @@ void main() {
     );
   });
 
-  group('buildOccurrences - monthly recurrence', () {
+  group('current occurrence - monthly recurrence', () {
     test('advances to the latest reached month', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 1, 15),
         recurrence: TaskRecurrence.monthly,
@@ -198,7 +198,7 @@ void main() {
     });
 
     test('clamps day for month with fewer days', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 1, 31),
         recurrence: TaskRecurrence.monthly,
@@ -212,7 +212,7 @@ void main() {
     });
 
     test('returns to the anchor day after a short month', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 1, 31),
         recurrence: TaskRecurrence.monthly,
@@ -226,7 +226,7 @@ void main() {
     });
 
     test('keeps the first not-yet-started completed occurrence current', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 8, 12),
         recurrence: TaskRecurrence.weekly,
@@ -240,7 +240,7 @@ void main() {
     });
 
     test('keeps an overdue occurrence until the next date starts', () {
-      final beforeNext = buildOccurrences(
+      final beforeNext = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 8, 12),
         recurrence: TaskRecurrence.weekly,
@@ -248,7 +248,7 @@ void main() {
         now: DateTime(2026, 8, 18),
         completedScheduledAts: {},
       );
-      final atNext = buildOccurrences(
+      final atNext = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 8, 12),
         recurrence: TaskRecurrence.weekly,
@@ -264,9 +264,9 @@ void main() {
     });
   });
 
-  group('buildOccurrences - weekdays recurrence', () {
+  group('current occurrence - weekdays recurrence', () {
     test('skips weekends', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7),
         recurrence: TaskRecurrence.weekdays,
@@ -284,9 +284,9 @@ void main() {
     });
   });
 
-  group('buildOccurrences - edge cases', () {
+  group('current occurrence - edge cases', () {
     test('preserves time of day', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: DateTime(2026, 7, 21, 14, 30),
         recurrence: TaskRecurrence.daily,
@@ -301,22 +301,8 @@ void main() {
       }
     });
 
-    test('limits total occurrences by maxCount', () {
-      final result = buildOccurrences(
-        taskId: 't1',
-        anchor: DateTime(2026),
-        recurrence: TaskRecurrence.daily,
-        hasTime: false,
-        now: now,
-        completedScheduledAts: {},
-        maxCount: 10,
-      );
-
-      expect(result.length, lessThanOrEqualTo(10));
-    });
-
     test('same date is pending not overdue', () {
-      final result = buildOccurrences(
+      final result = _currentOccurrence(
         taskId: 't1',
         anchor: now,
         recurrence: null,
@@ -328,4 +314,25 @@ void main() {
       expect(result[0].status, OccurrenceStatus.pending);
     });
   });
+}
+
+/// The occurrence the task list shows for a task, as a 0- or 1-item list.
+List<TaskOccurrence> _currentOccurrence({
+  required String taskId,
+  required DateTime? anchor,
+  required TaskRecurrence? recurrence,
+  required bool hasTime,
+  required DateTime now,
+  required Set<DateTime> completedScheduledAts,
+}) {
+  final occurrence = TaskOccurrencePolicy(clock: () => now).resolveCurrent(
+    taskId: taskId,
+    anchor: anchor,
+    recurrence: recurrence,
+    hasTime: hasTime,
+    completedAtByScheduledAt: {
+      for (final scheduledAt in completedScheduledAts) scheduledAt: scheduledAt,
+    },
+  );
+  return occurrence == null ? [] : [occurrence];
 }

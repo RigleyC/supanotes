@@ -370,17 +370,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
   }
 
-  /// Returns every note that has unsynced local changes and is eligible for
-  /// sync (has a remote copy, is inbox, or has non-empty content).
-  /// Locally-created-then-deleted notes without a remote copy are excluded
-  /// to avoid wasted API calls.
-  Future<List<NoteData>> getDirtyNotes() {
-    return (select(notes)
-          ..where((t) => t.isDirty.equals(true))
-          ..where((t) => t.hasRemoteCopy.equals(true) | t.deletedAt.isNull()))
-        .get();
-  }
-
   /// Returns dirty tombstones for notes that are known to exist remotely.
   Future<List<NoteData>> getDirtyDeletedNotes() {
     return (select(notes)..where(

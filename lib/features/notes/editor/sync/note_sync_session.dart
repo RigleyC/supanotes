@@ -42,17 +42,12 @@ class NoteSyncSession implements NoteEditorSyncHandle {
   final void Function(Object error)? onTransientError;
   final void Function(Object error)? onProtocolError;
 
-  static const _pollBaseInterval = Duration(seconds: 2);
-  static const _pollMaxInterval = Duration(seconds: 30);
-
-  Timer? _pollTimer;
   Timer? _networkSyncTimer;
   StreamSubscription<AppLifecycleState>? _lifecycleSubscription;
-  Duration _pollInterval = _pollBaseInterval;
-  bool _pollingEnabled = false;
   bool _pollingPaused = false;
   bool _isClosing = false;
-  bool _isPolling = false;
+  Future<bool>? _reconciling;
+  bool _reconcileAgain = false;
   bool _disposed = false;
   bool _protocolFailed = false;
   bool _blockedByForeignSession = false;
@@ -127,7 +122,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
       _lifecycleSubscription = appLifecycleStates?.listen(
         _handleLifecycleState,
       );
-      _startPolling();
       if (_status == NoteSessionStatus.opening) {
         _setStatus(NoteSessionStatus.ready);
       }
@@ -146,9 +140,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
 
   void _handleLocalOperations(List<OperationRequest> _) {
     if (_isClosing || _disposed || !_captureLocalOperations) return;
-    // A local edit is a strong signal that the open note is active, so the
-    // next poll uses the base interval again.
-    _pollInterval = _pollBaseInterval;
     _scheduleNetworkSync();
   }
 
@@ -184,85 +175,67 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     );
   }
 
-  void _startPolling() {
-    _pollingEnabled = true;
-    _scheduleNextPoll();
-  }
-
-  void _scheduleNextPoll() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
-    if (_isClosing || _disposed || _protocolFailed || _pollingPaused) return;
-    _pollTimer = Timer(_pollInterval, () {
-      _pollTimer = null;
-      unawaited(pollNow());
-    });
-  }
-
   void _handleLifecycleState(AppLifecycleState state) {
     if (_isClosing || _disposed) return;
     final shouldPause = state != AppLifecycleState.resumed;
     if (shouldPause == _pollingPaused) return;
     _pollingPaused = shouldPause;
     if (shouldPause) {
-      _pollTimer?.cancel();
-      _pollTimer = null;
       _cancelScheduledNetworkSync();
       return;
     }
-    // Coming back to the foreground is the best moment to accept remote work,
-    // so the first poll runs immediately and the cadence restarts at its base.
-    _pollInterval = _pollBaseInterval;
-    unawaited(pollNow());
+    // Coming back to the foreground: push edits made before backgrounding.
+    // Remote changes arrive through the app-wide change feed, which also
+    // wakes on resume.
+    if (_captureLocalOperations) _scheduleNetworkSync();
   }
 
-  void _updatePollInterval({required bool hasChanges}) {
-    if (hasChanges) {
-      _pollInterval = _pollBaseInterval;
-      return;
+  /// Pulls remote changes for this note into the open editor.
+  ///
+  /// The session does not poll on its own: the app-wide change feed calls
+  /// this when it sees a change for a note that is open, so there is one
+  /// network loop for all notes instead of one per open editor. Local
+  /// pending operations are pushed first, which also returns the remote
+  /// operations that came before them.
+  @override
+  Future<bool> reconcileRemote() async {
+    if (_isClosing || _disposed || _protocolFailed) return false;
+    final running = _reconciling;
+    if (running != null) {
+      // A pass is already running; it may have fetched before this change
+      // was published, so queue exactly one more pass behind it.
+      _reconcileAgain = true;
+      return running;
     }
-    if (_pollInterval >= _pollMaxInterval) return;
-    final next = _pollInterval * 2;
-    _pollInterval = next > _pollMaxInterval ? _pollMaxInterval : next;
-  }
-
-  Future<void> pollNow() async {
-    if (_isClosing ||
-        _disposed ||
-        _protocolFailed ||
-        _isPolling ||
-        _pollingPaused) {
-      return;
-    }
-    _isPolling = true;
-    var hasChanges = false;
+    final pass = _reconcileLoop();
+    _reconciling = pass;
     try {
-      // Polling is already an explicit network opportunity. Consume a pending
-      // debounce so it cannot fire again immediately after this pass.
+      return await pass;
+    } finally {
+      _reconciling = null;
+    }
+  }
+
+  Future<bool> _reconcileLoop() async {
+    do {
+      _reconcileAgain = false;
+      if (_isClosing || _disposed || _protocolFailed) return false;
+      // This pass already pushes pending operations. Consume a scheduled
+      // debounce so it cannot fire again immediately afterwards.
       _cancelScheduledNetworkSync();
-      await _runSyncOperation('pollNow', () async {
+      await _runSyncOperation('reconcileRemote', () async {
         SyncResult? pendingResult;
         if (_captureLocalOperations) {
           pendingResult = await _syncPending();
         }
-        final result = pendingResult;
-        if (result?.hasReconciliationPayload ?? false) {
-          hasChanges = true;
-          return;
-        }
+        if (pendingResult?.hasReconciliationPayload ?? false) return;
         await syncService.pollAndReconcile(
           noteId,
-          onReconcile: (result) async {
-            hasChanges = true;
-            await _handleSyncResult(result);
-          },
+          onReconcile: _handleSyncResult,
         );
       });
-    } finally {
-      _isPolling = false;
-      _updatePollInterval(hasChanges: hasChanges);
-      if (_pollingEnabled) _scheduleNextPoll();
-    }
+    } while (_reconcileAgain);
+    return !_protocolFailed;
   }
 
   Future<void> _runSyncOperation(
@@ -347,9 +320,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
     if (_disposed) return;
     _isClosing = true;
     _setStatus(NoteSessionStatus.closing);
-    final restartPollingOnFailure = _pollingEnabled;
-    _pollingEnabled = false;
-    _pollTimer?.cancel();
     _cancelScheduledNetworkSync();
     unawaited(_lifecycleSubscription?.cancel());
     adapter.setCaptureLocalOperations(false);
@@ -372,9 +342,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
       _setStatus(NoteSessionStatus.syncError);
       adapter.onLocalOperations = _handleLocalOperations;
       adapter.setCaptureLocalOperations(_captureLocalOperations);
-      if (restartPollingOnFailure && !_protocolFailed) {
-        _startPolling();
-      }
       dev.log(
         'NoteSyncSession flush on dispose failed for $noteId',
         error: error,
@@ -403,7 +370,6 @@ class NoteSyncSession implements NoteEditorSyncHandle {
         setCaptureLocalOperations(false);
       }
       _protocolFailed = true;
-      _pollTimer?.cancel();
       _cancelScheduledNetworkSync();
       _setStatus(NoteSessionStatus.error);
       onProtocolError?.call(error);

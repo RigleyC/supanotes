@@ -28,6 +28,9 @@ class _ReadySyncHandle implements NoteEditorSyncHandle {
   Future<void> dispose() async {}
 
   @override
+  Future<bool> reconcileRemote() async => true;
+
+  @override
   Future<void> flushNow() async {}
 
   @override

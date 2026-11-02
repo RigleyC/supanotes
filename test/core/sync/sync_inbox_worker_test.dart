@@ -42,7 +42,7 @@ void main() {
                 ],
               );
             },
-        isNoteActive: (_) => false,
+        deferChange: (_) => false,
         applyChange: (change) async => applied.add(change.sequence),
       );
 
@@ -81,7 +81,7 @@ void main() {
               ),
             ],
           ),
-      isNoteActive: (_) => active,
+      deferChange: (_) => active,
       applyChange: (_) async => applied++,
     );
 
@@ -131,7 +131,7 @@ void main() {
               hasMore: false,
               changes: const [],
             ),
-        isNoteActive: (_) => false,
+        deferChange: (_) => false,
         applyChange: (change) async => applied.add(change.sequence),
       );
 

@@ -24,7 +24,6 @@ import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/daos/note_operations_pending_query.dart';
 import 'package:supanotes/core/database/daos/tasks_dao.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/core/database/tables/tasks.dart';
 import 'package:supanotes/core/notifications/local_notification_service.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/core/sync/note_outbox_worker.dart';
@@ -190,14 +189,6 @@ final taskOutboxWorkerProvider = Provider<TaskOutboxWorker?>((ref) {
   });
   return worker;
 });
-
-/// Independent tasks can be disabled after a legacy SQLite table is
-/// quarantined with rows. This provider intentionally does not wrap note
-/// errors, so the notes experience can continue independently.
-final taskStorageDiagnosticProvider =
-    FutureProvider.autoDispose<TaskStorageDiagnostic>((ref) {
-      return ref.watch(appDatabaseProvider).readTaskStorageDiagnostic();
-    });
 
 // ---------------------------------------------------------------------------
 // Note sync client

@@ -69,7 +69,12 @@ void main() {
     expect(mutation.result.scheduledAt, DateTime(2026, 9, 16, 9));
     expect(
       mutation.node.metadata['completions'],
-      containsPair('2026-09-16T09:00:00.000', '2026-09-16T15:00:00.000Z'),
+      // Completion time is stored in UTC; derive it from the local clock so
+      // the expectation holds in every machine time zone.
+      containsPair(
+        '2026-09-16T09:00:00.000',
+        DateTime(2026, 9, 16, 12).toUtc().toIso8601String(),
+      ),
     );
   });
 }

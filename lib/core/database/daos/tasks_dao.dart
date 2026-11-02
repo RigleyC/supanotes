@@ -112,18 +112,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return query.get();
   }
 
-  Future<List<PendingTaskOperationData>> getPendingOperationsForOwner(
-    String userId,
-  ) {
-    final query = select(pendingTaskOperations)
-      ..where((operation) => operation.ownerUserId.equals(userId))
-      ..orderBy([
-        (operation) => OrderingTerm(expression: operation.createdAt),
-        (operation) => OrderingTerm(expression: operation.ordinal),
-      ]);
-    return query.get();
-  }
-
   /// Returns task ids that still have durable work. Blocked operations are
   /// intentionally excluded; they require an explicit user-visible
   /// resolution instead of being retried by the background worker.
