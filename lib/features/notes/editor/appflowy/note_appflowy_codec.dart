@@ -23,13 +23,22 @@ abstract final class NoteNodeKeys {
 
 /// Inline attributes the synced document stores; editor-only styles such as
 /// inline code or colors (from paste or shortcuts) are dropped.
+///
+/// Italic is stored as `italics`, the name every existing note and older app
+/// version uses; AppFlowy calls it `italic`.
 const _storedAttributes = {
   'bold',
-  'italic',
+  'italics',
   'strikethrough',
   'underline',
   'link',
 };
+
+/// Stored attribute name -> AppFlowy attribute name, where they differ.
+const _editorNames = {'link': 'href', 'italics': 'italic', 'italic': 'italic'};
+
+/// AppFlowy attribute name -> stored attribute name, where they differ.
+const _storedNames = {'href': 'link', 'italic': 'italics'};
 
 const _nestableTypes = {
   BulletedListBlockKeys.type,
@@ -222,17 +231,16 @@ final class NoteAppFlowyCodec {
 
   static List<Map<String, dynamic>> _toEditorDelta(
     List<Map<String, dynamic>> ops,
-  ) => [for (final op in ops) _renameAttribute(op, from: 'link', to: 'href')];
+  ) => [for (final op in ops) _renameAttributes(op, _editorNames)];
 
   static List<Map<String, dynamic>> _fromEditorDelta(Object? raw) {
     if (raw is! List) return const [];
     final ops = <Map<String, dynamic>>[];
     for (final op in raw) {
       if (op is! Map || op['insert'] is! String || op['insert'] == '') continue;
-      final renamed = _renameAttribute(
+      final renamed = _renameAttributes(
         Map<String, dynamic>.from(op),
-        from: 'href',
-        to: 'link',
+        _storedNames,
       );
       // Toggling a style off can leave `{bold: null}` behind; it means "no
       // attribute", and keeping it would make equal text look different.
@@ -271,20 +279,20 @@ final class NoteAppFlowyCodec {
     return true;
   }
 
-  static Map<String, dynamic> _renameAttribute(
-    Map<String, dynamic> op, {
-    required String from,
-    required String to,
-  }) {
+  static Map<String, dynamic> _renameAttributes(
+    Map<String, dynamic> op,
+    Map<String, String> names,
+  ) {
     final attributes = op['attributes'];
-    if (attributes is! Map || !attributes.containsKey(from)) return op;
-    final renamed = <String, dynamic>{
-      for (final entry in attributes.entries)
-        if (entry.key == from)
-          to: entry.value
-        else
-          entry.key as String: entry.value,
+    if (attributes is! Map || !attributes.keys.any(names.containsKey)) {
+      return op;
+    }
+    return {
+      ...op,
+      'attributes': <String, dynamic>{
+        for (final entry in attributes.entries)
+          names[entry.key] ?? entry.key as String: entry.value,
+      },
     };
-    return {...op, 'attributes': renamed};
   }
 }

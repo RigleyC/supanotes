@@ -12,6 +12,7 @@ import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_style.dar
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
 
@@ -180,6 +181,10 @@ class _NoteEditorState extends State<NoteEditor> {
       child: Column(
         children: [
           Expanded(child: editor),
+          NoteSuggestionOverlay(
+            editorState: editorState,
+            currentNoteId: widget.noteId,
+          ),
           // Rebuilds only when editing starts or stops, not on every caret
           // move: the toolbar listens to the selection itself.
           ValueListenableBuilder<Selection?>(

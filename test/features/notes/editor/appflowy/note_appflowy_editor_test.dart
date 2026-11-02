@@ -19,7 +19,9 @@ NoteBlock _block(
 ]) => NoteBlock(
   id: id,
   type: type,
-  delta: [if (text.isNotEmpty) {'insert': text}],
+  delta: [
+    if (text.isNotEmpty) {'insert': text},
+  ],
   metadata: metadata,
 );
 
