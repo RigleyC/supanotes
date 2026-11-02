@@ -61,8 +61,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   Widget build(BuildContext context) {
     final isGridView = ref.watch(isGridViewProvider);
     final notesAsync = ref.watch(activeNotesProvider);
-    final trimmedSearchQuery = _searchQuery.trim();
-    final normalizedSearchQuery = trimmedSearchQuery.toLowerCase();
+    final normalizedSearchQuery = _searchQuery.trim().toLowerCase();
+    // Full-content matches come from the database; until they load, fall back
+    // to the title/excerpt already in memory so typing stays responsive.
+    final contentMatches = normalizedSearchQuery.isEmpty
+        ? null
+        : ref.watch(noteSearchMatchesProvider(normalizedSearchQuery)).value;
 
     return Scaffold(
       appBar: AppBar(
@@ -87,7 +91,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
             )
           else
             IconButton(icon: const Icon(Icons.search), onPressed: _openSearch),
-          IconButton(icon: const Icon(Icons.close), onPressed: _closeSearch),
+          if (_isSearching)
+            IconButton(icon: const Icon(Icons.close), onPressed: _closeSearch),
           NotesMoreMenu(
             isListView: !isGridView,
             onToggleViewMode: _toggleViewMode,
@@ -114,6 +119,9 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                   final filteredNotes = normalizedSearchQuery.isEmpty
                       ? notes
                       : notes.where((n) {
+                          if (contentMatches?.contains(n.id) ?? false) {
+                            return true;
+                          }
                           final bodyText = (n.excerpt ?? n.content)
                               .toLowerCase();
                           return n.title.toLowerCase().contains(
@@ -182,8 +190,14 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     unawaited(context.push(AppRoutes.note(id)));
   }
 
-  void _deleteNote(NoteModel note) {
-    unawaited(ref.read(notesRepositoryProvider).softDelete(note.id));
+  Future<void> _deleteNote(NoteModel note) async {
+    try {
+      await ref.read(notesRepositoryProvider).softDelete(note.id);
+    } on Object catch (error, stackTrace) {
+      debugPrint('Failed to delete note ${note.id}: $error\n$stackTrace');
+      if (mounted) AppMessenger.showError('Não foi possível apagar a nota');
+      return;
+    }
     if (!mounted) return;
     AppMessenger.showSuccess('Nota movida para a lixeira');
   }

@@ -169,15 +169,15 @@ class NoteOperationsSyncService {
     String? materializedDocumentJson,
   }) async {
     await _prepareAccountScope(noteId);
-    final pending = await _dao.getPendingOperations(
+    final last = await _dao.getLastPendingOperation(
       noteId,
       ownerUserId: _actorId,
     );
-    var ordinal = pending.isEmpty ? 0 : pending.last.ordinal + 1;
-    var baseRevision = pending.isEmpty
+    var ordinal = last == null ? 0 : last.ordinal + 1;
+    var baseRevision = last == null
         ? (await getConfirmedDocument(noteId))?.revision ??
               requests.first.baseRevision
-        : pending.last.baseRevision + 1;
+        : last.baseRevision + 1;
     final now = DateTime.now().toUtc();
     final operations = <PendingNoteOperationsCompanion>[];
     for (final request in requests) {

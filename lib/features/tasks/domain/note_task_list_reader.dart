@@ -21,7 +21,7 @@ class NoteTaskListReader {
   }) {
     final policy = TaskOccurrencePolicy(clock: clock);
     final result = <NoteTask>[];
-    for (final parsed in parseNoteTaskBlocks(documentJson)) {
+    for (final parsed in parseNoteTaskBlocks(documentJson, cacheKey: noteId)) {
       final occurrence = policy.resolveCurrent(
         taskId: parsed.blockId,
         anchor: parsed.dueDate,
@@ -66,7 +66,7 @@ class NoteTaskListReader {
     DateTime? createdAt,
   }) {
     return [
-      for (final parsed in parseNoteTaskBlocks(documentJson))
+      for (final parsed in parseNoteTaskBlocks(documentJson, cacheKey: noteId))
         NoteTask(
           noteId: noteId,
           blockId: parsed.blockId,

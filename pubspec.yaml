@@ -150,3 +150,6 @@ flutter:
     - assets/brand/
     - assets/icons/
     - assets/dividers/
+    # Bundled so text renders in the product font on first launch and
+    # offline, without a runtime download and the resulting re-layout.
+    - assets/google_fonts/

@@ -104,7 +104,9 @@ final sharedLinkDeliveryProvider = Provider<SharedLinkDelivery>((ref) {
 /// sync service
 /// because it serializes side effects across the whole app lifecycle.
 final shareIntakeCoordinatorProvider = Provider<ShareIntakeCoordinator>((ref) {
-  return ShareIntakeCoordinator(ref);
+  final coordinator = ShareIntakeCoordinator(ref);
+  ref.onDispose(coordinator.dispose);
+  return coordinator;
 });
 
 // ---------------------------------------------------------------------------

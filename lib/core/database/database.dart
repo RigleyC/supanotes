@@ -274,6 +274,15 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: _onUpgrade,
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
+      // WAL lets the many watched catalog/task queries read while the editor
+      // and outbox write, and with synchronous=NORMAL each commit no longer
+      // fsyncs the main database file. Autosaves and outbox batches happen
+      // several times per second while typing, so this keeps writes cheap.
+      // NORMAL is durable against app crashes; only an OS crash/power loss
+      // can roll back the very last commits, which the server sync tolerates.
+      // In-memory test databases ignore journal_mode.
+      await customStatement('PRAGMA journal_mode = WAL');
+      await customStatement('PRAGMA synchronous = NORMAL');
     },
   );
 

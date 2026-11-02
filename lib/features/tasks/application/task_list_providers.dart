@@ -253,8 +253,7 @@ List<TaskListItem> buildTaskList({
     }
   }
 
-  result.sort((left, right) => _compareTaskListItems(left, right, now));
-  return result;
+  return _sortTaskListItems(result, now);
 }
 
 /// Pure history projection. The list is sorted by the real completion instant.
@@ -466,16 +465,31 @@ Stream<List<TaskListItem>> _watchWithTemporalInvalidation({
     }
   }
 
+  // One autosave re-runs both the catalog and the document queries, so the
+  // combined source fires twice for the same change. Rebuilding the list on
+  // the next event-loop turn coalesces those into a single rebuild.
+  Timer? pendingEmit;
   final subscription = sources.listen(
     (snapshot) {
       latest = snapshot;
-      emit();
+      pendingEmit ??= Timer(Duration.zero, () {
+        pendingEmit = null;
+        emit();
+      });
     },
     onError: controller.addError,
-    onDone: controller.close,
+    onDone: () {
+      final hadPendingEmit = pendingEmit != null;
+      pendingEmit?.cancel();
+      pendingEmit = null;
+      if (hadPendingEmit) emit();
+      timer?.cancel();
+      unawaited(controller.close());
+    },
   );
   controller.onCancel = () async {
     timer?.cancel();
+    pendingEmit?.cancel();
     await subscription.cancel();
   };
   return controller.stream;
@@ -508,17 +522,68 @@ DateTime? _nextTaskListBoundary(Iterable<TaskListItem> items, DateTime now) {
   return next;
 }
 
-int _compareTaskListItems(TaskListItem left, TaskListItem right, DateTime now) {
-  final leftGroup = _taskGroup(left, now);
-  final rightGroup = _taskGroup(right, now);
-  if (leftGroup != rightGroup) return leftGroup - rightGroup;
-  final leftDate = left.dueDate;
-  final rightDate = right.dueDate;
+/// Sorts open tasks: overdue, today, upcoming, undated; then by canonical
+/// schedule, creation time and a stable UI key.
+///
+/// Sort keys are computed once per item. Building local [DateTime] values
+/// queries the platform time zone, and the previous comparator rebuilt up to
+/// ten of them per comparison (hundreds of thousands per sort for a large
+/// library), which made every task-list refresh take hundreds of milliseconds.
+List<TaskListItem> _sortTaskListItems(List<TaskListItem> items, DateTime now) {
+  final context = _TaskSortContext(now);
+  final keyed = [for (final item in items) _TaskSortKey.of(item, context)]
+    ..sort(_compareTaskSortKeys);
+  return [for (final key in keyed) key.item];
+}
+
+final class _TaskSortContext {
+  _TaskSortContext(DateTime now)
+    : nowWithTime = canonicalScheduledAt(now, hasTime: true),
+      nowDateOnly = canonicalScheduledAt(now, hasTime: false),
+      today = DateTime(now.year, now.month, now.day);
+
+  final DateTime nowWithTime;
+  final DateTime nowDateOnly;
+  final DateTime today;
+}
+
+final class _TaskSortKey {
+  const _TaskSortKey({
+    required this.item,
+    required this.group,
+    required this.canonicalDue,
+    required this.createdAt,
+    required this.uiKey,
+  });
+
+  factory _TaskSortKey.of(TaskListItem item, _TaskSortContext context) {
+    final due = item.dueDate;
+    final hasTime = item.hasTime;
+    final canonicalDue = due == null
+        ? null
+        : canonicalScheduledAt(due, hasTime: hasTime);
+    return _TaskSortKey(
+      item: item,
+      group: _taskGroup(due, canonicalDue, hasTime: hasTime, context: context),
+      canonicalDue: canonicalDue,
+      createdAt: item.createdAt,
+      uiKey: item.uiKey,
+    );
+  }
+
+  final TaskListItem item;
+  final int group;
+  final DateTime? canonicalDue;
+  final DateTime? createdAt;
+  final String uiKey;
+}
+
+int _compareTaskSortKeys(_TaskSortKey left, _TaskSortKey right) {
+  if (left.group != right.group) return left.group - right.group;
+  final leftDate = left.canonicalDue;
+  final rightDate = right.canonicalDue;
   if (leftDate != null && rightDate != null) {
-    final date = canonicalScheduledAt(
-      leftDate,
-      hasTime: left.hasTime,
-    ).compareTo(canonicalScheduledAt(rightDate, hasTime: right.hasTime));
+    final date = leftDate.compareTo(rightDate);
     if (date != 0) return date;
   } else if (leftDate != null) {
     return -1;
@@ -534,15 +599,17 @@ int _compareTaskListItems(TaskListItem left, TaskListItem right, DateTime now) {
   return left.uiKey.compareTo(right.uiKey);
 }
 
-int _taskGroup(TaskListItem item, DateTime now) {
-  final due = item.dueDate;
-  if (due == null) return 3;
-  final normalizedDue = canonicalScheduledAt(due, hasTime: item.hasTime);
-  final normalizedNow = canonicalScheduledAt(now, hasTime: item.hasTime);
-  if (normalizedDue.isBefore(normalizedNow)) return 0;
-  final today = DateTime(now.year, now.month, now.day);
+int _taskGroup(
+  DateTime? due,
+  DateTime? canonicalDue, {
+  required bool hasTime,
+  required _TaskSortContext context,
+}) {
+  if (due == null || canonicalDue == null) return 3;
+  final normalizedNow = hasTime ? context.nowWithTime : context.nowDateOnly;
+  if (canonicalDue.isBefore(normalizedNow)) return 0;
   final dueDay = DateTime(due.year, due.month, due.day);
-  if (dueDay == today) return 1;
+  if (dueDay == context.today) return 1;
   return 2;
 }
 

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/daos/note_links_dao.dart';
@@ -10,7 +11,8 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/notes/catalog/data/local/notes_local_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
-import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart' show NotesListScreen;
+import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart'
+    show NotesListScreen;
 
 /// Presentation-facing facade over the local notes database.
 ///
@@ -30,6 +32,9 @@ abstract class INotesRepository {
   Future<void> updateNoteIcon(String id, NoteIcon? icon);
   Future<void> toggleFavorite(String noteId);
   Future<void> softDelete(String id);
+
+  /// Ids of active notes whose full content contains [normalizedQuery].
+  Future<Set<String>> searchNoteIds(String normalizedQuery);
   Future<NoteModel> createLocalNote({required String id});
   Future<void> saveNoteSnapshot({required String id, required String content});
 }
@@ -53,9 +58,9 @@ class NotesRepository implements INotesRepository {
     } else {
       source = _local.watchActiveNotes();
     }
-    return source.map(
-      (rows) => rows.map(NoteModel.fromQueryResult).toList(),
-    );
+    return source
+        .map((rows) => rows.map(NoteModel.fromQueryResult).toList())
+        .distinct(listEquals);
   }
 
   /// Streams a single note by id.
@@ -63,7 +68,8 @@ class NotesRepository implements INotesRepository {
   Stream<NoteModel?> watchNoteById(String id) {
     return _local
         .watchNoteById(id)
-        .map((qr) => qr == null ? null : NoteModel.fromQueryResult(qr));
+        .map((qr) => qr == null ? null : NoteModel.fromQueryResult(qr))
+        .distinct();
   }
 
   @override
@@ -150,6 +156,11 @@ class NotesRepository implements INotesRepository {
   }
 
   @override
+  Future<Set<String>> searchNoteIds(String normalizedQuery) {
+    return _local.searchNoteIds(normalizedQuery);
+  }
+
+  @override
   Future<NoteModel> createLocalNote({required String id}) async {
     final existing = await _local.getNoteById(id);
     if (existing != null) return NoteModel.fromQueryResult(existing);
@@ -223,16 +234,17 @@ class NotesRepository implements INotesRepository {
 /// of chaining through [notesLocalRepositoryProvider]. This avoids the
 /// 3-level autoDispose cascade that triggers setState() during build when
 /// [NotesListScreen] first mounts and the intermediate provider is dirty.
-final Provider<INotesRepository> notesRepositoryProvider = Provider.autoDispose<INotesRepository>((ref) {
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) {
-    throw StateError('notesRepositoryProvider: unauthenticated');
-  }
-  final db = ref.watch(appDatabaseProvider);
-  final local = NotesLocalRepository(db.notesDao, userId);
-  return NotesRepository(
-    local,
-    db.userNotePreferencesDao,
-    noteLinksDao: db.noteLinksDao,
-  );
-});
+final Provider<INotesRepository> notesRepositoryProvider =
+    Provider.autoDispose<INotesRepository>((ref) {
+      final userId = ref.watch(currentUserIdProvider);
+      if (userId == null) {
+        throw StateError('notesRepositoryProvider: unauthenticated');
+      }
+      final db = ref.watch(appDatabaseProvider);
+      final local = NotesLocalRepository(db.notesDao, userId);
+      return NotesRepository(
+        local,
+        db.userNotePreferencesDao,
+        noteLinksDao: db.noteLinksDao,
+      );
+    });

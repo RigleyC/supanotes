@@ -58,6 +58,11 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_handleAppResumed());
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      // The share extension runs while the app is in the background, so a
+      // debounced index update must not be left pending.
+      unawaited(ref.read(shareIntakeCoordinatorProvider).flushNotesIndex());
     }
   }
 
@@ -134,9 +139,9 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
     });
     ref.listen(activeNotesProvider, (_, next) {
       next.whenData((notes) {
-        unawaited(
-          ref.read(shareIntakeCoordinatorProvider).publishNotesIndex(notes),
-        );
+        ref
+            .read(shareIntakeCoordinatorProvider)
+            .schedulePublishNotesIndex(notes);
       });
     });
 

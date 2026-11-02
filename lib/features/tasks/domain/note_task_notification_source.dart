@@ -45,22 +45,41 @@ class NoteTaskNotificationSource implements TaskNotificationSource {
         ]);
       }
 
+      // One autosave writes both `notes` and `local_note_documents`, so both
+      // watched queries re-run for the same change. Coalescing them into one
+      // event-loop turn avoids rebuilding every reminder twice per save.
+      Timer? pendingEmit;
+      void scheduleEmit() {
+        if (pendingEmit != null) return;
+        pendingEmit = Timer(Duration.zero, () {
+          pendingEmit = null;
+          try {
+            emit();
+          } on Object catch (error, stackTrace) {
+            // A malformed document must surface on the stream instead of
+            // escaping as an uncaught timer error.
+            controller.addError(error, stackTrace);
+          }
+        });
+      }
+
       final notesSubscription = notes.listen((authorizedNotes) {
         latestAuthorizedNoteIds = {
           for (final note in authorizedNotes) note.note.id,
         };
         notesReady = true;
-        emit();
+        scheduleEmit();
       }, onError: controller.addError);
       final documentsSubscription = documents.listen((nextDocuments) {
         latestDocuments = nextDocuments;
         documentsReady = true;
-        emit();
+        scheduleEmit();
       }, onError: controller.addError);
       final timer = Timer.periodic(const Duration(minutes: 1), (_) => emit());
 
       controller.onCancel = () async {
         timer.cancel();
+        pendingEmit?.cancel();
         await notesSubscription.cancel();
         await documentsSubscription.cancel();
       };

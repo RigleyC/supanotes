@@ -211,6 +211,12 @@ class FakeNotesLocalRepository implements NotesLocalRepository {
   Stream<List<NoteQueryResult>> watchFavorites() => const Stream.empty();
 
   @override
+  Future<Set<String>> searchNoteIds(String normalizedQuery) async => {
+    for (final note in _store.values)
+      if (note.content.toLowerCase().contains(normalizedQuery)) note.id,
+  };
+
+  @override
   Stream<NoteQueryResult?> watchNoteById(String id) => const Stream.empty();
 
   @override

@@ -55,19 +55,63 @@ class ShareIntakeCoordinator {
   String? _publishedForUserId;
   String? _publishedAccessToken;
 
+  /// Delay before a catalog change is mirrored to the native share index.
+  ///
+  /// The catalog emits on every autosave while the user types. Each publish
+  /// serializes the whole index over a platform channel and the native side
+  /// writes it to disk on the platform (UI) thread, so publishing is coalesced
+  /// until edits settle. [flushNotesIndex] publishes immediately (e.g. when
+  /// the app is backgrounded, which is when the share extension can run).
+  static const notesIndexDebounce = Duration(seconds: 3);
+
+  Timer? _notesIndexTimer;
+  List<NoteModel>? _pendingNotesIndex;
+  String? _lastPublishedNotesIndex;
+
   /// Best-effort refresh of the note index exposed to the share extension.
   /// A stale index only affects what the extension suggests; failures are
-  /// logged and retried on the next notes emission.
+  /// logged and retried on the next notes emission. An index identical to the
+  /// last published one is not sent again.
   Future<void> publishNotesIndex(List<NoteModel> notes) async {
+    _notesIndexTimer?.cancel();
+    _notesIndexTimer = null;
+    _pendingNotesIndex = null;
     final user = _ref.read(authControllerProvider).asData?.value;
     if (user == null) return;
     try {
-      await _ref
-          .read(nativeShareBridgeProvider)
-          .publishNotesIndex(ShareNoteIndex.fromNotes(user.id, notes));
+      final index = ShareNoteIndex.fromNotes(user.id, notes);
+      final encoded = index.encode();
+      if (encoded == _lastPublishedNotesIndex) return;
+      await _ref.read(nativeShareBridgeProvider).publishNotesIndex(index);
+      _lastPublishedNotesIndex = encoded;
     } catch (error) {
       debugPrint('Error publishing native share index: $error');
     }
+  }
+
+  /// Coalesces catalog updates and publishes the latest one after
+  /// [notesIndexDebounce].
+  void schedulePublishNotesIndex(List<NoteModel> notes) {
+    _pendingNotesIndex = notes;
+    _notesIndexTimer?.cancel();
+    _notesIndexTimer = Timer(notesIndexDebounce, () {
+      _notesIndexTimer = null;
+      final pending = _pendingNotesIndex;
+      if (pending != null) unawaited(publishNotesIndex(pending));
+    });
+  }
+
+  /// Publishes a pending debounced index right away, if there is one.
+  Future<void> flushNotesIndex() async {
+    final pending = _pendingNotesIndex;
+    if (pending == null) return;
+    await publishNotesIndex(pending);
+  }
+
+  /// Cancels a pending debounced publish.
+  void dispose() {
+    _notesIndexTimer?.cancel();
+    _notesIndexTimer = null;
   }
 
   /// Keeps the native credential store in sync with the auth session:

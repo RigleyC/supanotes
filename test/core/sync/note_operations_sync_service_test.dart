@@ -74,6 +74,21 @@ void main() {
     when(
       () => mockDao.getNoteDocument(any()),
     ).thenAnswer((_) async => null);
+    // The service reads only the outbox tail when appending. Derive it from
+    // the per-test getPendingOperations stubs so each scenario declares the
+    // outbox contents once.
+    when(
+      () => mockDao.getLastPendingOperation(
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((invocation) async {
+      final pending = await mockDao.getPendingOperations(
+        invocation.positionalArguments.first as String,
+        ownerUserId: invocation.namedArguments[#ownerUserId] as String?,
+      );
+      return pending.isEmpty ? null : pending.last;
+    });
     when(
       () =>
           mockDao.getSyncSession(any(), ownerUserId: any(named: 'ownerUserId')),

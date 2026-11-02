@@ -234,6 +234,28 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     return query.get();
   }
 
+  /// Returns the highest-ordinal pending operation for [noteId], or `null`.
+  ///
+  /// Appending a batch only needs the tail of the outbox; reading every
+  /// pending row (with payloads) made each keystroke batch O(outbox size)
+  /// while offline.
+  Future<PendingNoteOperationData?> getLastPendingOperation(
+    String noteId, {
+    String? ownerUserId,
+  }) {
+    final query = select(pendingNoteOperations)
+      ..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    query
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.ordinal, mode: OrderingMode.desc),
+      ])
+      ..limit(1);
+    return query.getSingleOrNull();
+  }
+
   Future<String?> getNoteOwnerId(String noteId) async {
     final note = await (select(
       notes,
