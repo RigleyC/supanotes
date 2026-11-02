@@ -7,6 +7,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/appflowy/appflowy_note_adapter.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_task_commands.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
@@ -209,4 +210,38 @@ void main() {
       expect(await pending(), isEmpty);
     },
   );
+
+  test('completing a task syncs its completion', () async {
+    await open(_doc([_block('t', 'task', 'Leite')]));
+
+    await editorState.completeNoteTask('t', now: DateTime(2026, 9, 16, 10));
+
+    final ops = await pending();
+    expect(ops.single.kind, NoteOperationWireNames.setBlockMetadata);
+    expect(ops.single.blockId, 't');
+    final metadata =
+        (jsonDecode(ops.single.payloadJson) as Map)['metadata'] as Map;
+    expect(metadata['isCompleted'], isTrue);
+    expect(adapter.blocks.single.metadata['isCompleted'], isTrue);
+  });
+
+  test('completing a recurring occurrence is its own operation', () async {
+    await open(
+      _doc([
+        _block('t', 'task', 'Remédio', {
+          'dueDate': '2026-09-16T09:00:00.000',
+          'hasTime': true,
+          'recurrenceRule': 'daily',
+        }),
+      ]),
+    );
+
+    await editorState.completeNoteTask('t', now: DateTime(2026, 9, 16, 10));
+
+    final ops = await pending();
+    expect(ops.map((op) => op.kind), [
+      NoteOperationWireNames.completeTaskOccurrence,
+    ]);
+    expect(ops.single.blockId, 't');
+  });
 }

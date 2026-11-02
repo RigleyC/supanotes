@@ -20,7 +20,12 @@ class TaskMetadataDraft {
     this.completions = const {},
   });
 
-  factory TaskMetadataDraft.fromTaskNode(TaskNode node) {
+  factory TaskMetadataDraft.fromTaskNode(TaskNode node) =>
+      TaskMetadataDraft.fromMetadata(node.metadata);
+
+  /// Reads a task block's metadata, whatever editor holds the block.
+  factory TaskMetadataDraft.fromMetadata(Map<String, dynamic> metadata) {
+    final node = (metadata: metadata);
     final hasTime = node.metadata['hasTime'] as bool? ?? false;
     return TaskMetadataDraft(
       scheduleAnchor: parseScheduledAt(

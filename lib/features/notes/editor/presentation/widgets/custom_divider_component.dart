@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_divider_art.dart';
 import 'package:supanotes/shared/theme/app_colors.dart';
 import 'package:super_editor/super_editor.dart';
 
@@ -49,7 +49,8 @@ class CustomDividerComponentViewModel
     with SelectionAwareViewModelMixin {
   CustomDividerComponentViewModel({
     required super.nodeId,
-    required this.caretColor, this.dividerIndex,
+    required this.caretColor,
+    this.dividerIndex,
     super.createdAt,
     super.maxWidth,
     super.padding = EdgeInsets.zero,
@@ -85,7 +86,9 @@ class CustomDividerComponentViewModel
 
 class CustomDividerComponent extends StatelessWidget {
   const CustomDividerComponent({
-    required this.componentKey, required this.caretColor, super.key,
+    required this.componentKey,
+    required this.caretColor,
+    super.key,
     this.dividerIndex,
     this.selectionColor = AppColors.joiBlue,
     this.selection,
@@ -100,15 +103,8 @@ class CustomDividerComponent extends StatelessWidget {
   final bool showCaret;
   final double opacity;
 
-  // Number of available divider SVG assets
-  static const int _dividerCount = 35;
-
   @override
   Widget build(BuildContext context) {
-    final safeIndex = (dividerIndex ?? 1).clamp(1, _dividerCount);
-    final padIndex = safeIndex.toString().padLeft(2, '0');
-    final assetPath = 'assets/dividers/divider_$padIndex.svg';
-
     return IgnorePointer(
       child: SelectableBox(
         selection: selection,
@@ -116,16 +112,7 @@ class CustomDividerComponent extends StatelessWidget {
         child: BoxComponent(
           key: componentKey,
           opacity: opacity,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: SizedBox(
-              height: 16,
-              width: double.infinity,
-              child: RepaintBoundary(
-                child: SvgPicture.asset(assetPath, fit: BoxFit.fitWidth),
-              ),
-            ),
-          ),
+          child: NoteDividerArt(dividerIndex: dividerIndex),
         ),
       ),
     );

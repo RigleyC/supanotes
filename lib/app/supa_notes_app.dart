@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:appflowy_editor/appflowy_editor.dart'
+    show AppFlowyEditorLocalizations;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -146,6 +148,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
+        AppFlowyEditorLocalizations.delegate,
       ],
       supportedLocales: const [Locale('pt', 'BR'), Locale('en', 'US')],
       theme: AppTheme.lightTheme,
