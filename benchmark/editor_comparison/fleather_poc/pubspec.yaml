@@ -1,0 +1,13 @@
+name: fleather_poc
+publish_to: none
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  fleather: ^1.28.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  editor_harness:
+    path: ../harness
