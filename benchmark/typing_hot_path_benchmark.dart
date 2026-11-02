@@ -38,6 +38,10 @@ final bool _catalog = _enabled.contains('catalog');
 final bool _reminder = _enabled.contains('reminder');
 final bool _tasks = _enabled.contains('tasks');
 
+/// `body` edits a paragraph in the middle of the note (the common case);
+/// `title` edits the note's first line, which the Tasks list displays.
+const _scenario = String.fromEnvironment('SCENARIO', defaultValue: 'body');
+
 void main() {
   test('typing hot path: autosave fan-out', () async {
     final database = AppDatabase.test();
@@ -101,9 +105,6 @@ void main() {
 
     final stopwatch = Stopwatch()..start();
     for (var save = 0; save < _saves; save++) {
-      final catalogBefore = catalogEmissions;
-      final reminderBefore = reminderEmissions;
-      final taskListBefore = taskListEmissions;
       final document = _document('note-0', edit: save + 1);
       await database.noteOperationsDao.saveMaterializedDocument(
         noteId: 'note-0',
@@ -112,13 +113,9 @@ void main() {
         excerpt: document.content.substring(0, 200),
         updatedAt: now.add(Duration(seconds: save + 1)),
       );
-      await _waitUntil(
-        () =>
-            observed(catalogBefore, catalogEmissions, enabled: _catalog) &&
-            observed(reminderBefore, reminderEmissions, enabled: _reminder) &&
-            observed(taskListBefore, taskListEmissions, enabled: _tasks),
-      );
-      await settle();
+      // Run until every consumer that reacts to this save has finished.
+      // Consumers that are not affected by the save do not emit at all.
+      await pumpEventQueue(times: 200);
     }
     stopwatch.stop();
 
@@ -126,8 +123,10 @@ void main() {
     // A benchmark reports its result on stdout.
     // ignore: avoid_print
     print(
-      'BENCHMARK typing_hot_path consumers=$_consumers notes=$_noteCount '
-      'saves=$_saves '
+      'BENCHMARK typing_hot_path scenario=$_scenario consumers=$_consumers '
+      'notes=$_noteCount '
+      'saves=$_saves emissions(catalog/reminder/tasks)='
+      '${catalogEmissions - 1}/${reminderEmissions - 1}/${taskListEmissions - 1} '
       'total=${stopwatch.elapsedMilliseconds}ms '
       'perSave=${perSave.toStringAsFixed(2)}ms',
     );
@@ -182,9 +181,11 @@ Future<void> _seed(AppDatabase database, DateTime now) async {
   final blocks = <Map<String, dynamic>>[];
   final content = StringBuffer();
   for (var p = 0; p < _paragraphsPerNote; p++) {
+    final edited =
+        edit > 0 && p == (_scenario == 'title' ? 0 : _paragraphsPerNote ~/ 2);
     final text =
-        'Paragraph $p of $noteId (edit $edit). Lorem ipsum dolor sit amet, '
-        'consectetur adipiscing elit, sed do eiusmod tempor incididunt.';
+        'Paragraph $p of $noteId${edited ? ' (edit $edit)' : ''}. Lorem ipsum '
+        'dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.';
     blocks.add({
       'id': '$noteId-p$p',
       'type': 'paragraph',

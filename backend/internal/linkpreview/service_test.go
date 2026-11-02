@@ -10,7 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -85,7 +84,7 @@ func TestRedirectPolicyRejectsUnsafeTargetAndLimitsChain(t *testing.T) {
 	require.ErrorIs(t, err, http.ErrUseLastResponse)
 }
 
-func TestFetchParsesHTMLAndCachesByNormalizedURL(t *testing.T) {
+func TestFetchParsesHTMLAndReportsNormalizedURL(t *testing.T) {
 	t.Parallel()
 
 	var requests atomic.Int32
@@ -97,8 +96,7 @@ func TestFetchParsesHTMLAndCachesByNormalizedURL(t *testing.T) {
 	defer server.Close()
 
 	svc := newService(serviceOptions{
-		client:   server.Client(),
-		cacheTTL: time.Minute,
+		client: server.Client(),
 		normalizeURL: func(rawURL string) (*url.URL, string, error) {
 			parsed, err := url.Parse(rawURL)
 			if err != nil {
@@ -115,34 +113,11 @@ func TestFetchParsesHTMLAndCachesByNormalizedURL(t *testing.T) {
 	require.Equal(t, "https://cdn.example.com/i.png", preview.ImageURL)
 	require.Equal(t, "http://example.com/page", preview.URL)
 
-	preview, err = svc.Fetch(context.Background(), server.URL+"/page")
-	require.NoError(t, err)
-	require.Equal(t, "Title", preview.Title)
 	require.Equal(t, int32(1), requests.Load())
-	require.Equal(t, Metrics{CacheEntries: 1, CacheCapacity: defaultCacheCapacity}, svc.Metrics())
+	require.Equal(t, Metrics{}, svc.Metrics())
 }
 
-func TestCacheExpiresAndEvictsOldestEntry(t *testing.T) {
-	t.Parallel()
-
-	now := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
-	cache := newPreviewCache(1, time.Minute, func() time.Time { return now })
-	cache.set("first", &Preview{Title: "first"})
-	cache.set("second", &Preview{Title: "second"})
-
-	_, ok := cache.get("first")
-	require.False(t, ok)
-
-	second, ok := cache.get("second")
-	require.True(t, ok)
-	require.Equal(t, "second", second.Title)
-
-	now = now.Add(time.Minute + time.Nanosecond)
-	_, ok = cache.get("second")
-	require.False(t, ok)
-}
-
-func TestMetricsExposeBlockedFetchesAndCacheOccupancy(t *testing.T) {
+func TestMetricsExposeBlockedFetches(t *testing.T) {
 	t.Parallel()
 
 	svc := newService(serviceOptions{})
@@ -152,8 +127,6 @@ func TestMetricsExposeBlockedFetchesAndCacheOccupancy(t *testing.T) {
 
 	metrics := svc.Metrics()
 	require.Equal(t, int64(1), metrics.BlockedFetches)
-	require.Equal(t, 0, metrics.CacheEntries)
-	require.Equal(t, defaultCacheCapacity, metrics.CacheCapacity)
 	require.Equal(t, "http://127.0.0.1", SafeURLSummary("http://127.0.0.1/private?token=secret"))
 }
 
@@ -236,7 +209,6 @@ func TestFetchDeduplicatesConcurrentRequests(t *testing.T) {
 func newTestService(server *httptest.Server, maxBodyBytes int64) *service {
 	return newService(serviceOptions{
 		client:       server.Client(),
-		cacheTTL:     time.Minute,
 		maxBodyBytes: maxBodyBytes,
 		normalizeURL: func(rawURL string) (*url.URL, string, error) {
 			parsed, err := url.Parse(rawURL)

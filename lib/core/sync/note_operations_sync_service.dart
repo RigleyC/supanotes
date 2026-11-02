@@ -476,6 +476,13 @@ class NoteOperationsSyncService {
   }
 
   Future<SyncResult> _pollAndReconcileWithoutSessionGate(String noteId) async {
+    // A local-only note has nothing to pull. Its local materialization creates
+    // a document row at revision 0, so the row alone does not prove the note
+    // exists remotely; polling it made the server answer 403 and the open
+    // editor switched to read-only one poll after a new note was created.
+    if (await _dao.isNoteLocalOnly(noteId)) {
+      return SyncResult.empty();
+    }
     final confirmed = await _dao.getNoteDocument(noteId);
     if (confirmed == null) {
       return SyncResult.empty();

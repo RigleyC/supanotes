@@ -74,6 +74,9 @@ void main() {
     when(
       () => mockDao.getNoteDocument(any()),
     ).thenAnswer((_) async => null);
+    when(
+      () => mockDao.isNoteLocalOnly(any()),
+    ).thenAnswer((_) async => false);
     // The service reads only the outbox tail when appending. Derive it from
     // the per-test getPendingOperations stubs so each scenario declares the
     // outbox contents once.

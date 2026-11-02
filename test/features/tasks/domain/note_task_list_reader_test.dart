@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/tasks/domain/note_task_list_reader.dart';
+import 'package:supanotes/features/tasks/domain/note_task_reader.dart';
 
 Map<String, dynamic> _taskBlock({
   required String id,
@@ -39,15 +40,17 @@ void main() {
         ).read(
           noteId: 'note-1',
           noteTitle: 'Agenda',
-          documentJson: _document([
-            _taskBlock(
-              id: 'block-1',
-              title: 'Revisar contrato',
-              dueDate: '2026-09-01T09:00:00.000',
-              hasTime: true,
-              recurrenceRule: 'weekly',
-            ),
-          ]),
+          tasks: parseNoteTaskBlocks(
+            _document([
+              _taskBlock(
+                id: 'block-1',
+                title: 'Revisar contrato',
+                dueDate: '2026-09-01T09:00:00.000',
+                hasTime: true,
+                recurrenceRule: 'weekly',
+              ),
+            ]),
+          ),
         );
 
     expect(tasks, hasLength(1));
@@ -63,10 +66,12 @@ void main() {
         ).read(
           noteId: 'note-1',
           noteTitle: 'Agenda',
-          documentJson: _document([
-            _taskBlock(id: 'open', title: 'Sem data'),
-            _taskBlock(id: 'done', title: 'Concluída', isCompleted: true),
-          ]),
+          tasks: parseNoteTaskBlocks(
+            _document([
+              _taskBlock(id: 'open', title: 'Sem data'),
+              _taskBlock(id: 'done', title: 'Concluída', isCompleted: true),
+            ]),
+          ),
         );
 
     expect(tasks.map((task) => task.blockId), ['open', 'done']);
@@ -83,10 +88,12 @@ void main() {
         ).read(
           noteId: 'note-1',
           noteTitle: 'Agenda',
-          documentJson: _document([
-            _taskBlock(id: 'open', title: 'Em aberto'),
-            _taskBlock(id: 'done', title: 'Concluída', isCompleted: true),
-          ]),
+          tasks: parseNoteTaskBlocks(
+            _document([
+              _taskBlock(id: 'open', title: 'Em aberto'),
+              _taskBlock(id: 'done', title: 'Concluída', isCompleted: true),
+            ]),
+          ),
         );
 
     expect(tasks.map((task) => task.blockId), ['open', 'done']);

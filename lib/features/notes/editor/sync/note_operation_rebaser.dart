@@ -7,21 +7,25 @@ import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dar
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
 class NoteOp {
-
   NoteOp({
     required this.operationId,
     required this.actorId,
-    required this.kind, required this.blockId, required this.payload, this.revision,
-    this.cachedDelta,
+    required this.kind,
+    required this.blockId,
+    required this.payload,
+    this.revision,
+    this.delta,
   });
 
   factory NoteOp.fromData({
     required String operationId,
     required String actorId,
-    required String kind, required String? blockId, required Map<String, dynamic> payload, int? revision,
-    quill.Delta? cachedDelta,
+    required String kind,
+    required String? blockId,
+    required Map<String, dynamic> payload,
+    int? revision,
+    quill.Delta? delta,
   }) {
-    var delta = cachedDelta;
     if (delta == null &&
         kind == NoteOperationKind.textDelta.wireName &&
         payload.containsKey('ops')) {
@@ -37,7 +41,7 @@ class NoteOp {
       kind: kind,
       blockId: blockId,
       payload: payload,
-      cachedDelta: delta,
+      delta: delta,
     );
   }
   final String operationId;
@@ -46,18 +50,23 @@ class NoteOp {
   final String kind;
   final String? blockId;
   final Map<String, dynamic> payload;
-  final quill.Delta? cachedDelta;
+
+  /// The typed text delta of a `text_delta` operation, decoded once when the
+  /// operation is built. Transforms operate on it directly.
+  final quill.Delta? delta;
 }
 
 class NoteOperationRebaser {
-
   NoteOperationRebaser({required this.localActorId});
   final String localActorId;
 
   /// Pure rebase: transforms [pending] ops against [remote] ops, assigns
   /// sequential baseRevisions from [finalRevision], and omits no-ops.
   List<PendingNoteOperationData> rebase({
-    required List<PendingNoteOperationData> pending, required List<Operation> remote, required int finalRevision, List<PendingNoteOperationData>? inFlight,
+    required List<PendingNoteOperationData> pending,
+    required List<Operation> remote,
+    required int finalRevision,
+    List<PendingNoteOperationData>? inFlight,
     List<AcceptedOperation>? acceptedOps,
   }) {
     final acceptedRevisions = _acceptedRevisions(acceptedOps);
@@ -254,7 +263,7 @@ class NoteOperationRebaser {
         if (_sameBlockWasDeleted(opToTransform, appliedOp)) return null;
     }
 
-    return NoteOp(
+    return NoteOp.fromData(
       operationId: opToTransform.operationId,
       actorId: opToTransform.actorId,
       revision: opToTransform.revision,
@@ -287,11 +296,9 @@ class NoteOperationRebaser {
     if (operationOps == null || appliedOps == null) return operation;
 
     final operationDelta =
-        operation.cachedDelta ??
-        quill.Delta.fromJson(operationOps as List<dynamic>);
+        operation.delta ?? quill.Delta.fromJson(operationOps as List<dynamic>);
     final appliedDelta =
-        appliedOp.cachedDelta ??
-        quill.Delta.fromJson(appliedOps as List<dynamic>);
+        appliedOp.delta ?? quill.Delta.fromJson(appliedOps as List<dynamic>);
     final transformedDelta = appliedDelta.transform(
       operationDelta,
       !operationHasPriority,
@@ -306,7 +313,7 @@ class NoteOperationRebaser {
       kind: operation.kind,
       blockId: operation.blockId,
       payload: payload,
-      cachedDelta: transformedDelta,
+      delta: transformedDelta,
     );
   }
 

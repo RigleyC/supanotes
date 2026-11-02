@@ -60,8 +60,18 @@ class _NoteEditorState extends State<NoteEditor> {
   final _isImeConnected = ValueNotifier<bool>(false);
   late final KeyboardPanelController<Object> _keyboardPanelController;
   EditorControls? _controls;
-  Stylesheet? _cachedStylesheet;
-  ColorScheme? _cachedColorScheme;
+  // Derived from the theme in didChangeDependencies, which runs exactly when
+  // an inherited dependency such as Theme changes.
+  late Stylesheet _stylesheet;
+  late SelectionStyles _selectionStyles;
+  late List<SuperEditorLayerBuilder> _documentOverlayBuilders;
+  final _keyboardActions = editorKeyboardActions();
+
+  static const _documentPadding = EdgeInsets.only(
+    left: 24,
+    right: 24,
+    bottom: 24,
+  );
 
   CustomTaskComponentBuilder? _taskComponentBuilder;
   List<ComponentBuilder>? _componentBuilders;
@@ -77,6 +87,25 @@ class _NoteEditorState extends State<NoteEditor> {
       _softwareKeyboardController,
     );
     _attachSession(widget.session);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final colorScheme = Theme.of(context).colorScheme;
+    _stylesheet = mobileNoteStylesheet(
+      context,
+      documentPadding: _documentPadding,
+    );
+    _selectionStyles = editorSelectionStyle(colorScheme);
+    _documentOverlayBuilders = [
+      ...defaultSuperEditorDocumentOverlayBuilders.where(
+        (builder) => builder is! DefaultCaretOverlayBuilder,
+      ),
+      DefaultCaretOverlayBuilder(
+        caretStyle: CaretStyle(color: colorScheme.primary, width: 1.5),
+      ),
+    ];
   }
 
   void _attachSession(NoteEditorSession session) {
@@ -148,7 +177,7 @@ class _NoteEditorState extends State<NoteEditor> {
         attachmentDelivery: widget.attachmentDelivery,
       ),
       ...defaultComponentBuilders,
-    ];
+    ].map(RepaintIsolatedComponentBuilder.new).toList(growable: false);
   }
 
   void _configureHiddenTaskEditing() {
@@ -297,112 +326,103 @@ class _NoteEditorState extends State<NoteEditor> {
     }
     _initStableBuilders();
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const docPadding = EdgeInsets.only(
-          left: 24,
-          right: 24,
-          bottom: 24,
-        );
+    if (_isReadOnly) {
+      return SuperReader(
+        key: ValueKey<bool>(_isReadOnly),
+        editor: controller.editor,
+        documentLayoutKey: _docLayoutKey,
+        selectionLayerLinks: _selectionLayerLinks,
+        stylesheet: _stylesheet,
+        selectionStyle: _selectionStyles,
+        componentBuilders: _componentBuilders,
+        contentTapDelegateFactory: (readerContext) => NoteLinkTapHandler(
+          readerContext.document,
+          allowInternalNoteLinks: !_isReadOnly,
+          onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
+        ),
+      );
+    }
 
-        if (_cachedStylesheet == null ||
-            !identical(
-              _cachedColorScheme,
-              Theme.of(context).colorScheme,
-            ) ||
-            _cachedStylesheet!.documentPadding != docPadding) {
-          _cachedColorScheme = Theme.of(context).colorScheme;
-          _cachedStylesheet = mobileNoteStylesheet(
-            context,
-            documentPadding: docPadding,
-          );
-        }
-
-        if (_isReadOnly) {
-          return SuperReader(
-            key: ValueKey<bool>(_isReadOnly),
-            editor: controller.editor,
-            documentLayoutKey: _docLayoutKey,
-            selectionLayerLinks: _selectionLayerLinks,
-            stylesheet: _cachedStylesheet,
-            selectionStyle: editorSelectionStyle(
-              Theme.of(context).colorScheme,
-            ),
-            componentBuilders: _componentBuilders,
-            contentTapDelegateFactory: (readerContext) => NoteLinkTapHandler(
-              readerContext.document,
-              allowInternalNoteLinks: !_isReadOnly,
-              onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
-            ),
-          );
-        }
-
-        return KeyboardPanelScaffold<Object>(
-          controller: _keyboardPanelController,
-          isImeConnected: _isImeConnected,
-          contentBuilder: (context, _) => PopScope(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SuperEditorAndroidControlsScope(
-                    controller: _controls!.androidController,
-                    child: SuperEditorIosControlsScope(
-                      controller: _controls!.iosController,
-                      child: TapRegion(
-                        groupId: noteEditorToolbarTapRegionGroup,
-                        child: SuperEditor(
-                          key: ValueKey<bool>(_isReadOnly),
-                          editor: controller.editor,
-                          focusNode: controller.focusNode,
-                          autofocus: widget.requestInitialFocus,
-                          inputSource: TextInputSource.ime,
-                          softwareKeyboardController:
-                              _softwareKeyboardController,
-                          isImeConnected: _isImeConnected,
-                          documentLayoutKey: _docLayoutKey,
-                          selectionLayerLinks: _selectionLayerLinks,
-                          stylesheet: _cachedStylesheet,
-                          selectionStyle: editorSelectionStyle(
-                            Theme.of(context).colorScheme,
-                          ),
-                          documentOverlayBuilders: [
-                            ...defaultSuperEditorDocumentOverlayBuilders.where(
-                              (builder) =>
-                                  builder is! DefaultCaretOverlayBuilder,
-                            ),
-                            DefaultCaretOverlayBuilder(
-                              caretStyle: CaretStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                width: 1.5,
-                              ),
-                            ),
-                          ],
-                          contentTapDelegateFactories:
-                              _contentTapDelegateFactories,
-                          keyboardActions: editorKeyboardActions(),
-                          componentBuilders: _componentBuilders,
-                        ),
-                      ),
+    return KeyboardPanelScaffold<Object>(
+      controller: _keyboardPanelController,
+      isImeConnected: _isImeConnected,
+      contentBuilder: (context, _) => PopScope(
+        child: Column(
+          children: [
+            Expanded(
+              child: SuperEditorAndroidControlsScope(
+                controller: _controls!.androidController,
+                child: SuperEditorIosControlsScope(
+                  controller: _controls!.iosController,
+                  child: TapRegion(
+                    groupId: noteEditorToolbarTapRegionGroup,
+                    child: SuperEditor(
+                      key: ValueKey<bool>(_isReadOnly),
+                      editor: controller.editor,
+                      focusNode: controller.focusNode,
+                      autofocus: widget.requestInitialFocus,
+                      inputSource: TextInputSource.ime,
+                      softwareKeyboardController: _softwareKeyboardController,
+                      isImeConnected: _isImeConnected,
+                      documentLayoutKey: _docLayoutKey,
+                      selectionLayerLinks: _selectionLayerLinks,
+                      stylesheet: _stylesheet,
+                      selectionStyle: _selectionStyles,
+                      documentOverlayBuilders: _documentOverlayBuilders,
+                      contentTapDelegateFactories: _contentTapDelegateFactories,
+                      keyboardActions: _keyboardActions,
+                      componentBuilders: _componentBuilders,
                     ),
                   ),
                 ),
-                NoteSuggestionOverlay(
-                  editor: controller.editor,
-                  composer: controller.composer,
-                  currentNoteId: widget.noteId,
-                ),
-              ],
+              ),
             ),
-          ),
-          toolbarBuilder: (context, _) => NoteToolbar(
-            editor: controller.editor,
-            composer: controller.composer,
-            onAttachFile: () => _attachFile(),
-            onAttachImage: () => _attachFile(imageOnly: true),
-          ),
-          keyboardPanelBuilder: (_, _) => const SizedBox.shrink(),
-        );
-      },
+            NoteSuggestionOverlay(
+              editor: controller.editor,
+              composer: controller.composer,
+              currentNoteId: widget.noteId,
+            ),
+          ],
+        ),
+      ),
+      toolbarBuilder: (context, _) => NoteToolbar(
+        editor: controller.editor,
+        composer: controller.composer,
+        onAttachFile: () => _attachFile(),
+        onAttachImage: () => _attachFile(imageOnly: true),
+      ),
+      keyboardPanelBuilder: (_, _) => const SizedBox.shrink(),
     );
+  }
+}
+
+/// Gives every document block its own paint layer.
+///
+/// SuperEditor lays all blocks out in a single column without repaint
+/// boundaries, so typing one character or moving the selection repainted the
+/// text of every block in the note. Isolating each block (as `ListView` does
+/// per item) limits each frame's painting to the blocks that changed.
+@visibleForTesting
+final class RepaintIsolatedComponentBuilder implements ComponentBuilder {
+  const RepaintIsolatedComponentBuilder(this._inner);
+
+  final ComponentBuilder _inner;
+
+  @override
+  SingleColumnLayoutComponentViewModel? createViewModel(
+    Document document,
+    DocumentNode node,
+  ) => _inner.createViewModel(document, node);
+
+  @override
+  Widget? createComponent(
+    SingleColumnDocumentComponentContext componentContext,
+    SingleColumnLayoutComponentViewModel componentViewModel,
+  ) {
+    final component = _inner.createComponent(
+      componentContext,
+      componentViewModel,
+    );
+    return component == null ? null : RepaintBoundary(child: component);
   }
 }

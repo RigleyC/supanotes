@@ -40,41 +40,25 @@ class ParsedNoteTask {
   final List<TaskCompletionRecord> completionHistory;
 }
 
-/// Decodes task blocks from an effective document snapshot.
+/// A task block as stored in a note document: identity, text and the raw
+/// metadata object.
+typedef NoteTaskBlock = ({
+  String blockId,
+  String title,
+  Map<String, dynamic> metadata,
+});
+
+/// Extracts the task blocks of an effective document snapshot.
+///
+/// This runs once per saved note, when its document is persisted, to fill the
+/// local `note_tasks` projection. Readers then query that projection instead
+/// of decoding every note document on every change.
 ///
 /// [NoteDocumentCodec] remains the authority for document and metadata
-/// validation. Invalid snapshots are allowed to throw so callers can expose
-/// the error instead of silently hiding one note from a task list.
-///
-/// When [cacheKey] (normally the note id) is given, the result is memoized
-/// per key and reused while the document JSON is unchanged. Reminder and
-/// task-list streams re-read every visible note document whenever any note is
-/// saved (about once per second while typing), but only the edited note's
-/// JSON actually changes. Re-decoding and re-validating every other document
-/// on each save dominated the main isolate. Keeping one entry per note bounds
-/// memory to the size of the local library. Parsed tasks are immutable, which
-/// makes sharing them across calls safe.
-List<ParsedNoteTask> parseNoteTaskBlocks(
-  String documentJson, {
-  String? cacheKey,
-}) {
-  if (cacheKey == null) return _parseNoteTaskBlocksUncached(documentJson);
-  final cached = _parsedTaskCache[cacheKey];
-  if (cached != null && cached.json == documentJson) return cached.tasks;
-  final tasks = List<ParsedNoteTask>.unmodifiable(
-    _parseNoteTaskBlocksUncached(documentJson),
-  );
-  _parsedTaskCache[cacheKey] = (json: documentJson, tasks: tasks);
-  return tasks;
-}
-
-final _parsedTaskCache =
-    <String, ({String json, List<ParsedNoteTask> tasks})>{};
-
-/// Clears the memoized task parses (account switches and tests).
-void clearParsedNoteTaskCache() => _parsedTaskCache.clear();
-
-List<ParsedNoteTask> _parseNoteTaskBlocksUncached(String documentJson) {
+/// validation. Invalid snapshots throw so the projection can record the note
+/// as invalid and readers can expose the error instead of silently hiding one
+/// note from a task list.
+List<NoteTaskBlock> extractNoteTaskBlocks(String documentJson) {
   final json = jsonDecode(documentJson) as Map<String, dynamic>;
   final snapshot = const NoteDocumentCodec().parseSnapshot(
     json,
@@ -84,11 +68,18 @@ List<ParsedNoteTask> _parseNoteTaskBlocksUncached(String documentJson) {
   return [
     for (final block in snapshot.blocks)
       if (block.type == 'task')
-        _parseNoteTaskBlock(block.id, block.text, block.metadata),
+        (blockId: block.id, title: block.text, metadata: block.metadata),
   ];
 }
 
-ParsedNoteTask _parseNoteTaskBlock(
+/// Decodes the task blocks of an effective document snapshot.
+List<ParsedNoteTask> parseNoteTaskBlocks(String documentJson) => [
+  for (final block in extractNoteTaskBlocks(documentJson))
+    parseNoteTaskBlock(block.blockId, block.title, block.metadata),
+];
+
+/// Interprets one task block's metadata.
+ParsedNoteTask parseNoteTaskBlock(
   String blockId,
   String title,
   Map<String, dynamic> metadata,
@@ -106,8 +97,9 @@ ParsedNoteTask _parseNoteTaskBlock(
       metadata['recurrenceRule'] as String?,
     ),
     reminder: metadata['reminder'] as String?,
-    completions: Map.unmodifiable(
-      readScheduledCompletions(metadata['completions'], hasTime: hasTime),
+    completions: readScheduledCompletions(
+      metadata['completions'],
+      hasTime: hasTime,
     ),
     isCompleted: metadata['isCompleted'] as bool? ?? false,
     lastCompletedAt: _parseCompletedAt(metadata['lastCompletedAt']),
@@ -140,12 +132,12 @@ class NoteTaskReader {
   final DateTime Function()? clock;
 
   List<TaskNotificationEntry> read(
-    String documentJson, {
+    Iterable<ParsedNoteTask> tasks, {
     required String noteId,
   }) {
     final policy = TaskOccurrencePolicy(clock: clock);
     final entries = <TaskNotificationEntry>[];
-    for (final task in parseNoteTaskBlocks(documentJson, cacheKey: noteId)) {
+    for (final task in tasks) {
       final occurrence = policy.resolveNotificationOccurrence(
         taskId: task.blockId,
         anchor: task.dueDate,

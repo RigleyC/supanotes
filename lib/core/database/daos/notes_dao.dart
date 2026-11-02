@@ -497,7 +497,12 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
 
   /// Permanently removes a note from the local database.
   Future<void> hardDeleteNote(String id) async {
-    await (delete(notes)..where((t) => t.id.equals(id))).go();
+    await transaction(() async {
+      await (delete(notes)..where((t) => t.id.equals(id))).go();
+      await (delete(
+        attachedDatabase.noteTasks,
+      )..where((task) => task.noteId.equals(id))).go();
+    });
   }
 
   /// Stores a note that came back from the backend. Uses

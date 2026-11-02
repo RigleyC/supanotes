@@ -11,6 +11,9 @@ mixin _$NoteOperationsDaoMixin on DatabaseAccessor<AppDatabase> {
   $NoteSyncErrorsTable get noteSyncErrors => attachedDatabase.noteSyncErrors;
   $NotesTable get notes => attachedDatabase.notes;
   $SyncSessionsTable get syncSessions => attachedDatabase.syncSessions;
+  $NoteTasksTable get noteTasks => attachedDatabase.noteTasks;
+  $UserNotePreferencesTable get userNotePreferences =>
+      attachedDatabase.userNotePreferences;
   NoteOperationsDaoManager get managers => NoteOperationsDaoManager(this);
 }
 
@@ -36,4 +39,11 @@ class NoteOperationsDaoManager {
       $$NotesTableTableManager(_db.attachedDatabase, _db.notes);
   $$SyncSessionsTableTableManager get syncSessions =>
       $$SyncSessionsTableTableManager(_db.attachedDatabase, _db.syncSessions);
+  $$NoteTasksTableTableManager get noteTasks =>
+      $$NoteTasksTableTableManager(_db.attachedDatabase, _db.noteTasks);
+  $$UserNotePreferencesTableTableManager get userNotePreferences =>
+      $$UserNotePreferencesTableTableManager(
+        _db.attachedDatabase,
+        _db.userNotePreferences,
+      );
 }

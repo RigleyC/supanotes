@@ -66,3 +66,35 @@ final class MethodChannelNativeShareBridge implements NativeShareBridge {
   Future<void> clearPendingShare() =>
       _channel.invokeMethod('clearPendingShare');
 }
+
+/// Bridge for platforms without a native share extension (desktop, web).
+///
+/// Only Android and iOS register the `com.supanotes/share` channel. Calling it
+/// elsewhere threw `MissingPluginException` on every app resume, which
+/// surfaced as a "share delivery failed" error and an unhandled async error.
+final class NoopNativeShareBridge implements NativeShareBridge {
+  const NoopNativeShareBridge();
+
+  @override
+  Future<void> publishNotesIndex(ShareNoteIndex index) async {}
+
+  @override
+  Future<void> publishSessionCredentials({
+    required String ownerUserId,
+    required String accessToken,
+    required String refreshToken,
+    required String apiBaseUrl,
+  }) async {}
+
+  @override
+  Future<void> clearShareSession() async {}
+
+  @override
+  Future<void> retryPendingShares() async {}
+
+  @override
+  Future<PendingShare?> readPendingShare() async => null;
+
+  @override
+  Future<void> clearPendingShare() async {}
+}

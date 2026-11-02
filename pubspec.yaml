@@ -91,7 +91,9 @@ dependencies:
   material_shapes:
     git:
       url: https://github.com/kamranbekirovyz/bunpod.git
-      ref: main
+      # Pinned: upstream `main` no longer contains packages/material_shapes,
+      # so resolving the branch breaks fresh installs and upgrades.
+      ref: 849645d9a01b1ae1c3eba8e41bab61ab2870f9da
       path: packages/material_shapes
   flutter_local_notifications: ^22.0.1
   timezone: ^0.11.1

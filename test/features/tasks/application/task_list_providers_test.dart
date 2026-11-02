@@ -8,6 +8,8 @@ import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
+import 'package:supanotes/features/tasks/domain/note_task_reader.dart';
+import 'package:supanotes/features/tasks/domain/visible_note_tasks.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 
@@ -34,7 +36,7 @@ Task _task(
   updatedAt: createdAt,
 );
 
-VisibleNoteDocument _noteDocument({
+VisibleNoteTasks _noteDocument({
   required String noteId,
   required String blockId,
   required String title,
@@ -42,28 +44,30 @@ VisibleNoteDocument _noteDocument({
   bool isCompleted = false,
   String? lastCompletedAt,
   DateTime? createdAt,
-}) => VisibleNoteDocument(
+}) => VisibleNoteTasks(
   noteId: noteId,
   noteTitle: 'Origem',
   createdAt: createdAt,
-  documentJson: jsonEncode({
-    'schemaVersion': 1,
-    'blocks': [
-      {
-        'id': blockId,
-        'type': 'task',
-        'delta': [
-          {'insert': title},
-        ],
-        'metadata': {
-          if (dueDate != null) 'dueDate': dueDate,
-          'hasTime': false,
-          'isCompleted': isCompleted,
-          if (lastCompletedAt != null) 'lastCompletedAt': lastCompletedAt,
+  tasks: parseNoteTaskBlocks(
+    jsonEncode({
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': blockId,
+          'type': 'task',
+          'delta': [
+            {'insert': title},
+          ],
+          'metadata': {
+            if (dueDate != null) 'dueDate': dueDate,
+            'hasTime': false,
+            'isCompleted': isCompleted,
+            if (lastCompletedAt != null) 'lastCompletedAt': lastCompletedAt,
+          },
         },
-      },
-    ],
-  }),
+      ],
+    }),
+  ),
 );
 
 class _ManualTimer implements Timer {

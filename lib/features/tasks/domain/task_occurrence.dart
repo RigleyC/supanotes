@@ -237,58 +237,25 @@ class TaskOccurrencePolicy {
     required DateTime now,
     required Map<DateTime, DateTime> completedAtByScheduledAt,
   }) {
-    var scheduledAt = anchor;
-    DateTime? latestStarted;
-
-    for (var i = 0; i < 10000; i++) {
-      final hasStarted = _hasDateStarted(scheduledAt, now);
-
-      if (!hasStarted) {
-        final current = latestStarted ?? scheduledAt;
-        final currentCompletion = _findCompletion(
-          current,
-          hasTime: hasTime,
-          completedAtByScheduledAt: completedAtByScheduledAt,
-        );
-        return TaskOccurrence(
-          taskId: '',
-          scheduledAt: current,
-          status: currentCompletion != null
-              ? OccurrenceStatus.completed
-              : latestStarted == null
-              ? OccurrenceStatus.pending
-              : _isOverdue(current, now, hasTime)
-              ? OccurrenceStatus.overdue
-              : OccurrenceStatus.pending,
-          completedAt: currentCompletion,
-        );
-      }
-
-      // Keep the latest occurrence date visible, including after completion.
-      // A new timed occurrence replaces it at local midnight on its date.
-      latestStarted = scheduledAt;
-
-      final next = nextDueDate(
-        from: scheduledAt,
-        recurrence: recurrence,
-        anchorDay: anchor.day,
-      );
-      if (next == null || next.isAtSameMomentAs(scheduledAt)) break;
-      scheduledAt = next;
-    }
-
-    final result = latestStarted ?? scheduledAt;
+    // The current occurrence is the latest one whose date has started; before
+    // the anchor's date the anchor itself is upcoming.
+    final latestStarted = latestOccurrenceOnOrBefore(
+      anchor: anchor,
+      recurrence: recurrence,
+      today: now.toLocal(),
+    );
+    final current = latestStarted ?? anchor;
     final completedAt = _findCompletion(
-      result,
+      current,
       hasTime: hasTime,
       completedAtByScheduledAt: completedAtByScheduledAt,
     );
     return TaskOccurrence(
       taskId: '',
-      scheduledAt: result,
+      scheduledAt: current,
       status: completedAt != null
           ? OccurrenceStatus.completed
-          : _isOverdue(result, now, hasTime)
+          : latestStarted != null && _isOverdue(current, now, hasTime)
           ? OccurrenceStatus.overdue
           : OccurrenceStatus.pending,
       completedAt: completedAt,
@@ -303,17 +270,6 @@ class TaskOccurrencePolicy {
     final scheduled = canonicalScheduledAt(scheduledAt, hasTime: hasTime);
     final current = canonicalScheduledAt(now.toLocal(), hasTime: hasTime);
     return !scheduled.isAfter(current);
-  }
-
-  bool _hasDateStarted(DateTime scheduledAt, DateTime now) {
-    final scheduledDate = DateTime(
-      scheduledAt.year,
-      scheduledAt.month,
-      scheduledAt.day,
-    );
-    final current = now.toLocal();
-    final currentDate = DateTime(current.year, current.month, current.day);
-    return !scheduledDate.isAfter(currentDate);
   }
 }
 

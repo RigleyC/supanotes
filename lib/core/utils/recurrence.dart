@@ -33,6 +33,70 @@ DateTime? nextDueDate({
   return raw;
 }
 
+/// Returns the latest occurrence of the series anchored at [anchor] whose
+/// calendar date is on or before the calendar date of [today], or `null` when
+/// the anchor's own date is still in the future.
+///
+/// The series is the one produced by repeatedly applying [nextDueDate] from
+/// [anchor] (monthly occurrences keep the anchor's day, clamped to the month
+/// length). It is computed with calendar arithmetic in constant time instead
+/// of stepping through every occurrence since the anchor, which made old
+/// recurring tasks cost one local DateTime per elapsed day on every read.
+DateTime? latestOccurrenceOnOrBefore({
+  required DateTime anchor,
+  required TaskRecurrence recurrence,
+  required DateTime today,
+}) {
+  final anchorDay = _civilDay(anchor.year, anchor.month, anchor.day);
+  final todayDay = _civilDay(today.year, today.month, today.day);
+  final elapsed = todayDay - anchorDay;
+  if (elapsed < 0) return null;
+  switch (recurrence) {
+    case TaskRecurrence.daily:
+      return _copyWith(anchor, day: anchor.day + elapsed);
+    case TaskRecurrence.weekly:
+      return _copyWith(anchor, day: anchor.day + elapsed - elapsed % 7);
+    case TaskRecurrence.weekdays:
+      // The anchor always belongs to the series; later occurrences are the
+      // weekdays after it. Step back from today to the nearest weekday.
+      var offset = elapsed;
+      while (offset > 0 && _isWeekend(anchorDay + offset)) {
+        offset--;
+      }
+      return _copyWith(anchor, day: anchor.day + offset);
+    case TaskRecurrence.monthly:
+      var months =
+          (today.year - anchor.year) * 12 + (today.month - anchor.month);
+      var candidate = _monthlyOccurrence(anchor, months);
+      if (_civilDay(candidate.year, candidate.month, candidate.day) >
+          todayDay) {
+        months--;
+        candidate = _monthlyOccurrence(anchor, months);
+      }
+      return months <= 0 ? anchor : candidate;
+  }
+}
+
+DateTime _monthlyOccurrence(DateTime anchor, int monthsAfter) {
+  final monthIndex = anchor.month - 1 + monthsAfter;
+  final year = anchor.year + monthIndex ~/ 12;
+  final month = monthIndex % 12 + 1;
+  final lastDay = DateTime.utc(year, month + 1, 0).day;
+  final day = anchor.day <= lastDay ? anchor.day : lastDay;
+  return _copyWith(anchor, year: year, month: month, day: day);
+}
+
+/// Days since 1970-01-01 for a calendar date, independent of time zones.
+int _civilDay(int year, int month, int day) =>
+    DateTime.utc(year, month, day).millisecondsSinceEpoch ~/
+    Duration.millisecondsPerDay;
+
+/// 1970-01-01 was a Thursday.
+bool _isWeekend(int civilDay) {
+  final weekday = (civilDay + 3) % 7 + 1;
+  return weekday == DateTime.saturday || weekday == DateTime.sunday;
+}
+
 /// Returns the latest occurrence that has started at [now].
 ///
 /// A missed occurrence is not kept as a permanent backlog. The task advances

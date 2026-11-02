@@ -24,27 +24,6 @@ const double _taskCheckboxTouchHeight = 44;
 
 const _occurrencePolicy = TaskOccurrencePolicy();
 
-/// Slack that keeps cache pruning rare while still bounding entries for task
-/// blocks that no longer exist in the document.
-const int _occurrenceCacheSlack = 16;
-
-int _localDayKey() {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-}
-
-final class _TaskOccurrenceMemo {
-  const _TaskOccurrenceMemo({
-    required this.metadata,
-    required this.day,
-    required this.occurrence,
-  });
-
-  final TaskMetadataDraft metadata;
-  final int day;
-  final TaskOccurrence? occurrence;
-}
-
 class CustomTaskComponentBuilder implements ComponentBuilder {
   CustomTaskComponentBuilder({
     this.hideCompleted = false,
@@ -61,8 +40,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
   final Future<void> Function(String taskId, DateTime? scheduledAt)?
   onTaskReopen;
 
-  final Map<String, _TaskOccurrenceMemo> _occurrenceByNodeId = {};
-
   @override
   TaskComponentViewModel? createViewModel(
     Document document,
@@ -72,7 +49,15 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
 
     final metadata = TaskMetadataDraft.fromTaskNode(node);
     final isRecurring = metadata.recurrence != null;
-    final occurrence = _resolveOccurrence(document, node.id, metadata);
+    // Constant-time: the occurrence is computed arithmetically, not by
+    // walking the series, so it is cheap to resolve on every document change.
+    final occurrence = _occurrencePolicy.resolveCurrent(
+      taskId: node.id,
+      anchor: metadata.scheduleAnchor,
+      recurrence: metadata.recurrence,
+      hasTime: metadata.hasTime,
+      completedAtByScheduledAt: metadata.completions,
+    );
     final isComplete = isTaskOccurrenceCompleted(
       isComplete: node.isComplete,
       recurrence: metadata.recurrence,
@@ -107,48 +92,6 @@ class CustomTaskComponentBuilder implements ComponentBuilder {
       isRecurring: isRecurring,
       resolvedOccurrenceDate: occurrence?.scheduledAt,
       onCompletionChange: updateCompletion,
-    );
-  }
-
-  /// Resolving an occurrence walks every date between the task anchor and
-  /// today, and the view model layer runs for each visible block on every
-  /// document change. Task metadata is the only input that can change the
-  /// result besides the local day boundary, so both key the cache.
-  TaskOccurrence? _resolveOccurrence(
-    Document document,
-    String nodeId,
-    TaskMetadataDraft metadata,
-  ) {
-    final day = _localDayKey();
-    final cached = _occurrenceByNodeId[nodeId];
-    if (cached != null && cached.day == day && cached.metadata == metadata) {
-      return cached.occurrence;
-    }
-
-    _pruneOccurrenceCache(document);
-    final occurrence = _occurrencePolicy.resolveCurrent(
-      taskId: nodeId,
-      anchor: metadata.scheduleAnchor,
-      recurrence: metadata.recurrence,
-      hasTime: metadata.hasTime,
-      completedAtByScheduledAt: metadata.completions,
-    );
-    _occurrenceByNodeId[nodeId] = _TaskOccurrenceMemo(
-      metadata: metadata,
-      day: day,
-      occurrence: occurrence,
-    );
-    return occurrence;
-  }
-
-  void _pruneOccurrenceCache(Document document) {
-    if (_occurrenceByNodeId.length <=
-        document.nodeCount + _occurrenceCacheSlack) {
-      return;
-    }
-    final liveNodeIds = {for (final node in document) node.id};
-    _occurrenceByNodeId.removeWhere(
-      (nodeId, _) => !liveNodeIds.contains(nodeId),
     );
   }
 
@@ -208,28 +151,27 @@ class CustomTaskComponentViewModel extends TaskComponentViewModel {
   @override
   CustomTaskComponentViewModel copy() {
     return super.internalCopy(
-          CustomTaskComponentViewModel(
-            nodeId: nodeId,
-            createdAt: createdAt,
-            padding: padding,
-            text: text.copy(),
-            textStyleBuilder: textStyleBuilder,
-            opacity: opacity,
-            selectionColor: selectionColor,
-            indent: indent,
-            isComplete: isComplete,
-            setComplete: setComplete,
-            textDirection: textDirection,
-            textAlignment: textAlignment,
-            dueDate: dueDate,
-            recurrence: recurrence,
-            taskMetadata: taskMetadata,
-            isRecurring: isRecurring,
-            resolvedOccurrenceDate: resolvedOccurrenceDate,
-            onCompletionChange: onCompletionChange,
-          ),
-        )
-        as CustomTaskComponentViewModel;
+      CustomTaskComponentViewModel(
+        nodeId: nodeId,
+        createdAt: createdAt,
+        padding: padding,
+        text: text.copy(),
+        textStyleBuilder: textStyleBuilder,
+        opacity: opacity,
+        selectionColor: selectionColor,
+        indent: indent,
+        isComplete: isComplete,
+        setComplete: setComplete,
+        textDirection: textDirection,
+        textAlignment: textAlignment,
+        dueDate: dueDate,
+        recurrence: recurrence,
+        taskMetadata: taskMetadata,
+        isRecurring: isRecurring,
+        resolvedOccurrenceDate: resolvedOccurrenceDate,
+        onCompletionChange: onCompletionChange,
+      ),
+    ) as CustomTaskComponentViewModel;
   }
 
   @override

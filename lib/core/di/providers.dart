@@ -11,6 +11,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart' show Dio;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -92,6 +93,11 @@ final authControllerProvider = AsyncNotifierProvider<AuthController, User?>(
 );
 
 final nativeShareBridgeProvider = Provider<NativeShareBridge>((ref) {
+  if (kIsWeb ||
+      (defaultTargetPlatform != TargetPlatform.android &&
+          defaultTargetPlatform != TargetPlatform.iOS)) {
+    return const NoopNativeShareBridge();
+  }
   return MethodChannelNativeShareBridge();
 });
 
@@ -104,9 +110,7 @@ final sharedLinkDeliveryProvider = Provider<SharedLinkDelivery>((ref) {
 /// sync service
 /// because it serializes side effects across the whole app lifecycle.
 final shareIntakeCoordinatorProvider = Provider<ShareIntakeCoordinator>((ref) {
-  final coordinator = ShareIntakeCoordinator(ref);
-  ref.onDispose(coordinator.dispose);
-  return coordinator;
+  return ShareIntakeCoordinator(ref);
 });
 
 // ---------------------------------------------------------------------------

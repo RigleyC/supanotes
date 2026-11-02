@@ -26,11 +26,9 @@ func (h *Handler) Preview(c echo.Context) error {
 	if err != nil {
 		metrics := h.svc.Metrics()
 		c.Logger().Warnf(
-			"link preview failed target=%s errorClass=%T cacheEntries=%d cacheCapacity=%d blockedFetches=%d",
+			"link preview failed target=%s errorClass=%T blockedFetches=%d",
 			SafeURLSummary(rawURL),
 			err,
-			metrics.CacheEntries,
-			metrics.CacheCapacity,
 			metrics.BlockedFetches,
 		)
 		return web.JSONError(c, http.StatusUnprocessableEntity, "could not fetch preview")

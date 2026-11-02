@@ -3,9 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/utils/recurrence.dart';
 import 'package:supanotes/core/auth/current_user.dart';
-import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/features/tasks/data/task_repository.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_record.dart';
 import 'package:supanotes/features/tasks/domain/note_task_list_reader.dart';
@@ -15,6 +13,7 @@ import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
+import 'package:supanotes/features/tasks/domain/visible_note_tasks.dart';
 
 /// A clock boundary used by task list providers and easily replaced in tests.
 class TaskListClock {
@@ -33,95 +32,16 @@ final taskListClockProvider = Provider<TaskListClock>(
   (ref) => const TaskListClock(),
 );
 
-/// An effective, visible note document ready for task extraction.
-class VisibleNoteDocument {
-  const VisibleNoteDocument({
-    required this.noteId,
-    required this.noteTitle,
-    required this.documentJson,
-    this.createdAt,
-  });
-
-  factory VisibleNoteDocument.fromRows({
-    required NoteQueryResult note,
-    required LocalNoteDocumentData document,
-  }) {
-    final json = document.materializedDocumentJson;
-    if (json == null) {
-      throw StateError(
-        'Visible note ${note.note.id} has no effective document',
-      );
-    }
-    return VisibleNoteDocument(
-      noteId: note.note.id,
-      noteTitle: note.title,
-      documentJson: json,
-      createdAt: note.note.createdAt,
-    );
-  }
-
-  final String noteId;
-  final String noteTitle;
-  final String documentJson;
-  final DateTime? createdAt;
-}
-
-/// Visible notes are selected from the active catalog and joined with the
-/// materialized effective-document stream. This keeps deleted, archived,
-/// revoked and not-yet-hydrated notes out of the aggregation.
-final StreamProvider<List<VisibleNoteDocument>> taskNotesVisibilityProvider =
-    StreamProvider.autoDispose<List<VisibleNoteDocument>>((ref) {
+/// The tasks of the notes visible to the current account, read from the
+/// `note_tasks` projection.
+final StreamProvider<List<VisibleNoteTasks>> taskNotesVisibilityProvider =
+    StreamProvider.autoDispose<List<VisibleNoteTasks>>((ref) {
       final userId = ref.watch(currentUserIdProvider);
       if (userId == null || userId.isEmpty) {
         throw StateError('taskNotesVisibilityProvider requires an owner');
       }
-
-      return _watchVisibleNoteDocuments(
-        database: ref.watch(appDatabaseProvider),
-        userId: userId,
-      );
+      return watchVisibleNoteTasks(ref.watch(appDatabaseProvider), userId);
     });
-
-Stream<List<VisibleNoteDocument>> _watchVisibleNoteDocuments({
-  required AppDatabase database,
-  required String userId,
-}) {
-  final notes = database.notesDao.watchAllActiveNotes(userId);
-  final documents = database.noteOperationsDao.watchMaterializedDocuments();
-  return _combineLatest2(
-    notes,
-    documents,
-    (catalog, localDocuments) {
-      final byId = <String, LocalNoteDocumentData>{
-        for (final document in localDocuments) document.noteId: document,
-      };
-      final visible = <VisibleNoteDocument>[];
-      for (final note in catalog) {
-        // The DAO scopes rows to this account's ownership or membership. Keep
-        // this defense-in-depth check so a stale/alternate catalog stream
-        // cannot turn arbitrary permission metadata into task visibility.
-        final isAuthorizedPermission =
-            note.note.permission == 'view' || note.note.permission == 'edit';
-        if (note.note.userId != userId && !isAuthorizedPermission) {
-          continue;
-        }
-        if (note.note.deletedAt != null ||
-            note.note.lifecycleState == emptyDraftLifecycleState ||
-            (note.note.permission != null &&
-                note.note.permission != 'view' &&
-                note.note.permission != 'edit')) {
-          continue;
-        }
-        final document = byId[note.note.id];
-        if (document?.materializedDocumentJson == null) continue;
-        visible.add(
-          VisibleNoteDocument.fromRows(note: note, document: document!),
-        );
-      }
-      return visible;
-    },
-  );
-}
 
 final _taskListProviderFamily = StreamProvider.autoDispose
     .family<List<TaskListItem>, bool>(
@@ -142,10 +62,7 @@ final _taskListProviderFamily = StreamProvider.autoDispose
         }
         return _watchOpenTasks(
           standalone: standalone,
-          notes: _watchVisibleNoteDocuments(
-            database: database,
-            userId: userId,
-          ),
+          notes: watchVisibleNoteTasks(database, userId),
           clock: clock,
         );
       },
@@ -180,10 +97,7 @@ final _completedTaskHistoryProviderFamily = StreamProvider.autoDispose
         }
         return _combineLatest2(
           standalone,
-          _watchVisibleNoteDocuments(
-            database: ref.watch(appDatabaseProvider),
-            userId: userId,
-          ),
+          watchVisibleNoteTasks(ref.watch(appDatabaseProvider), userId),
           (rows, notes) => buildCompletedTaskHistory(
             standalone: rows.map(TaskRepository.fromData),
             notes: notes,
@@ -200,7 +114,7 @@ final completedTaskHistoryProvider = ({required bool includeNoteTasks}) =>
 /// Pure list projection used by the provider and result-focused tests.
 List<TaskListItem> buildTaskList({
   required Iterable<Task> standalone,
-  required Iterable<VisibleNoteDocument> notes,
+  required Iterable<VisibleNoteTasks> notes,
   required bool includeNoteTasks,
   required DateTime now,
 }) {
@@ -236,7 +150,7 @@ List<TaskListItem> buildTaskList({
       final noteTasks = clockReader.read(
         noteId: visibleNote.noteId,
         noteTitle: visibleNote.noteTitle,
-        documentJson: visibleNote.documentJson,
+        tasks: visibleNote.tasks,
         createdAt: visibleNote.createdAt,
       );
       for (final task in noteTasks) {
@@ -259,7 +173,7 @@ List<TaskListItem> buildTaskList({
 /// Pure history projection. The list is sorted by the real completion instant.
 List<TaskHistoryEntry> buildCompletedTaskHistory({
   required Iterable<Task> standalone,
-  required Iterable<VisibleNoteDocument> notes,
+  required Iterable<VisibleNoteTasks> notes,
   required bool includeNoteTasks,
 }) {
   final result = <TaskHistoryEntry>[];
@@ -335,7 +249,7 @@ List<TaskHistoryEntry> buildCompletedTaskHistory({
       for (final note in reader.readForHistory(
         noteId: visibleNote.noteId,
         noteTitle: visibleNote.noteTitle,
-        documentJson: visibleNote.documentJson,
+        tasks: visibleNote.tasks,
         createdAt: visibleNote.createdAt,
       )) {
         final completions = [...note.completionHistory];
@@ -402,7 +316,7 @@ String _completionIdentity(
 
 Stream<List<TaskListItem>> _watchOpenTasks({
   required Stream<List<TaskData>> standalone,
-  required Stream<List<VisibleNoteDocument>>? notes,
+  required Stream<List<VisibleNoteTasks>>? notes,
   required TaskListClock clock,
 }) {
   final standaloneTasks = standalone.map(
@@ -412,7 +326,7 @@ Stream<List<TaskListItem>> _watchOpenTasks({
     return _watchWithTemporalInvalidation(
       sources: _combineLatest2(
         standaloneTasks,
-        Stream.value(const <VisibleNoteDocument>[]),
+        Stream.value(const <VisibleNoteTasks>[]),
         (tasks, visibleNotes) => (tasks: tasks, notes: visibleNotes),
       ),
       clock: clock,
@@ -429,13 +343,12 @@ Stream<List<TaskListItem>> _watchOpenTasks({
 }
 
 Stream<List<TaskListItem>> _watchWithTemporalInvalidation({
-  required Stream<({List<Task> tasks, List<VisibleNoteDocument> notes})>
-  sources,
+  required Stream<({List<Task> tasks, List<VisibleNoteTasks> notes})> sources,
   required TaskListClock clock,
 }) {
   final controller = StreamController<List<TaskListItem>>();
   Timer? timer;
-  ({List<Task> tasks, List<VisibleNoteDocument> notes})? latest;
+  ({List<Task> tasks, List<VisibleNoteTasks> notes})? latest;
 
   void emit() {
     try {
@@ -465,31 +378,16 @@ Stream<List<TaskListItem>> _watchWithTemporalInvalidation({
     }
   }
 
-  // One autosave re-runs both the catalog and the document queries, so the
-  // combined source fires twice for the same change. Rebuilding the list on
-  // the next event-loop turn coalesces those into a single rebuild.
-  Timer? pendingEmit;
   final subscription = sources.listen(
     (snapshot) {
       latest = snapshot;
-      pendingEmit ??= Timer(Duration.zero, () {
-        pendingEmit = null;
-        emit();
-      });
+      emit();
     },
     onError: controller.addError,
-    onDone: () {
-      final hadPendingEmit = pendingEmit != null;
-      pendingEmit?.cancel();
-      pendingEmit = null;
-      if (hadPendingEmit) emit();
-      timer?.cancel();
-      unawaited(controller.close());
-    },
+    onDone: controller.close,
   );
   controller.onCancel = () async {
     timer?.cancel();
-    pendingEmit?.cancel();
     await subscription.cancel();
   };
   return controller.stream;
