@@ -1,118 +1,123 @@
 import 'dart:io';
 
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:mime/mime.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_upload.dart';
-import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
-import 'package:supanotes/features/notes/editor/document/empty_task_deletion_policy.dart';
-import 'package:supanotes/features/notes/editor/document/hidden_task_editing_guard.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_editor_state.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_task_commands.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
-import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart'
-    show RandomDividerConversionReaction;
-import 'package:supanotes/features/notes/editor/document/note_task_editor_commands.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
-import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
+import 'package:uuid/uuid.dart';
 
+/// Owns one open note's editor state and the edits the app makes to it
+/// (tasks, attachments) besides typing.
 class NoteEditorController {
   NoteEditorController({
     required this.userId,
     required String noteId,
-    List<DocumentNode>? nodes,
+    List<NoteBlock>? blocks,
   }) : _noteId = noteId,
-       document = MutableDocument(
-         nodes: List<DocumentNode>.of(
-           nodes == null || nodes.isEmpty
-               ? [ParagraphNode(id: initialNoteBlockId, text: AttributedText())]
-               : nodes,
+       editorState = NoteEditorState(
+         document: const NoteAppFlowyCodec().toDocument(
+           blocks == null || blocks.isEmpty
+               ? [NoteBlock(id: initialNoteBlockId, type: 'paragraph')]
+               : blocks,
          ),
-       ) {
-    _setupEditor();
-  }
+       );
 
   final String userId;
-  final MutableDocument document;
-  late final Editor editor;
-  late final MutableDocumentComposer composer;
-  final FocusNode focusNode = FocusNode();
-  void Function()? _assertCanMutate;
-  late final HiddenTaskEditingGuard _hiddenTaskEditingGuard;
+  final NoteEditorState editorState;
+  final FocusNode focusNode = FocusNode(debugLabel: 'note editor');
   final String _noteId;
+  void Function()? _assertCanMutate;
   var _disposed = false;
 
+  static const _uuid = Uuid();
+
+  /// Called before every app-initiated edit; throws when the note became
+  /// read-only.
   void attachMutationGuard(void Function() assertCanMutate) {
     _assertCanMutate = assertCanMutate;
   }
 
-  void setHiddenTaskPredicate(bool Function(TaskNode node) predicate) {
-    _hiddenTaskEditingGuard.updateHiddenTaskPredicate(predicate);
-    final selection = composer.selection;
-    if (selection == null) return;
+  /// Whether completed tasks are hidden (and therefore not editable).
+  set hideCompleted(bool value) => editorState.hideCompleted = value;
 
-    if (_hiddenTaskEditingGuard.selectionTouchesHiddenTask(
-      document,
-      selection,
-    )) {
-      composer.clearSelection();
-    }
+  /// The task block [blockId], as the metadata sheet edits it.
+  TaskMetadataDraft? taskMetadata(String blockId) {
+    final node = editorState.nodeForBlock(blockId);
+    if (node?.type != TodoListBlockKeys.type) return null;
+    return TaskMetadataDraft.fromMetadata(
+      Map<String, dynamic>.from(
+        node!.attributes[NoteNodeKeys.metadata] as Map? ?? const {},
+      ),
+    );
   }
 
-  TaskCompletionResult? completeTaskInEditor(
-    String nodeId, {
+  /// Whether the note has a task block [blockId].
+  bool hasTask(String blockId) =>
+      editorState.nodeForBlock(blockId)?.type == TodoListBlockKeys.type;
+
+  /// Puts the caret at the start of block [blockId].
+  void focusBlock(String blockId) {
+    final node = editorState.nodeForBlock(blockId);
+    if (node == null) return;
+    editorState.selection = Selection.collapsed(Position(path: node.path));
+  }
+
+  Future<TaskCompletionResult?> completeTaskInEditor(
+    String blockId, {
     DateTime? now,
     DateTime? scheduledAt,
   }) {
     _assertCanMutate?.call();
-    final node = document.getNodeById(nodeId);
-    if (node is! TaskNode) return null;
-    final mutation = const NoteTaskEditorCommands().complete(
-      node,
+    return editorState.completeNoteTask(
+      blockId,
       now: now,
       scheduledAt: scheduledAt,
     );
-    editor.execute([
-      ReplaceNodeRequest(existingNodeId: nodeId, newNode: mutation.node),
-    ]);
-    return mutation.result;
   }
 
-  void reopenTaskInEditor(
-    String nodeId, {
+  Future<void> reopenTaskInEditor(
+    String blockId, {
     DateTime? previousDue,
     DateTime? scheduledAt,
   }) {
     _assertCanMutate?.call();
-    final node = document.getNodeById(nodeId);
-    if (node is! TaskNode) return;
-    final updatedNode = const NoteTaskEditorCommands().reopen(
-      node,
+    return editorState.reopenNoteTask(
+      blockId,
       previousDue: previousDue,
       scheduledAt: scheduledAt,
     );
-    editor.execute([
-      ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
-    ]);
   }
 
-  /// Deletes a task node while keeping the note's required editable block.
-  void deleteTaskInEditor(String nodeId) {
+  /// Deletes a task block, keeping one editable block in the note.
+  Future<void> deleteTaskInEditor(String blockId) {
     _assertCanMutate?.call();
-    final node = document.getNodeById(nodeId);
-    if (node is! TaskNode) return;
-    if (document.nodeCount == 1) {
-      editor.execute([
-        ReplaceNodeRequest(
-          existingNodeId: nodeId,
-          newNode: ParagraphNode(id: nodeId, text: AttributedText()),
-        ),
-      ]);
-      return;
+    final node = editorState.nodeForBlock(blockId);
+    if (node == null || node.type != TodoListBlockKeys.type) {
+      return Future.value();
     }
-    editor.execute([DeleteNodeRequest(nodeId: nodeId)]);
+    final transaction = editorState.transaction;
+    if (editorState.document.root.children.length == 1 &&
+        node.parent == editorState.document.root) {
+      transaction.insertNode(
+        node.path,
+        paragraphNode(attributes: {NoteNodeKeys.blockId: blockId}),
+      );
+    }
+    transaction.deleteNode(node);
+    return editorState.apply(transaction, withUpdateSelection: false);
   }
 
-  void updateTaskMetadataInEditor(
-    String nodeId, {
+  Future<void> updateTaskMetadataInEditor(
+    String blockId, {
     DateTime? dueDate,
     String? recurrence,
     bool clearDueDate = false,
@@ -122,10 +127,8 @@ class NoteEditorController {
     bool clearReminder = false,
   }) {
     _assertCanMutate?.call();
-    final node = document.getNodeById(nodeId);
-    if (node is! TaskNode) return;
-    final updatedNode = const NoteTaskEditorCommands().updateMetadata(
-      node,
+    return editorState.updateNoteTaskMetadata(
+      blockId,
       dueDate: dueDate,
       recurrence: recurrence,
       clearDueDate: clearDueDate,
@@ -134,43 +137,6 @@ class NoteEditorController {
       reminder: reminder,
       clearReminder: clearReminder,
     );
-    if (identical(updatedNode, node)) return;
-    editor.execute([
-      ReplaceNodeRequest(existingNodeId: nodeId, newNode: updatedNode),
-    ]);
-  }
-
-  void _setupEditor() {
-    composer = MutableDocumentComposer();
-    _hiddenTaskEditingGuard = HiddenTaskEditingGuard();
-    editor = createDefaultDocumentEditor(
-      document: document,
-      composer: composer,
-    );
-    editor.requestHandlers.insertAll(0, [
-      _hiddenTaskEditingGuard.handle,
-      handleEmptyTaskDeletion,
-    ]);
-    editor.reactionPipeline.removeWhere(
-      (r) => r is HorizontalRuleConversionReaction,
-    );
-    editor.reactionPipeline.add(
-      const RandomDividerConversionReaction(),
-    );
-    document.addListener(_clearSelectionIfHidden);
-  }
-
-  void _clearSelectionIfHidden(DocumentChangeLog _) {
-    final selection = composer.selection;
-    if (selection == null ||
-        !_hiddenTaskEditingGuard.selectionTouchesHiddenTask(
-          document,
-          selection,
-        )) {
-      return;
-    }
-    composer.clearSelection();
-    focusNode.unfocus();
   }
 
   Future<void> pickAndAttachFile({
@@ -192,61 +158,62 @@ class NoteEditorController {
     );
   }
 
+  /// Inserts an attachment block at the caret right away, then fills in its
+  /// file details once [uploader] finishes; a failed upload removes it.
   Future<AttachmentUploadResult> attachFileFromPath({
     required String filePath,
     required String mimeType,
     required AttachmentUploader uploader,
-  }) {
+  }) async {
     _assertCanMutate?.call();
-    final id = Editor.createNodeId();
-    editor.execute([
-      InsertNodeAtCaretRequest(node: DocumentAttachmentNode(id: id)),
-    ]);
-
-    return uploader
-        .upload(
-          id: id,
-          noteId: _noteId,
-          file: File(filePath),
-          mimeType: mimeType,
-        )
-        .then((result) {
-          if (_disposed) return result;
-          final node = document.getNodeById(id);
-          if (node is DocumentAttachmentNode) {
-            editor.execute([
-              ReplaceNodeRequest(
-                existingNodeId: id,
-                newNode: node.copyWithAddedMetadata({
-                  'filename': result.fileName,
-                  'fileSize': result.fileSize,
-                  'mimeType': result.mimeType,
-                  'url': result.downloadUrl,
-                }),
-              ),
-            ]);
-          }
-          return result;
-        })
-        .catchError((Object error, StackTrace stackTrace) {
-          if (!_disposed && document.getNodeById(id) != null) {
-            try {
-              _assertCanMutate?.call();
-              editor.execute([DeleteNodeRequest(nodeId: id)]);
-            } on StateError {
-              // The session was closed; its document must not be mutated.
-            }
-          }
-          Error.throwWithStackTrace(error, stackTrace);
-        });
+    final id = _uuid.v4();
+    await editorState.insertNoteBlockAtCaret(
+      NoteBlock(id: id, type: 'attachment'),
+    );
+    try {
+      final result = await uploader.upload(
+        id: id,
+        noteId: _noteId,
+        file: File(filePath),
+        mimeType: mimeType,
+      );
+      final node = _disposed ? null : editorState.nodeForBlock(id);
+      if (node != null) {
+        await editorState.apply(
+          editorState.transaction..updateNode(node, {
+            NoteNodeKeys.metadata: {
+              ...?(node.attributes[NoteNodeKeys.metadata] as Map?)
+                  ?.cast<String, dynamic>(),
+              'filename': result.fileName,
+              'fileSize': result.fileSize,
+              'mimeType': result.mimeType,
+              'url': result.downloadUrl,
+            },
+          }),
+          withUpdateSelection: false,
+        );
+      }
+      return result;
+    } catch (_) {
+      final node = _disposed ? null : editorState.nodeForBlock(id);
+      if (node != null) {
+        try {
+          _assertCanMutate?.call();
+          await editorState.apply(
+            editorState.transaction..deleteNode(node),
+            withUpdateSelection: false,
+          );
+        } on StateError {
+          // The session was closed; its document must not be mutated.
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<void> dispose() async {
     _disposed = true;
-    document.removeListener(_clearSelectionIfHidden);
-    editor.dispose();
-    document.dispose();
-    composer.dispose();
+    editorState.dispose();
     focusNode.dispose();
   }
 }

@@ -1,3 +1,4 @@
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,8 @@ import 'package:supanotes/features/notes/editor/application/note_editor_provider
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
-import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 
 class _ReadySyncHandle implements NoteEditorSyncHandle {
   @override
@@ -50,11 +52,13 @@ void main() {
     controller = NoteEditorController(
       userId: 'user-1',
       noteId: 'note-1',
-      nodes: [
-        TaskNode(
+      blocks: [
+        NoteBlock(
           id: 'task-1',
-          text: AttributedText('Target task'),
-          isComplete: false,
+          type: 'task',
+          delta: const [
+            {'insert': 'Target task'},
+          ],
         ),
       ],
     );
@@ -95,6 +99,7 @@ void main() {
           ).overrideWith((ref) => Stream.value(true)),
         ],
         child: MaterialApp(
+          localizationsDelegates: const [AppFlowyEditorLocalizations.delegate],
           home: NoteEditorScreen(noteId: 'note-1', blockId: blockId),
         ),
       ),
@@ -108,22 +113,56 @@ void main() {
     addTearDown(tester.view.reset);
     await pumpScreen(tester);
 
-    expect(find.byType(KeyboardScaffoldSafeArea), findsOneWidget);
-
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-    expect(scaffold.resizeToAvoidBottomInset, isFalse);
     expect(scaffold.extendBodyBehindAppBar, isFalse);
 
     final appBarBottom = tester.getBottomLeft(find.byType(AppBar)).dy;
-    final editorTop = tester.getTopLeft(find.byType(SuperEditor)).dy;
+    final editorTop = tester.getTopLeft(find.byType(AppFlowyEditor)).dy;
     expect(editorTop, greaterThanOrEqualTo(appBarBottom));
 
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pumpAndSettle();
 
     final keyboardAppBarBottom = tester.getBottomLeft(find.byType(AppBar)).dy;
-    final keyboardEditorTop = tester.getTopLeft(find.byType(SuperEditor)).dy;
+    final keyboardEditorTop = tester.getTopLeft(find.byType(AppFlowyEditor)).dy;
     expect(keyboardEditorTop, greaterThanOrEqualTo(keyboardAppBarBottom));
+    // The editor ends above the keyboard instead of under it.
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final editorBottom = tester.getBottomLeft(find.byType(AppFlowyEditor)).dy;
+    expect(
+      editorBottom,
+      lessThanOrEqualTo(
+        screenHeight - 300 / tester.view.devicePixelRatio + 0.5,
+      ),
+    );
+  });
+
+  testWidgets('tapping below the text focuses the note and shows the toolbar', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    expect(find.byType(NoteToolbar), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await tester.pumpAndSettle();
+
+    final selection = controller.editorState.selection!;
+    expect(selection.isCollapsed, isTrue);
+    expect(selection.end.path, [0]);
+    expect(selection.end.offset, 'Target task'.length);
+    expect(find.byType(NoteToolbar), findsOneWidget);
+
+    // Dismissing the keyboard keeps the note focusable again (the
+    // "can't focus a new note" regression).
+    await tester.tap(find.byTooltip('Remover foco'));
+    await tester.pumpAndSettle();
+    expect(controller.editorState.selection, isNull);
+    expect(find.byType(NoteToolbar), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await tester.pumpAndSettle();
+    expect(controller.editorState.selection, isNotNull);
   });
 
   testWidgets('selects an existing task block from the route state', (
@@ -131,7 +170,7 @@ void main() {
   ) async {
     await pumpScreen(tester, blockId: 'task-1');
 
-    expect(controller.composer.selection?.extent.nodeId, 'task-1');
+    expect(controller.editorState.selection?.end.path, [0]);
   });
 
   testWidgets(
@@ -145,7 +184,7 @@ void main() {
         find.byKey(const ValueKey('missing-block:missing-task')),
         findsOneWidget,
       );
-      expect(find.byType(SuperEditor), findsOneWidget);
+      expect(find.byType(AppFlowyEditor), findsOneWidget);
     },
   );
 }

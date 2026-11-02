@@ -27,7 +27,6 @@ import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/app_platform_icon_button.dart';
 import 'package:supanotes/shared/widgets/app_popup_menu.dart';
-import 'package:super_editor/super_editor.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   const NoteEditorScreen({
@@ -50,12 +49,8 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
-  TaskMetadataDraft? _taskForMetadata(String taskId) {
-    final controller = _readSession().value?.controller;
-    final node = controller?.document.getNodeById(taskId);
-    if (node is! TaskNode) return null;
-    return TaskMetadataDraft.fromTaskNode(node);
-  }
+  TaskMetadataDraft? _taskForMetadata(String taskId) =>
+      _readSession().value?.controller.taskMetadata(taskId);
 
   AsyncValue<NoteEditorSession> _readSession() =>
       ref.read(noteEditorSessionProvider(widget.noteId));
@@ -79,44 +74,41 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       ),
       error: (_, _) => true,
     );
-    return KeyboardScaffoldSafeArea(
-      // Glass surfaces on this screen (the editor toolbar) share one backdrop
-      // copy through this group, as the liquid_glass_renderer guide recommends.
-      child: BackdropGroup(
-        child: Scaffold(
-          resizeToAvoidBottomInset: false,
-          appBar: _NoteEditorAppBar(
-            noteId: widget.noteId,
-            chromeAsync: chromeAsync,
-            isReadOnly: isReadOnly,
-            sessionAsync: sessionAsync,
-          ),
-          body: chromeAsync.when(
-            data: (chrome) {
-              if (chrome == null) {
-                return const Center(child: Text(NoteStrings.errorNotFound));
-              }
-              return sessionAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, _) =>
-                    const AppErrorView(title: NoteStrings.editorErrorTitle),
-                data: (session) => _NoteEditorWithSession(
-                  noteId: widget.noteId,
-                  blockId: widget.blockId,
-                  chrome: chrome,
-                  isReadOnly: isReadOnly,
-                  attachmentDelivery: widget.attachmentDelivery,
-                  attachmentUploader: ref.read(attachmentsRepositoryProvider),
-                  session: session,
-                  taskForMetadata: _taskForMetadata,
-                  readSession: _readSession,
-                ),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) =>
-                const AppErrorView(title: NoteStrings.editorErrorTitle),
-          ),
+    // Glass surfaces on this screen (the editor toolbar) share one backdrop
+    // copy through this group, as the liquid_glass_renderer guide recommends.
+    return BackdropGroup(
+      child: Scaffold(
+        appBar: _NoteEditorAppBar(
+          noteId: widget.noteId,
+          chromeAsync: chromeAsync,
+          isReadOnly: isReadOnly,
+          sessionAsync: sessionAsync,
+        ),
+        body: chromeAsync.when(
+          data: (chrome) {
+            if (chrome == null) {
+              return const Center(child: Text(NoteStrings.errorNotFound));
+            }
+            return sessionAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, _) =>
+                  const AppErrorView(title: NoteStrings.editorErrorTitle),
+              data: (session) => _NoteEditorWithSession(
+                noteId: widget.noteId,
+                blockId: widget.blockId,
+                chrome: chrome,
+                isReadOnly: isReadOnly,
+                attachmentDelivery: widget.attachmentDelivery,
+                attachmentUploader: ref.read(attachmentsRepositoryProvider),
+                session: session,
+                taskForMetadata: _taskForMetadata,
+                readSession: _readSession,
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, _) =>
+              const AppErrorView(title: NoteStrings.editorErrorTitle),
         ),
       ),
     );
@@ -328,28 +320,26 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return sessionAsync.when(
-      data: (session) => AnimatedBuilder(
-        animation: session.controller.focusNode,
-        builder: (context, _) {
-          if (!session.controller.focusNode.hasFocus) {
-            return const SizedBox.shrink();
-          }
-          return Tooltip(
-            message: 'Remover foco',
-            child: AppPlatformIconButton(
-              icon: Icons.check,
-              size: 44,
-              onPressed: () {
-                session.controller.focusNode.unfocus();
-                unawaited(
-                  SystemChannels.textInput.invokeMethod<void>(
-                    'TextInput.hide',
-                  ),
-                );
-              },
-            ),
-          );
-        },
+      data: (session) => ValueListenableBuilder(
+        // The editor is being edited while it has a caret or a selection.
+        // Only the button's visibility depends on it, not its content.
+        valueListenable: session.controller.editorState.selectionNotifier,
+        builder: (context, selection, button) =>
+            selection == null ? const SizedBox.shrink() : button!,
+        child: Tooltip(
+          message: 'Remover foco',
+          child: AppPlatformIconButton(
+            icon: Icons.check,
+            size: 44,
+            onPressed: () {
+              session.controller.editorState.selection = null;
+              session.controller.focusNode.unfocus();
+              unawaited(
+                SystemChannels.textInput.invokeMethod<void>('TextInput.hide'),
+              );
+            },
+          ),
+        ),
       ),
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
@@ -408,8 +398,7 @@ class _NoteEditorWithSessionState extends State<_NoteEditorWithSession> {
     if (blockId == null || blockId.isEmpty) return;
 
     final controller = widget.session.controller;
-    final node = controller.document.getNodeById(blockId);
-    if (node is! TaskNode) {
+    if (!controller.hasTask(blockId)) {
       _targetMissing = true;
       return;
     }
@@ -420,17 +409,7 @@ class _NoteEditorWithSessionState extends State<_NoteEditorWithSession> {
           widget.blockId != blockId) {
         return;
       }
-      final currentNode = controller.document.getNodeById(blockId);
-      if (currentNode is TaskNode) {
-        controller.composer.setSelectionWithReason(
-          DocumentSelection.collapsed(
-            position: DocumentPosition(
-              nodeId: blockId,
-              nodePosition: const TextNodePosition(offset: 0),
-            ),
-          ),
-        );
-      }
+      if (controller.hasTask(blockId)) controller.focusBlock(blockId);
     });
   }
 
@@ -516,7 +495,7 @@ class _NoteEditorTaskDelegate {
 
   Future<void> _saveTaskMetadata(String taskId, TaskMetadataDraft draft) async {
     final controller = readSession().value?.controller;
-    controller?.updateTaskMetadataInEditor(
+    await controller?.updateTaskMetadataInEditor(
       taskId,
       dueDate: draft.scheduleAnchor,
       clearDueDate: draft.scheduleAnchor == null,
@@ -532,7 +511,7 @@ class _NoteEditorTaskDelegate {
     return TaskSnackBarHelper.completeTaskWithFeedback(
       onComplete: () async {
         final controller = readSession().value?.controller;
-        final result = controller?.completeTaskInEditor(taskId);
+        final result = await controller?.completeTaskInEditor(taskId);
         return (
           nextDue: result?.nextDue,
           previousDue: result?.previousDue,
@@ -545,10 +524,12 @@ class _NoteEditorTaskDelegate {
         if (controller != null) {
           // For recurring tasks, the template's dueDate is the anchor and
           // never changes — only remove the completion.
-          controller.reopenTaskInEditor(
-            taskId,
-            previousDue: previousDue,
-            scheduledAt: scheduledAt,
+          unawaited(
+            controller.reopenTaskInEditor(
+              taskId,
+              previousDue: previousDue,
+              scheduledAt: scheduledAt,
+            ),
           );
         }
       },
@@ -557,6 +538,6 @@ class _NoteEditorTaskDelegate {
 
   Future<void> _onTaskReopen(String taskId, DateTime? scheduledAt) async {
     final controller = readSession().value?.controller;
-    controller?.reopenTaskInEditor(taskId, scheduledAt: scheduledAt);
+    await controller?.reopenTaskInEditor(taskId, scheduledAt: scheduledAt);
   }
 }

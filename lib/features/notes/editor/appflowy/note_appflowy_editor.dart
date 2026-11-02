@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/editor/appflowy/blocks/note_task_block.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_style.dart';
 
 bool _configured = false;
@@ -16,26 +19,52 @@ void configureNoteAppFlowy() {
 
 // Shortcuts that would create content a synced note cannot store: inline
 // code, highlight colors, tables and AppFlowy's own block menu.
-final _unsupportedCharacterShortcuts = <CharacterShortcutEvent>{
+// Dividers and indentation are replaced by note-aware versions: a divider
+// gets a random illustration, and Tab / Shift+Tab never reorder blocks.
+final _replacedCharacterShortcuts = <CharacterShortcutEvent>{
   formatBackquoteToCode,
   slashCommand,
+  convertMinusesToDivider,
+  convertStarsToDivider,
+  convertUnderscoreToDivider,
 };
-final _unsupportedCommandShortcuts = <CommandShortcutEvent>{
+final _replacedCommandShortcuts = <CommandShortcutEvent>{
   toggleCodeCommand,
   toggleHighlightCommand,
+  indentCommand,
+  outdentCommand,
   ...tableCommands,
 };
 
 /// Keyboard and markdown shortcuts available in a note.
 final noteCharacterShortcuts = [
+  noteDividerShortcut,
   for (final event in standardCharacterShortcutEvents)
-    if (!_unsupportedCharacterShortcuts.contains(event)) event,
+    if (!_replacedCharacterShortcuts.contains(event)) event,
 ];
 
 /// Command shortcuts (undo, formatting, navigation) available in a note.
 final noteCommandShortcuts = [
+  CommandShortcutEvent(
+    key: 'indent note blocks',
+    getDescription: () => 'Aumentar recuo',
+    command: 'tab',
+    handler: (editorState) {
+      unawaited(editorState.indentNoteBlocks());
+      return KeyEventResult.handled;
+    },
+  ),
+  CommandShortcutEvent(
+    key: 'outdent note blocks',
+    getDescription: () => 'Diminuir recuo',
+    command: 'shift+tab',
+    handler: (editorState) {
+      unawaited(editorState.outdentNoteBlocks());
+      return KeyEventResult.handled;
+    },
+  ),
   for (final event in standardCommandShortcutEvents)
-    if (!_unsupportedCommandShortcuts.contains(event)) event,
+    if (!_replacedCommandShortcuts.contains(event)) event,
 ];
 
 /// The note body editor.
