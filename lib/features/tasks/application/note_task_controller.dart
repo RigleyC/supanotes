@@ -31,7 +31,7 @@ class NoteTaskController {
       throw StateError('Esta nota não permite concluir a tarefa.');
     }
 
-    final result = session.controller.completeTaskInEditor(
+    final result = await session.controller.completeTaskInEditor(
       task.blockId,
       scheduledAt: scheduledAt,
     );
@@ -51,7 +51,7 @@ class NoteTaskController {
     if (!session.captureLocalOperations) {
       throw StateError('Esta nota não permite reabrir a tarefa.');
     }
-    session.controller.reopenTaskInEditor(
+    await session.controller.reopenTaskInEditor(
       task.blockId,
       scheduledAt: scheduledAt,
     );
@@ -64,7 +64,7 @@ class NoteTaskController {
     if (!session.captureLocalOperations) {
       throw StateError('Esta nota não permite excluir a tarefa.');
     }
-    session.controller.deleteTaskInEditor(task.blockId);
+    await session.controller.deleteTaskInEditor(task.blockId);
     await session.flushNow();
   }
 }

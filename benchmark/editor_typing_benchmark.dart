@@ -10,6 +10,7 @@
 //   flutter test benchmark/editor_typing_benchmark.dart
 import 'dart:convert';
 
+import 'package:appflowy_editor/appflowy_editor.dart' hide Document;
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -26,7 +27,6 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:super_editor/super_editor.dart';
 
 const _paragraphs = 150;
 const _tasks = 50;
@@ -74,7 +74,10 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const MaterialApp(home: NoteEditorScreen(noteId: 'note-1')),
+        child: const MaterialApp(
+          localizationsDelegates: [AppFlowyEditorLocalizations.delegate],
+          home: NoteEditorScreen(noteId: 'note-1'),
+        ),
       ),
     );
     // Measures only the frame's own work (animations, build, layout, paint),
@@ -95,33 +98,15 @@ void main() {
     await idle(1500);
     final session = container.read(noteEditorSessionProvider('note-1')).value!;
     final controller = session.controller;
-    final editor = controller.editor;
-    final document = controller.document;
-    final target = document.getNodeAt(_paragraphs ~/ 2)!;
-
-    editor.execute([
-      ChangeSelectionRequest(
-        DocumentSelection.collapsed(
-          position: DocumentPosition(
-            nodeId: target.id,
-            nodePosition: const TextNodePosition(offset: 0),
-          ),
-        ),
-        SelectionChangeType.placeCaret,
-        SelectionReason.userInteraction,
-      ),
-    ]);
+    final editorState = controller.editorState;
+    final nodes = editorState.document.root.children.toList();
+    editorState.selection = Selection.collapsed(
+      Position(path: nodes[_paragraphs ~/ 2].path),
+    );
     await idle(300);
 
     const experiment = String.fromEnvironment('EXPERIMENT');
     if (experiment == 'no_capture') session.setCaptureLocalOperations(false);
-    if (experiment == 'no_reactions') {
-      // ignore: avoid_print
-      print(
-        'REACTIONS ${editor.reactionPipeline.map((r) => r.runtimeType).join(',')}',
-      );
-      editor.reactionPipeline.clear();
-    }
 
     final rebuilds = <String, int>{};
     var counting = false;
@@ -135,9 +120,7 @@ void main() {
     await profile('typing', () async {
       for (var i = 0; i < _keystrokes; i++) {
         final sw = Stopwatch()..start();
-        editor.execute([
-          InsertCharacterAtCaretRequest(character: i % 7 == 6 ? ' ' : 'a'),
-        ]);
+        await editorState.insertTextAtCurrentSelection(i % 7 == 6 ? ' ' : 'a');
         typingEdit.add(sw.elapsedMicroseconds);
         counting = i == 40;
         final frameUs = await frame();
@@ -153,32 +136,42 @@ void main() {
     final moves = <int>[];
     final movesEdit = <int>[];
     for (var i = 0; i < _caretMoves; i++) {
-      final node = document.getNodeAt((i * 7) % document.nodeCount)!;
-      if (node is! TextNode) continue;
+      final node = nodes[(i * 7) % nodes.length];
+      final length = node.delta?.length;
+      if (length == null) continue;
       final sw = Stopwatch()..start();
-      editor.execute([
-        ChangeSelectionRequest(
-          DocumentSelection(
-            base: DocumentPosition(
-              nodeId: node.id,
-              nodePosition: const TextNodePosition(offset: 0),
-            ),
-            extent: DocumentPosition(
-              nodeId: node.id,
-              nodePosition: TextNodePosition(
-                offset: node.text.length < 5 ? node.text.length : 5,
-              ),
-            ),
-          ),
-          SelectionChangeType.expandSelection,
-          SelectionReason.userInteraction,
-        ),
-      ]);
+      editorState.selection = Selection.single(
+        path: node.path,
+        startOffset: 0,
+        endOffset: length < 5 ? length : 5,
+      );
       movesEdit.add(sw.elapsedMicroseconds);
       counting = i == 30;
       final frameUs = await frame();
       counting = false;
       moves.add(movesEdit.last + frameUs);
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    }
+
+    // Selection changes within the visible blocks, as dragging a handle or
+    // tapping does; the moves above jump across the whole note.
+    final target = _paragraphs ~/ 2;
+    editorState.selection = Selection.collapsed(
+      Position(path: nodes[target].path),
+    );
+    await idle(300);
+    final localMoves = <int>[];
+    for (var i = 0; i < _caretMoves; i++) {
+      final node = nodes[target + (i % 6)];
+      final length = node.delta?.length ?? 0;
+      final sw = Stopwatch()..start();
+      editorState.selection = Selection.single(
+        path: node.path,
+        startOffset: 0,
+        endOffset: (1 + i % 4).clamp(0, length),
+      );
+      final edit = sw.elapsedMicroseconds;
+      localMoves.add(edit + await frame());
       await Future<void>.delayed(const Duration(milliseconds: 40));
     }
 
@@ -197,6 +190,8 @@ void main() {
     print('BENCHMARK editor_typing keystroke ${summary(typing)}');
     // ignore: avoid_print
     print('BENCHMARK editor_selection move ${summary(moves)}');
+    // ignore: avoid_print
+    print('BENCHMARK editor_selection local ${summary(localMoves)}');
     String top(Map<String, int> m) {
       final e = m.entries.toList()..sort((a, b) => b.value - a.value);
       final total = m.values.fold<int>(0, (a, b) => a + b);

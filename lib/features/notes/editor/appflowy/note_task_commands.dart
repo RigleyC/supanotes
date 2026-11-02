@@ -25,10 +25,15 @@ extension NoteTaskCommands on EditorState {
     String blockId, {
     NoteTaskEditorCommands commands = const NoteTaskEditorCommands(),
     DateTime? now,
+    DateTime? scheduledAt,
   }) async {
     final node = _task(blockId);
     if (node == null) return null;
-    final (state, result) = commands.completeState(_stateOf(node), now: now);
+    final (state, result) = commands.completeState(
+      _stateOf(node),
+      now: now,
+      scheduledAt: scheduledAt,
+    );
     await _write(node, state);
     return result;
   }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:appflowy_editor/appflowy_editor.dart' hide Document;
 import 'package:drift/drift.dart' hide isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,6 @@ import 'package:supanotes/features/notes/attachments/data/attachments_repository
 import 'package:supanotes/features/notes/editor/application/note_editor_provider.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_coordinator.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:super_editor/super_editor.dart';
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
@@ -117,16 +117,14 @@ void main() {
       final session = await container.read(
         noteEditorSessionProvider('note-close-before-debounce').future,
       );
-      session.controller.editor.execute([
-        InsertTextRequest(
-          documentPosition: const DocumentPosition(
-            nodeId: 'init',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-          textToInsert: 'typed before close',
-          attributions: const {},
+      final editorState = session.controller.editorState;
+      await editorState.apply(
+        editorState.transaction..insertText(
+          editorState.getNodeAtPath([0])!,
+          0,
+          'typed before close',
         ),
-      ]);
+      );
 
       await container
           .read(noteSessionCoordinatorProvider)
@@ -179,7 +177,7 @@ void main() {
       );
 
       expect(
-        (session.controller.document.first as TextNode).text.toPlainText(),
+        _firstText(session.controller.editorState),
         'Local first frame',
       );
     },
@@ -229,7 +227,7 @@ void main() {
         noteEditorSessionProvider('note-restart-local').future,
       );
       expect(
-        (firstSession.controller.document.first as TextNode).text.toPlainText(),
+        _firstText(firstSession.controller.editorState),
         'Restarted local content',
       );
       firstContainer.dispose();
@@ -253,8 +251,7 @@ void main() {
       await pumpEventQueue();
 
       expect(
-        (secondSession.controller.document.first as TextNode).text
-            .toPlainText(),
+        _firstText(secondSession.controller.editorState),
         'Restarted local content',
       );
       verifyNever(() => client.getDocument('note-restart-local'));
@@ -336,3 +333,6 @@ void main() {
     },
   );
 }
+
+String _firstText(EditorState editorState) =>
+    editorState.getNodeAtPath([0])!.delta!.toPlainText();

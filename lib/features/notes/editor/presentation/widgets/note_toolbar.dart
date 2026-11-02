@@ -1,38 +1,44 @@
 // Compact contextual toolbar for the note editor.
 //
-// The toolbar derives its content from the editor selection and active nodes
-// (see NoteToolbarState). A paragraph-level interaction shows block-format
-// controls; selecting text or placing the caret in a list/task shows inline and
-// block conversion controls. The toolbar shell keeps a single position and
-// height - only its action content animates between the two modes.
+// The toolbar derives its content from the editor selection (see
+// NoteFormatState). A caret in a paragraph shows block-format controls;
+// selecting text or placing the caret in a list/task shows inline and block
+// conversion controls. The toolbar shell keeps a single position and height -
+// only its action content animates between the two modes.
 import 'dart:async';
 
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:motor/motor.dart';
-import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_interaction.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_state.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/glass/glass_surface.dart';
-import 'package:super_editor/super_editor.dart';
 
 export 'note_editor_interaction.dart' show noteEditorToolbarTapRegionGroup;
 
 /// Corner radius of the floating toolbar shell.
 const _shellRadius = 30.0;
 
+/// Which row of the note toolbar is shown.
+enum NoteToolbarMode { normal, contextual }
+
+/// Contextual for a text selection, or a caret inside a list or task.
+NoteToolbarMode noteToolbarModeFor(NoteFormatState state) =>
+    state.hasTextSelection || state.hasListOrTask
+    ? NoteToolbarMode.contextual
+    : NoteToolbarMode.normal;
+
 class NoteToolbar extends StatefulWidget {
   const NoteToolbar({
-    required this.editor,
-    required this.composer,
+    required this.editorState,
     super.key,
     this.onAttachFile,
     this.onAttachImage,
   });
 
-  final Editor editor;
-  final MutableDocumentComposer composer;
+  final EditorState editorState;
   final VoidCallback? onAttachFile;
   final VoidCallback? onAttachImage;
 
@@ -41,51 +47,57 @@ class NoteToolbar extends StatefulWidget {
 }
 
 class _NoteToolbarState extends State<NoteToolbar> {
-  late NoteToolbarState _state;
+  late NoteFormatState _state;
+  StreamSubscription<Object?>? _transactions;
 
   @override
   void initState() {
     super.initState();
-    _state = _readState();
-    widget.composer.selectionNotifier.addListener(_onStateChange);
-    widget.editor.context.document.addListener(_onStateChange);
+    _listen(widget.editorState);
   }
 
   @override
   void didUpdateWidget(NoteToolbar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.composer != widget.composer) {
-      oldWidget.composer.selectionNotifier.removeListener(_onStateChange);
-      widget.composer.selectionNotifier.addListener(_onStateChange);
+    if (oldWidget.editorState != widget.editorState) {
+      _unlisten(oldWidget.editorState);
+      _listen(widget.editorState);
     }
-    if (oldWidget.editor != widget.editor) {
-      oldWidget.editor.context.document.removeListener(_onStateChange);
-      widget.editor.context.document.addListener(_onStateChange);
-    }
-    _onStateChange();
   }
 
   @override
   void dispose() {
-    widget.composer.selectionNotifier.removeListener(_onStateChange);
-    widget.editor.context.document.removeListener(_onStateChange);
+    _unlisten(widget.editorState);
     super.dispose();
   }
 
-  NoteToolbarState _readState() => NoteToolbarState.from(
-    widget.editor.context.document,
-    widget.composer.selection,
-  );
+  void _listen(EditorState editorState) {
+    _state = NoteFormatState.of(editorState);
+    editorState.selectionNotifier.addListener(_onStateChange);
+    editorState.toggledStyleNotifier.addListener(_onStateChange);
+    // Formatting changes the selection's attributes without moving it.
+    _transactions = editorState.transactionStream.listen((event) {
+      if (event.$1 == TransactionTime.after) _onStateChange();
+    });
+  }
 
-  void _onStateChange([DocumentChangeLog? _]) {
+  void _unlisten(EditorState editorState) {
+    editorState.selectionNotifier.removeListener(_onStateChange);
+    editorState.toggledStyleNotifier.removeListener(_onStateChange);
+    unawaited(_transactions?.cancel());
+    _transactions = null;
+  }
+
+  void _onStateChange() {
     if (!mounted) return;
-    final next = _readState();
+    final next = NoteFormatState.of(widget.editorState);
     if (next == _state) return;
     setState(() => _state = next);
   }
 
   @override
   Widget build(BuildContext context) {
+    final editorState = widget.editorState;
     return TapRegion(
       groupId: noteEditorToolbarTapRegionGroup,
       child: Padding(
@@ -99,22 +111,24 @@ class _NoteToolbarState extends State<NoteToolbar> {
               vertical: 8,
             ),
             child: _ContextualToolbarContent(
-              mode: _state.mode,
+              mode: noteToolbarModeFor(_state),
               normalActions: _NormalActions(
                 state: _state,
-                onSetBlockType: _setBlockType,
-                onConvertToTask: _convertToTask,
-                onInsertDivider: _insertDivider,
+                onSetBlockStyle: (style) =>
+                    unawaited(editorState.toggleNoteBlockStyle(style)),
+                onInsertDivider: () =>
+                    unawaited(editorState.insertNoteDivider()),
                 onAttachImage: widget.onAttachImage,
                 onAttachFile: widget.onAttachFile,
               ),
               contextualActions: _ContextualActions(
                 state: _state,
-                onToggleInline: _toggleInline,
-                onConvertToList: _convertToList,
-                onConvertToTask: _convertToTask,
-                onUnindent: _unindentSelectedBlocks,
-                onIndent: _indentSelectedBlocks,
+                onToggleInline: (key) =>
+                    unawaited(editorState.toggleNoteInlineStyle(key)),
+                onSetBlockStyle: (style) =>
+                    unawaited(editorState.toggleNoteBlockStyle(style)),
+                onUnindent: () => unawaited(editorState.outdentNoteBlocks()),
+                onIndent: () => unawaited(editorState.indentNoteBlocks()),
               ),
             ),
           ),
@@ -122,103 +136,62 @@ class _NoteToolbarState extends State<NoteToolbar> {
       ),
     );
   }
-
-  void _setBlockType(Attribution attribution) {
-    NoteEditorCommands.setBlockType(
-      widget.editor,
-      widget.composer,
-      attribution,
-    );
-  }
-
-  void _toggleInline(Attribution attribution) {
-    NoteEditorCommands.toggleInlineAttribution(
-      widget.editor,
-      widget.composer,
-      attribution,
-    );
-  }
-
-  void _convertToList(ListItemType type) {
-    NoteEditorCommands.convertToListItem(widget.editor, widget.composer, type);
-  }
-
-  void _convertToTask() {
-    NoteEditorCommands.convertToTask(widget.editor, widget.composer);
-  }
-
-  void _indentSelectedBlocks() {
-    NoteEditorCommands.indentSelectedBlocks(widget.editor, widget.composer);
-  }
-
-  void _unindentSelectedBlocks() {
-    NoteEditorCommands.unindentSelectedBlocks(widget.editor, widget.composer);
-  }
-
-  void _insertDivider() {
-    NoteEditorCommands.insertDividerAtSelection(
-      widget.editor,
-      widget.composer,
-    );
-  }
 }
 
 class _NormalActions extends StatelessWidget {
   const _NormalActions({
     required this.state,
-    required this.onSetBlockType,
-    required this.onConvertToTask,
+    required this.onSetBlockStyle,
     required this.onInsertDivider,
     required this.onAttachImage,
     required this.onAttachFile,
   });
 
-  final NoteToolbarState state;
-  final ValueChanged<Attribution> onSetBlockType;
-  final VoidCallback onConvertToTask;
+  final NoteFormatState state;
+  final ValueChanged<NoteBlockStyle> onSetBlockStyle;
   final VoidCallback onInsertDivider;
   final VoidCallback? onAttachImage;
   final VoidCallback? onAttachFile;
 
   @override
   Widget build(BuildContext context) {
-    final blockType = state.blockType;
+    final blockStyle = state.blockStyle;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         ToolbarButton(
           svgAsset: 'assets/icons/h1_icon.svg',
-          isActive: blockType == header1Attribution,
+          isActive: blockStyle == NoteBlockStyle.header1,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onSetBlockType(header1Attribution),
+          onPressed: () => onSetBlockStyle(NoteBlockStyle.header1),
           semanticLabel: 'Título 1',
         ),
         ToolbarButton(
           svgAsset: 'assets/icons/h2_icon.svg',
-          isActive: blockType == header2Attribution,
+          isActive: blockStyle == NoteBlockStyle.header2,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onSetBlockType(header2Attribution),
+          onPressed: () => onSetBlockStyle(NoteBlockStyle.header2),
           semanticLabel: 'Título 2',
         ),
         ToolbarButton(
           svgAsset: 'assets/icons/h3_icon.svg',
-          isActive: blockType == header3Attribution,
+          isActive: blockStyle == NoteBlockStyle.header3,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onSetBlockType(header3Attribution),
+          onPressed: () => onSetBlockStyle(NoteBlockStyle.header3),
           semanticLabel: 'Título 3',
         ),
         ToolbarButton(
           icon: Icons.format_quote,
-          isActive: blockType == blockquoteAttribution,
+          isActive: blockStyle == NoteBlockStyle.quote,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onSetBlockType(blockquoteAttribution),
+          onPressed: () => onSetBlockStyle(NoteBlockStyle.quote),
           semanticLabel: 'Citação',
         ),
         ToolbarButton(
           svgAsset: 'assets/icons/checkbox.svg',
           isActive: state.allTasks,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: onConvertToTask,
+          onPressed: () => onSetBlockStyle(NoteBlockStyle.task),
           semanticLabel: 'Task',
         ),
         const ToolbarDivider(),
@@ -253,16 +226,14 @@ class _ContextualActions extends StatelessWidget {
   const _ContextualActions({
     required this.state,
     required this.onToggleInline,
-    required this.onConvertToList,
-    required this.onConvertToTask,
+    required this.onSetBlockStyle,
     required this.onUnindent,
     required this.onIndent,
   });
 
-  final NoteToolbarState state;
-  final ValueChanged<Attribution> onToggleInline;
-  final ValueChanged<ListItemType> onConvertToList;
-  final VoidCallback onConvertToTask;
+  final NoteFormatState state;
+  final ValueChanged<String> onToggleInline;
+  final ValueChanged<NoteBlockStyle> onSetBlockStyle;
   final VoidCallback onUnindent;
   final VoidCallback onIndent;
 
@@ -270,53 +241,57 @@ class _ContextualActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasText = state.hasTextSelection;
     final hasListOrTask = state.hasListOrTask;
-    final activeAttributions = state.activeAttributions;
+    final inline = state.inlineStyles;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         ToolbarButton(
           icon: Icons.format_bold,
-          isActive: activeAttributions.contains(boldAttribution),
+          isActive: inline.contains(NoteInlineStyle.bold),
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: hasText ? () => onToggleInline(boldAttribution) : null,
+          onPressed: hasText
+              ? () => onToggleInline(NoteInlineStyle.bold)
+              : null,
           semanticLabel: 'Negrito',
         ),
         ToolbarButton(
           icon: Icons.format_italic,
-          isActive: activeAttributions.contains(italicsAttribution),
+          isActive: inline.contains(NoteInlineStyle.italic),
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: hasText ? () => onToggleInline(italicsAttribution) : null,
+          onPressed: hasText
+              ? () => onToggleInline(NoteInlineStyle.italic)
+              : null,
           semanticLabel: 'Itálico',
         ),
         ToolbarButton(
           icon: Icons.format_strikethrough,
-          isActive: activeAttributions.contains(strikethroughAttribution),
+          isActive: inline.contains(NoteInlineStyle.strikethrough),
           haptic: ToolbarHaptic.selectionChange,
           onPressed: hasText
-              ? () => onToggleInline(strikethroughAttribution)
+              ? () => onToggleInline(NoteInlineStyle.strikethrough)
               : null,
           semanticLabel: 'Tachado',
         ),
         const ToolbarDivider(),
         ToolbarButton(
           icon: Icons.format_list_bulleted,
-          isActive: state.listType == ListItemType.unordered,
+          isActive: state.blockStyle == NoteBlockStyle.bulletList,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onConvertToList(ListItemType.unordered),
+          onPressed: () => onSetBlockStyle(NoteBlockStyle.bulletList),
           semanticLabel: 'Lista com marcadores',
         ),
         ToolbarButton(
           icon: Icons.format_list_numbered,
-          isActive: state.listType == ListItemType.ordered,
+          isActive: state.blockStyle == NoteBlockStyle.orderedList,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onConvertToList(ListItemType.ordered),
+          onPressed: () => onSetBlockStyle(NoteBlockStyle.orderedList),
           semanticLabel: 'Lista numerada',
         ),
         ToolbarButton(
           svgAsset: 'assets/icons/checkbox.svg',
           isActive: state.allTasks,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: onConvertToTask,
+          onPressed: () => onSetBlockStyle(NoteBlockStyle.task),
           semanticLabel: 'Task',
         ),
         const ToolbarDivider(),
