@@ -219,6 +219,16 @@ Map<String, BlockComponentBuilder> noteBlockBuilders(
           fontWeight: FontWeight.bold,
         ),
       ),
+      iconBuilder: (context, node) => Container(
+        width: 3,
+        margin: const EdgeInsetsDirectional.only(
+          end: NoteEditorMetrics.markerGap + 4,
+        ),
+        decoration: BoxDecoration(
+          color: scheme.outlineVariant,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
     ),
     BulletedListBlockKeys.type: BulletedListBlockComponentBuilder(
       configuration: config(padding: listPadding),
