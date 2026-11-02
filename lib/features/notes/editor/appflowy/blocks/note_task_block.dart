@@ -121,7 +121,9 @@ class _NoteTaskBlockState extends State<NoteTaskBlockComponent>
         BlockComponentAlignMixin {
   static const _checkboxSize = 20.0;
   static const _checkboxGap = 8.0;
-  static const _touchHeight = 44.0;
+  // With the 14 px spacing above each task (block padding) this keeps the
+  // previous 44 px touch target without making short tasks taller.
+  static const _touchHeight = 30.0;
 
   @override
   final forwardKey = GlobalKey(debugLabel: 'note_task_text');
