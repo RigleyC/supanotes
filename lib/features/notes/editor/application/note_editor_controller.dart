@@ -29,11 +29,31 @@ class NoteEditorController {
                ? [NoteBlock(id: initialNoteBlockId, type: 'paragraph')]
                : blocks,
          ),
-       );
+       ) {
+    editorState.selectionNotifier.addListener(_updateEditing);
+    focusNode.addListener(_updateEditing);
+  }
 
   final String userId;
   final NoteEditorState editorState;
   final FocusNode focusNode = FocusNode(debugLabel: 'note editor');
+
+  /// The user is editing: the editor has focus and shows a caret or a
+  /// selection. A caret placed by code alone (a deep link, a remote change)
+  /// is not editing, so the toolbar and keyboard controls stay hidden.
+  final ValueNotifier<bool> editing = ValueNotifier(false);
+
+  void _updateEditing() {
+    if (_disposed) return;
+    editing.value = editorState.selection != null && focusNode.hasFocus;
+  }
+
+  /// Places the caret as a user tap would: the editor takes focus and the
+  /// keyboard opens.
+  void editAt(Selection selection) => editorState.updateSelectionWithReason(
+    selection,
+    reason: SelectionUpdateReason.uiEvent,
+  );
   final String _noteId;
   void Function()? _assertCanMutate;
   var _disposed = false;
@@ -64,11 +84,18 @@ class NoteEditorController {
   bool hasTask(String blockId) =>
       editorState.nodeForBlock(blockId)?.type == TodoListBlockKeys.type;
 
-  /// Puts the caret at the start of block [blockId].
+  /// Shows the caret at the start of block [blockId] without starting to
+  /// edit (no focus, no keyboard), e.g. when a task is opened from a link.
+  ///
+  /// AppFlowy's plain `selection =` setter keeps the last update reason, a
+  /// user tap by default, which would focus the editor.
   void focusBlock(String blockId) {
     final node = editorState.nodeForBlock(blockId);
     if (node == null) return;
-    editorState.selection = Selection.collapsed(Position(path: node.path));
+    editorState.updateSelectionWithReason(
+      Selection.collapsed(Position(path: node.path)),
+      reason: SelectionUpdateReason.transaction,
+    );
   }
 
   Future<TaskCompletionResult?> completeTaskInEditor(
@@ -213,6 +240,9 @@ class NoteEditorController {
 
   Future<void> dispose() async {
     _disposed = true;
+    editorState.selectionNotifier.removeListener(_updateEditing);
+    focusNode.removeListener(_updateEditing);
+    editing.dispose();
     editorState.dispose();
     focusNode.dispose();
   }

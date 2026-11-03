@@ -321,11 +321,10 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return sessionAsync.when(
       data: (session) => ValueListenableBuilder(
-        // The editor is being edited while it has a caret or a selection.
-        // Only the button's visibility depends on it, not its content.
-        valueListenable: session.controller.editorState.selectionNotifier,
-        builder: (context, selection, button) =>
-            selection == null ? const SizedBox.shrink() : button!,
+        // Only the button's visibility depends on editing, not its content.
+        valueListenable: session.controller.editing,
+        builder: (context, editing, button) =>
+            editing ? button! : const SizedBox.shrink(),
         child: Tooltip(
           message: 'Remover foco',
           child: AppPlatformIconButton(
