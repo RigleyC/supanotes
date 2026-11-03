@@ -204,6 +204,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Formatar'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('note-format-panel')), findsOneWidget);
+    expect(find.byType(NoteToolbar), findsNothing);
 
     await tester.tap(find.bySemanticsLabel('Título'));
     await tester.pumpAndSettle();
@@ -215,6 +216,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Fechar formatação'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('note-format-panel')), findsNothing);
+    expect(find.byType(NoteToolbar), findsOneWidget);
     // Still editing: the caret stays.
     expect(controller.editorState.selection, isNotNull);
   });

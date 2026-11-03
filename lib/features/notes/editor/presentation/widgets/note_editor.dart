@@ -253,7 +253,9 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
           // move: the toolbar listens to the selection itself.
           ValueListenableBuilder<Selection?>(
             valueListenable: editorState.selectionNotifier,
-            builder: (context, selection, _) => selection == null
+            // The format panel replaces the bar while it is open; it has its
+            // own close button.
+            builder: (context, selection, _) => selection == null || _panelOpen
                 ? const SizedBox.shrink()
                 : NoteToolbar(
                     editorState: editorState,
