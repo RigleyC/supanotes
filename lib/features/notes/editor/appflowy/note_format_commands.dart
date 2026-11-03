@@ -277,70 +277,128 @@ extension NoteFormatCommands on EditorState {
   }) async {
     final current = selection?.normalized;
     if (current == null) return;
+    final range = _touchedRoots(
+      current,
+      includePrevious: includePrevious,
+      includeNext: includeNext,
+    );
+    if (range == null) return;
+
+    final reader = _BlockReader();
+    for (final node in range.nodes) {
+      reader.read(node, 0);
+    }
+    final selected = {
+      for (final node in getNodesInSelection(current))
+        if (reader.idOf[node] case final id?) id,
+    };
+    final result = rewrite(reader.blocks, selected);
+    if (result == null || listEquals(result.blocks, reader.blocks)) return;
+
+    final placement = _Placement(
+      nodes: _codec.toDocument(result.blocks).root.children.toList(),
+      first: range.first,
+      idOf: reader.idOf,
+    );
+    final afterSelection = _selectionAfter(
+      current,
+      caretBlockId: result.caretBlockId,
+      placement: placement,
+    );
+    final transaction = this.transaction
+      ..insertNodes([range.first], placement.nodes)
+      ..deleteNodes(range.nodes)
+      ..afterSelection = afterSelection;
+    await apply(transaction);
+  }
+
+  /// The top-level nodes [current] spans, widened by one on either side when
+  /// asked, and the index of the first one.
+  ({int first, List<Node> nodes})? _touchedRoots(
+    Selection current, {
+    required bool includePrevious,
+    required bool includeNext,
+  }) {
     final roots = document.root.children.toList();
-    if (roots.isEmpty) return;
+    if (roots.isEmpty) return null;
     var first = current.start.path.first.clamp(0, roots.length - 1);
     var last = current.end.path.first.clamp(0, roots.length - 1);
     if (includePrevious && first > 0) first--;
     if (includeNext && last < roots.length - 1) last++;
-    final range = roots.sublist(first, last + 1);
+    return (first: first, nodes: roots.sublist(first, last + 1));
+  }
 
-    final idOf = <Node, String>{};
-    final blocks = <NoteBlock>[];
-    final seen = <String>{};
-    void visit(Node node, int depth) {
-      var id = node.attributes[NoteNodeKeys.blockId] as String?;
-      if (id == null || !seen.add(id)) {
-        id = _uuid.v4();
-        seen.add(id);
+  /// The selection after a rewrite: a caret in [caretBlockId] when given,
+  /// otherwise the previous selection moved along with its blocks.
+  Selection? _selectionAfter(
+    Selection current, {
+    required String? caretBlockId,
+    required _Placement placement,
+  }) {
+    final caretPath = placement.pathOf(caretBlockId);
+    if (caretPath != null) {
+      return Selection.collapsed(Position(path: caretPath));
+    }
+    final start = _movedPosition(current.start, placement);
+    final end = _movedPosition(current.end, placement);
+    return start != null && end != null
+        ? Selection(start: start, end: end)
+        : null;
+  }
+
+  /// [position] in the rebuilt blocks, or null when its block is gone.
+  Position? _movedPosition(Position position, _Placement placement) {
+    final node = getNodeAtPath(position.path);
+    final path = placement.pathOf(node == null ? null : placement.idOf[node]);
+    return path == null ? null : position.copyWith(path: path);
+  }
+}
+
+/// Reads nodes and their children as flat blocks, remembering the block id
+/// each node got. Nodes without an id, or with one already seen (a pasted
+/// copy), get a fresh one.
+final class _BlockReader {
+  final idOf = <Node, String>{};
+  final blocks = <NoteBlock>[];
+  final _seen = <String>{};
+
+  void read(Node node, int depth) {
+    var id = node.attributes[NoteNodeKeys.blockId] as String?;
+    if (id == null || !_seen.add(id)) {
+      id = _uuid.v4();
+      _seen.add(id);
+    }
+    idOf[node] = id;
+    blocks.add(NoteFormatCommands._codec.toBlock(node, id: id, depth: depth));
+    for (final child in node.children) {
+      read(child, depth + 1);
+    }
+  }
+}
+
+/// Where rebuilt blocks land: [nodes] replace the top-level nodes from index
+/// [first]; [idOf] maps the replaced nodes to their block ids.
+final class _Placement {
+  const _Placement({
+    required this.nodes,
+    required this.first,
+    required this.idOf,
+  });
+
+  final List<Node> nodes;
+  final int first;
+  final Map<Node, String> idOf;
+
+  /// The document path block [id] will have, if it is among [nodes].
+  Path? pathOf(String? id) {
+    if (id == null) return null;
+    for (var i = 0; i < nodes.length; i++) {
+      final found = _find(nodes[i], id);
+      if (found != null) {
+        return [first + i, ...found.path.skip(1)];
       }
-      idOf[node] = id;
-      blocks.add(_codec.toBlock(node, id: id, depth: depth));
-      for (final child in node.children) {
-        visit(child, depth + 1);
-      }
     }
-
-    for (final node in range) {
-      visit(node, 0);
-    }
-    final selected = {
-      for (final node in getNodesInSelection(current))
-        if (idOf[node] case final id?) id,
-    };
-    final result = rewrite(blocks, selected);
-    if (result == null || listEquals(result.blocks, blocks)) return;
-
-    final nodes = _codec.toDocument(result.blocks).root.children.toList();
-    Path? pathOf(String? id) {
-      if (id == null) return null;
-      for (var i = 0; i < nodes.length; i++) {
-        final found = _find(nodes[i], id);
-        if (found != null) {
-          return [first + i, ...found.path.skip(1)];
-        }
-      }
-      return null;
-    }
-
-    Position? moved(Position position) {
-      final node = getNodeAtPath(position.path);
-      final path = pathOf(node == null ? null : idOf[node]);
-      return path == null ? null : position.copyWith(path: path);
-    }
-
-    final caretPath = pathOf(result.caretBlockId);
-    final start = moved(current.start);
-    final end = moved(current.end);
-    final transaction = this.transaction
-      ..insertNodes([first], nodes)
-      ..deleteNodes(range)
-      ..afterSelection = caretPath != null
-          ? Selection.collapsed(Position(path: caretPath))
-          : start != null && end != null
-          ? Selection(start: start, end: end)
-          : null;
-    await apply(transaction);
+    return null;
   }
 }
 

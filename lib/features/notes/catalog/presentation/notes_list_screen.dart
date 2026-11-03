@@ -81,97 +81,126 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         : ref.watch(noteSearchMatchesProvider(normalizedSearchQuery)).value;
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        actions: [
-          if (_isSearching)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 220),
-              child: TextField(
-                key: const ValueKey('notes-inline-search-field'),
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Buscar notas',
-                  prefixIcon: const Icon(Icons.search),
-                  border: InputBorder.none,
-                  filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
-                ),
-                onChanged: _onSearchQueryChanged,
-              ),
-            )
-          else
-            IconButton(
-              tooltip: 'Buscar notas',
-              icon: const Icon(Icons.search),
-              onPressed: _openSearch,
-            ),
-          if (_isSearching)
-            IconButton(icon: const Icon(Icons.close), onPressed: _closeSearch),
-          NotesMoreMenu(
-            isListView: !isGridView,
-            onToggleViewMode: _toggleViewMode,
-            onLogout: () => ref.read(authControllerProvider.notifier).logout(),
-            onOpenSettings: () => context.push(AppRoutes.settings),
-          ),
-          const SizedBox(width: 12),
-        ],
-      ),
+      appBar: _buildAppBar(context, isGridView: isGridView),
       body: notesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => AppErrorView(
           title: 'Erro ao carregar as notas',
           subtitle: e.toString(),
         ),
-        data: (notes) {
-          final filteredNotes = normalizedSearchQuery.isEmpty
-              ? notes
-              : notes.where((n) {
-                  if (contentMatches?.contains(n.id) ?? false) {
-                    return true;
-                  }
-                  final bodyText = (n.excerpt ?? n.content).toLowerCase();
-                  return n.title.toLowerCase().contains(
-                        normalizedSearchQuery,
-                      ) ||
-                      bodyText.contains(normalizedSearchQuery);
-                }).toList();
-
-          if (filteredNotes.isEmpty) {
-            return _NotesEmptyMessage(
-              key: const ValueKey('notes-empty-state'),
-              title: normalizedSearchQuery.isEmpty
-                  ? 'Nenhuma nota ainda'
-                  : 'Nenhuma nota encontrada',
-              subtitle: normalizedSearchQuery.isEmpty
-                  ? 'Crie uma nota para começar.'
-                  : 'Tente buscar por outro termo.',
-            );
-          }
-
-          return isGridView
-              ? NotesGridView(
-                  key: const ValueKey('grid'),
-                  notes: filteredNotes,
-                  onTap: _openNote,
-                  onDelete: _deleteNote,
-                  onToggleFavorite: _toggleFavorite,
-                  onEditIcon: _editNoteIcon,
-                )
-              : NotesListView(
-                  key: const ValueKey('list'),
-                  notes: filteredNotes,
-                  onTap: _openNote,
-                  onDelete: _deleteNote,
-                  onToggleFavorite: _toggleFavorite,
-                  onEditIcon: _editNoteIcon,
-                );
-        },
+        data: (notes) => _buildNotes(
+          _filterNotes(notes, normalizedSearchQuery, contentMatches),
+          normalizedSearchQuery: normalizedSearchQuery,
+          isGridView: isGridView,
+        ),
       ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context, {
+    required bool isGridView,
+  }) {
+    return AppBar(
+      automaticallyImplyLeading: false,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      actions: [
+        if (_isSearching)
+          _buildSearchField(context)
+        else
+          IconButton(
+            tooltip: 'Buscar notas',
+            icon: const Icon(Icons.search),
+            onPressed: _openSearch,
+          ),
+        if (_isSearching)
+          IconButton(icon: const Icon(Icons.close), onPressed: _closeSearch),
+        NotesMoreMenu(
+          isListView: !isGridView,
+          onToggleViewMode: _toggleViewMode,
+          onLogout: () => ref.read(authControllerProvider.notifier).logout(),
+          onOpenSettings: () => context.push(AppRoutes.settings),
+        ),
+        const SizedBox(width: 12),
+      ],
+    );
+  }
+
+  Widget _buildSearchField(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 220),
+      child: TextField(
+        key: const ValueKey('notes-inline-search-field'),
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: 'Buscar notas',
+          prefixIcon: const Icon(Icons.search),
+          border: InputBorder.none,
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surface,
+        ),
+        onChanged: _onSearchQueryChanged,
+      ),
+    );
+  }
+
+  /// Notes matching [normalizedSearchQuery] by full content (when the database
+  /// matches are loaded) or by in-memory title/excerpt.
+  static List<NoteModel> _filterNotes(
+    List<NoteModel> notes,
+    String normalizedSearchQuery,
+    Set<String>? contentMatches,
+  ) {
+    if (normalizedSearchQuery.isEmpty) return notes;
+    return notes.where((n) {
+      if (contentMatches?.contains(n.id) ?? false) {
+        return true;
+      }
+      final bodyText = (n.excerpt ?? n.content).toLowerCase();
+      return n.title.toLowerCase().contains(normalizedSearchQuery) ||
+          bodyText.contains(normalizedSearchQuery);
+    }).toList();
+  }
+
+  Widget _buildNotes(
+    List<NoteModel> filteredNotes, {
+    required String normalizedSearchQuery,
+    required bool isGridView,
+  }) {
+    if (filteredNotes.isEmpty) {
+      return _buildEmptyState(normalizedSearchQuery);
+    }
+
+    return isGridView
+        ? NotesGridView(
+            key: const ValueKey('grid'),
+            notes: filteredNotes,
+            onTap: _openNote,
+            onDelete: _deleteNote,
+            onToggleFavorite: _toggleFavorite,
+            onEditIcon: _editNoteIcon,
+          )
+        : NotesListView(
+            key: const ValueKey('list'),
+            notes: filteredNotes,
+            onTap: _openNote,
+            onDelete: _deleteNote,
+            onToggleFavorite: _toggleFavorite,
+            onEditIcon: _editNoteIcon,
+          );
+  }
+
+  static Widget _buildEmptyState(String normalizedSearchQuery) {
+    final isSearching = normalizedSearchQuery.isNotEmpty;
+    return _NotesEmptyMessage(
+      key: const ValueKey('notes-empty-state'),
+      title: isSearching ? 'Nenhuma nota encontrada' : 'Nenhuma nota ainda',
+      subtitle: isSearching
+          ? 'Tente buscar por outro termo.'
+          : 'Crie uma nota para começar.',
     );
   }
 

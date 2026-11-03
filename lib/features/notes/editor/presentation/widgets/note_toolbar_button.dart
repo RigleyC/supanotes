@@ -180,37 +180,55 @@ class _ToolbarButtonVisual extends StatelessWidget {
   final double activeProgress;
   final double iconProgress;
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+  static const _labelBase = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+  );
+
+  bool get _filled => activeStyle == ToolbarActiveStyle.filled;
+
+  Color _foreground(ColorScheme colorScheme) {
     final inactiveColor = onPressed == null
         ? colorScheme.onSurface.withValues(alpha: 0.38)
         : colorScheme.onSurface;
-    final filled = activeStyle == ToolbarActiveStyle.filled;
-    final foreground = Color.lerp(
+    return Color.lerp(
       inactiveColor,
-      filled ? colorScheme.onPrimary : colorScheme.primary,
+      _filled ? colorScheme.onPrimary : colorScheme.primary,
       activeProgress,
     )!;
-    final background = colorScheme.primary.withValues(
-      alpha: (filled ? 1 : 0.12) * activeProgress,
+  }
+
+  Color _background(ColorScheme colorScheme) => colorScheme.primary.withValues(
+    alpha: (_filled ? 1 : 0.12) * activeProgress,
+  );
+
+  /// The label, icon or SVG, in [foreground].
+  Widget _glyph(Color foreground) {
+    if (label != null) {
+      return Text(
+        label!,
+        textScaler: TextScaler.noScaling,
+        style: _labelBase
+            .merge(labelStyle)
+            .copyWith(color: foreground, decorationColor: foreground),
+      );
+    }
+    if (icon != null) {
+      return Icon(icon, size: spacious ? 28 : 26, color: foreground);
+    }
+    return SvgPicture.asset(
+      svgAsset!,
+      width: spacious ? 26 : 24,
+      height: spacious ? 26 : 24,
+      colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
     );
-    final buttonIcon = label != null
-        ? Text(
-            label!,
-            textScaler: TextScaler.noScaling,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)
-                .merge(labelStyle)
-                .copyWith(color: foreground, decorationColor: foreground),
-          )
-        : icon != null
-        ? Icon(icon, size: spacious ? 28 : 26, color: foreground)
-        : SvgPicture.asset(
-            svgAsset!,
-            width: spacious ? 26 : 24,
-            height: spacious ? 26 : 24,
-            colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
-          );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final background = _background(colorScheme);
+    final buttonIcon = _glyph(_foreground(colorScheme));
 
     return Semantics(
       button: true,

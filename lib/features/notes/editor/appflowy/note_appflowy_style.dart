@@ -141,79 +141,129 @@ Map<String, BlockComponentBuilder> noteBlockBuilders(
     fontSize: NoteEditorMetrics.bodySize,
     height: NoteEditorMetrics.lineHeight,
   );
-  final placeholderStyle = body.copyWith(color: scheme.outline);
-
-  bool isFirst(Node node) =>
-      node.parent?.type == 'page' && node.path.first == 0;
-  bool isListLike(Node? node) =>
-      node != null &&
-      (node.type == BulletedListBlockKeys.type ||
-          node.type == NumberedListBlockKeys.type);
-
-  EdgeInsets indent(Node node, TextDirection direction) =>
-      direction == TextDirection.ltr
-      ? const EdgeInsets.only(left: NoteEditorMetrics.indentUnit)
-      : const EdgeInsets.only(right: NoteEditorMetrics.indentUnit);
-
-  BlockComponentConfiguration config({
-    required EdgeInsets Function(Node node) padding,
-    TextStyle? style,
-    String Function(Node node)? placeholderText,
-  }) => BlockComponentConfiguration(
-    padding: padding,
-    indentPadding: indent,
-    textStyle: (node, {textSpan}) => style ?? body,
-    placeholderTextStyle: (node, {textSpan}) =>
-        (style ?? body).copyWith(color: scheme.outline),
-    placeholderText: placeholderText ?? (_) => ' ',
-  );
-
-  final listPadding = (Node node) => EdgeInsets.only(
-    top: 8,
-    // The last item of a list keeps some air before the next block.
-    bottom: isListLike(node.next) || node.children.isNotEmpty ? 0 : 12,
-  );
-
-  TextStyle heading(double size) => body.copyWith(
-    fontSize: size,
-    fontWeight: FontWeight.bold,
-    height: size >= NoteEditorMetrics.h1Size ? 1.15 : 1.25,
-    letterSpacing: size >= NoteEditorMetrics.h1Size ? -0.2 : null,
-  );
 
   return {
     PageBlockKeys.type: PageBlockComponentBuilder(),
-    ParagraphBlockKeys.type: ParagraphBlockComponentBuilder(
-      configuration: config(
-        padding: (node) => EdgeInsets.only(top: isFirst(node) ? 0 : 10),
-        // Hint only on an empty note, like the previous editor.
-        placeholderText: (node) =>
-            node.path.first == 0 && node.next == null ? placeholder : ' ',
-      ).copyWith(placeholderTextStyle: (node, {textSpan}) => placeholderStyle),
-    ),
-    HeadingBlockKeys.type: HeadingBlockComponentBuilder(
-      configuration: config(
-        padding: (node) {
-          final level = node.attributes[HeadingBlockKeys.level] as int? ?? 1;
-          final top = switch (level) {
-            1 => 24.0,
-            2 => 20.0,
-            _ => 16.0,
-          };
-          return EdgeInsets.only(
-            top: isFirst(node) ? 0 : top,
-            bottom: level == 3 ? 8 : 12,
-          );
-        },
+    ParagraphBlockKeys.type: _paragraphBuilder(scheme, body, placeholder),
+    HeadingBlockKeys.type: _headingBuilder(scheme, body),
+    QuoteBlockKeys.type: _quoteBuilder(scheme, body),
+    BulletedListBlockKeys.type: _bulletedListBuilder(scheme, body),
+    NumberedListBlockKeys.type: _numberedListBuilder(scheme, body),
+    TodoListBlockKeys.type: NoteTaskBlockComponentBuilder(
+      actions: taskActions,
+      readOnly: readOnly,
+      hideCompleted: hideCompleted,
+      configuration: _config(
+        scheme,
+        body,
+        padding: (_) => const EdgeInsets.only(top: 6),
       ),
-      textStyleBuilder: (level) => heading(switch (level) {
-        1 => NoteEditorMetrics.h1Size,
-        2 => NoteEditorMetrics.h2Size,
-        _ => NoteEditorMetrics.h3Size,
-      }),
     ),
-    QuoteBlockKeys.type: QuoteBlockComponentBuilder(
-      configuration: config(
+    DividerBlockKeys.type: noteDividerBlockBuilder()
+      ..configuration = BlockComponentConfiguration(
+        padding: (_) => const EdgeInsets.symmetric(vertical: 4),
+      ),
+    NoteNodeTypes.attachment: noteAttachmentBlockBuilder(
+      collapseImages: collapseImages,
+      readOnly: readOnly,
+      attachmentDelivery: attachmentDelivery,
+    ),
+    NoteNodeTypes.richLink: noteRichLinkBlockBuilder(
+      allowInternalNoteLinks: allowInternalNoteLinks,
+    ),
+  };
+}
+
+bool _isFirst(Node node) => node.parent?.type == 'page' && node.path.first == 0;
+
+bool _isListLike(Node? node) =>
+    node != null &&
+    (node.type == BulletedListBlockKeys.type ||
+        node.type == NumberedListBlockKeys.type);
+
+EdgeInsets _indent(Node node, TextDirection direction) =>
+    direction == TextDirection.ltr
+    ? const EdgeInsets.only(left: NoteEditorMetrics.indentUnit)
+    : const EdgeInsets.only(right: NoteEditorMetrics.indentUnit);
+
+/// The configuration shared by text blocks: [style] (the body text by
+/// default) and its outline-colored placeholder.
+BlockComponentConfiguration _config(
+  ColorScheme scheme,
+  TextStyle body, {
+  required EdgeInsets Function(Node node) padding,
+  TextStyle? style,
+  String Function(Node node)? placeholderText,
+}) => BlockComponentConfiguration(
+  padding: padding,
+  indentPadding: _indent,
+  textStyle: (node, {textSpan}) => style ?? body,
+  placeholderTextStyle: (node, {textSpan}) =>
+      (style ?? body).copyWith(color: scheme.outline),
+  placeholderText: placeholderText ?? (_) => ' ',
+);
+
+EdgeInsets _listPadding(Node node) => EdgeInsets.only(
+  top: 8,
+  // The last item of a list keeps some air before the next block.
+  bottom: _isListLike(node.next) || node.children.isNotEmpty ? 0 : 12,
+);
+
+TextStyle _heading(TextStyle body, double size) => body.copyWith(
+  fontSize: size,
+  fontWeight: FontWeight.bold,
+  height: size >= NoteEditorMetrics.h1Size ? 1.15 : 1.25,
+  letterSpacing: size >= NoteEditorMetrics.h1Size ? -0.2 : null,
+);
+
+double _headingSize(int level) => switch (level) {
+  1 => NoteEditorMetrics.h1Size,
+  2 => NoteEditorMetrics.h2Size,
+  _ => NoteEditorMetrics.h3Size,
+};
+
+EdgeInsets _headingPadding(Node node) {
+  final level = node.attributes[HeadingBlockKeys.level] as int? ?? 1;
+  final top = switch (level) {
+    1 => 24.0,
+    2 => 20.0,
+    _ => 16.0,
+  };
+  return EdgeInsets.only(
+    top: _isFirst(node) ? 0 : top,
+    bottom: level == 3 ? 8 : 12,
+  );
+}
+
+BlockComponentBuilder _paragraphBuilder(
+  ColorScheme scheme,
+  TextStyle body,
+  String placeholder,
+) {
+  final placeholderStyle = body.copyWith(color: scheme.outline);
+  return ParagraphBlockComponentBuilder(
+    configuration: _config(
+      scheme,
+      body,
+      padding: (node) => EdgeInsets.only(top: _isFirst(node) ? 0 : 10),
+      // Hint only on an empty note, like the previous editor.
+      placeholderText: (node) =>
+          node.path.first == 0 && node.next == null ? placeholder : ' ',
+    ).copyWith(placeholderTextStyle: (node, {textSpan}) => placeholderStyle),
+  );
+}
+
+BlockComponentBuilder _headingBuilder(ColorScheme scheme, TextStyle body) =>
+    HeadingBlockComponentBuilder(
+      configuration: _config(scheme, body, padding: _headingPadding),
+      textStyleBuilder: (level) => _heading(body, _headingSize(level)),
+    );
+
+BlockComponentBuilder _quoteBuilder(ColorScheme scheme, TextStyle body) =>
+    QuoteBlockComponentBuilder(
+      configuration: _config(
+        scheme,
+        body,
         padding: (_) => const EdgeInsets.symmetric(vertical: 8),
         style: body.copyWith(
           fontSize: NoteEditorMetrics.quoteSize,
@@ -230,47 +280,32 @@ Map<String, BlockComponentBuilder> noteBlockBuilders(
           borderRadius: BorderRadius.circular(2),
         ),
       ),
+    );
+
+BlockComponentBuilder _bulletedListBuilder(
+  ColorScheme scheme,
+  TextStyle body,
+) => BulletedListBlockComponentBuilder(
+  configuration: _config(scheme, body, padding: _listPadding),
+  iconBuilder: (context, node) => _ListMarker(
+    child: Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.primary),
     ),
-    BulletedListBlockKeys.type: BulletedListBlockComponentBuilder(
-      configuration: config(padding: listPadding),
-      iconBuilder: (context, node) => _ListMarker(
-        child: Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: scheme.primary,
-          ),
-        ),
-      ),
-    ),
-    NumberedListBlockKeys.type: NumberedListBlockComponentBuilder(
-      configuration: config(padding: listPadding),
-      iconBuilder: (context, node, direction) => _ListMarker(
-        alignment: AlignmentDirectional.centerStart,
-        child: Text('${_listIndex(node)}.', style: body),
-      ),
-    ),
-    TodoListBlockKeys.type: NoteTaskBlockComponentBuilder(
-      actions: taskActions,
-      readOnly: readOnly,
-      hideCompleted: hideCompleted,
-      configuration: config(padding: (_) => const EdgeInsets.only(top: 6)),
-    ),
-    DividerBlockKeys.type: noteDividerBlockBuilder()
-      ..configuration = BlockComponentConfiguration(
-        padding: (_) => const EdgeInsets.symmetric(vertical: 4),
-      ),
-    NoteNodeTypes.attachment: noteAttachmentBlockBuilder(
-      collapseImages: collapseImages,
-      readOnly: readOnly,
-      attachmentDelivery: attachmentDelivery,
-    ),
-    NoteNodeTypes.richLink: noteRichLinkBlockBuilder(
-      allowInternalNoteLinks: allowInternalNoteLinks,
-    ),
-  };
-}
+  ),
+);
+
+BlockComponentBuilder _numberedListBuilder(
+  ColorScheme scheme,
+  TextStyle body,
+) => NumberedListBlockComponentBuilder(
+  configuration: _config(scheme, body, padding: _listPadding),
+  iconBuilder: (context, node, direction) => _ListMarker(
+    alignment: AlignmentDirectional.centerStart,
+    child: Text('${_listIndex(node)}.', style: body),
+  ),
+);
 
 /// 1-based position of [node] among the consecutive numbered items around it.
 int _listIndex(Node node) {

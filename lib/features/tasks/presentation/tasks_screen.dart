@@ -79,58 +79,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   /// list opens at its top so overdue tasks are seen first.
   Widget _buildList(BuildContext context, List<TaskListItem> openTasks) {
     final now = DateTime.now();
-    final entries = <_Entry>[];
-    if (openTasks.isEmpty) {
-      entries.add(const _EmptyEntry());
-    } else {
-      final sections = <_TaskSection, List<TaskListItem>>{
-        for (final section in _TaskSection.values) section: [],
-      };
-      for (final item in openTasks) {
-        sections[_sectionOf(item, now)]!.add(item);
-      }
-      for (final MapEntry(key: section, value: items) in sections.entries) {
-        if (items.isEmpty) continue;
-        entries.add(_HeaderEntry(section));
-        for (final item in items) {
-          entries.add(_TaskEntry(item, section));
-        }
-      }
-    }
-    entries.add(const _CompletedLinkEntry());
-
+    final entries = _entriesFor(openTasks, now);
     final overdueColor = Theme.of(context).colorScheme.error;
-    Widget buildEntry(_Entry entry) {
-      switch (entry) {
-        case _HeaderEntry(:final section):
-          return _SectionHeader(section: section);
-        case _TaskEntry(:final item, :final section):
-          return KeyedSubtree(
-            key: ValueKey(item.uiKey),
-            child: Padding(
-              padding: const EdgeInsets.only(
-                left: AppNavigationBar.contentInset - 14,
-                right: AppNavigationBar.contentInset,
-              ),
-              child: TaskListTile(
-                item: item,
-                checked: item.isCompleted,
-                trailingLabel: _scheduleLabel(item, now),
-                trailingColor: section == _TaskSection.overdue
-                    ? overdueColor
-                    : null,
-                onTap: () => unawaited(_openTask(context, item)),
-                onToggle: () => _toggleTask(item),
-                onDelete: () => _deleteTask(item),
-              ),
-            ),
-          );
-        case _EmptyEntry():
-          return const _TasksEmptyMessage();
-        case _CompletedLinkEntry():
-          return const _CompletedTasksLink();
-      }
-    }
 
     final bottomPadding = AppNavigationBar.contentBottomPadding(context);
     return LayoutBuilder(
@@ -144,8 +94,56 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [for (final entry in entries) buildEntry(entry)],
+            children: [
+              for (final entry in entries)
+                _buildEntry(context, entry, now, overdueColor),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEntry(
+    BuildContext context,
+    _Entry entry,
+    DateTime now,
+    Color overdueColor,
+  ) {
+    switch (entry) {
+      case _HeaderEntry(:final section):
+        return _SectionHeader(section: section);
+      case _TaskEntry(:final item, :final section):
+        return _buildTaskEntry(context, item, section, now, overdueColor);
+      case _EmptyEntry():
+        return const _TasksEmptyMessage();
+      case _CompletedLinkEntry():
+        return const _CompletedTasksLink();
+    }
+  }
+
+  Widget _buildTaskEntry(
+    BuildContext context,
+    TaskListItem item,
+    _TaskSection section,
+    DateTime now,
+    Color overdueColor,
+  ) {
+    return KeyedSubtree(
+      key: ValueKey(item.uiKey),
+      child: Padding(
+        padding: const EdgeInsets.only(
+          left: AppNavigationBar.contentInset - 14,
+          right: AppNavigationBar.contentInset,
+        ),
+        child: TaskListTile(
+          item: item,
+          checked: item.isCompleted,
+          trailingLabel: _scheduleLabel(item, now),
+          trailingColor: section == _TaskSection.overdue ? overdueColor : null,
+          onTap: () => unawaited(_openTask(context, item)),
+          onToggle: () => _toggleTask(item),
+          onDelete: () => _deleteTask(item),
         ),
       ),
     );
@@ -288,6 +286,36 @@ DateFormat _localizedFormat(String pattern) {
 }
 
 String _stripDots(String value) => value.replaceAll('.', '').toLowerCase();
+
+/// Flattens the open tasks into rows: an empty message when there is nothing
+/// to do, otherwise a header plus tasks per non-empty section; the completed
+/// link always closes the list.
+List<_Entry> _entriesFor(List<TaskListItem> openTasks, DateTime now) {
+  final entries = openTasks.isEmpty
+      ? <_Entry>[const _EmptyEntry()]
+      : _sectionEntries(openTasks, now);
+  return entries..add(const _CompletedLinkEntry());
+}
+
+/// Groups [openTasks] by section (in [_TaskSection] order), skipping empty
+/// sections.
+List<_Entry> _sectionEntries(List<TaskListItem> openTasks, DateTime now) {
+  final sections = <_TaskSection, List<TaskListItem>>{
+    for (final section in _TaskSection.values) section: [],
+  };
+  for (final item in openTasks) {
+    sections[_sectionOf(item, now)]!.add(item);
+  }
+  final entries = <_Entry>[];
+  for (final MapEntry(key: section, value: items) in sections.entries) {
+    if (items.isEmpty) continue;
+    entries.add(_HeaderEntry(section));
+    for (final item in items) {
+      entries.add(_TaskEntry(item, section));
+    }
+  }
+  return entries;
+}
 
 sealed class _Entry {
   const _Entry();

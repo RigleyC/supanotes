@@ -180,85 +180,136 @@ void applyNoteOperation(
   required String? blockId,
   required Map<String, dynamic> payload,
 }) {
-  int indexOf(String? id) =>
-      id == null ? -1 : blocks.indexWhere((block) => block.id == id);
-
   switch (kind) {
     case NoteOperationWireNames.textDelta:
-      final index = indexOf(blockId);
-      final rawOps = payload['ops'];
-      if (index < 0 || rawOps is! List) return;
-      final delta = composeBlockDelta(
-        blocks[index].delta,
-        [for (final op in rawOps) Map<String, dynamic>.from(op as Map)],
-      );
-      if (delta != null) blocks[index] = blocks[index].copyWith(delta: delta);
+      _applyTextDelta(blocks, blockId, payload);
     case NoteOperationWireNames.createBlock:
-      final block = NoteBlock.fromJson(payload);
-      if (indexOf(block.id) >= 0) return;
-      final afterBlockId = payload['afterBlockId'] as String?;
-      var index = blocks.length;
-      if (afterBlockId == null) {
-        index = 0;
-      } else {
-        final target = indexOf(afterBlockId);
-        if (target >= 0) index = target + 1;
-      }
-      blocks.insert(index.clamp(0, blocks.length), block);
+      _applyCreateBlock(blocks, payload);
     case NoteOperationWireNames.deleteBlock:
-      final index = indexOf(blockId ?? payload['blockId'] as String?);
-      if (index >= 0 && blocks.length > 1) blocks.removeAt(index);
+      _applyDeleteBlock(blocks, blockId, payload);
     case NoteOperationWireNames.moveBlock:
-      final moveId = payload['blockId'] as String? ?? blockId;
-      final source = indexOf(moveId);
-      if (source < 0 || blocks.length <= 1) return;
-      final afterId = payload['afterBlockId'] as String?;
-      if (afterId == moveId) return;
-      var target = blocks.length - 1;
-      if (afterId == null) {
-        target = 0;
-      } else {
-        final afterIndex = indexOf(afterId);
-        if (afterIndex >= 0) {
-          target = afterIndex + 1;
-          if (source < afterIndex) target -= 1;
-        }
-      }
-      final block = blocks.removeAt(source);
-      blocks.insert(target.clamp(0, blocks.length), block);
+      _applyMoveBlock(blocks, blockId, payload);
     case NoteOperationWireNames.setBlockType:
-      final index = indexOf(blockId);
-      if (index < 0) return;
-      blocks[index] = blocks[index].copyWith(
-        type: payload['type'] as String? ?? 'paragraph',
-      );
+      _applySetBlockType(blocks, blockId, payload);
     case NoteOperationWireNames.setBlockMetadata:
-      final index = indexOf(blockId);
-      final updates = payload['metadata'];
-      if (index < 0 || updates is! Map) return;
-      blocks[index] = blocks[index].copyWith(
-        metadata: mergeNoteMetadata(
-          blocks[index].metadata,
-          Map<String, dynamic>.from(updates),
-        ),
-      );
+      _applySetBlockMetadata(blocks, blockId, payload);
     case NoteOperationWireNames.completeTaskOccurrence:
-      final index = indexOf(blockId ?? payload['taskId'] as String?);
-      final scheduledAt = payload['scheduledAt'] as String?;
-      if (index < 0 || !blocks[index].isTask || scheduledAt == null) return;
-      final completions = Map<String, dynamic>.from(
-        blocks[index].metadata['completions'] as Map? ?? const {},
-      );
-      final completedAt = payload['completedAt'] as String?;
-      if (completedAt != null && completedAt.isNotEmpty) {
-        completions[scheduledAt] = completedAt;
-      } else {
-        completions.remove(scheduledAt);
-      }
-      blocks[index] = blocks[index].copyWith(
-        metadata: {...blocks[index].metadata, 'completions': completions},
-      );
+      _applyCompleteTaskOccurrence(blocks, blockId, payload);
   }
+}
+
+int _indexOfBlock(List<NoteBlock> blocks, String? id) =>
+    id == null ? -1 : blocks.indexWhere((block) => block.id == id);
+
+void _applyTextDelta(
+  List<NoteBlock> blocks,
+  String? blockId,
+  Map<String, dynamic> payload,
+) {
+  final index = _indexOfBlock(blocks, blockId);
+  final rawOps = payload['ops'];
+  if (index < 0 || rawOps is! List) return;
+  final delta = composeBlockDelta(
+    blocks[index].delta,
+    [for (final op in rawOps) Map<String, dynamic>.from(op as Map)],
+  );
+  if (delta != null) blocks[index] = blocks[index].copyWith(delta: delta);
+}
+
+void _applyCreateBlock(List<NoteBlock> blocks, Map<String, dynamic> payload) {
+  final block = NoteBlock.fromJson(payload);
+  if (_indexOfBlock(blocks, block.id) >= 0) return;
+  final afterBlockId = payload['afterBlockId'] as String?;
+  var index = blocks.length;
+  if (afterBlockId == null) {
+    index = 0;
+  } else {
+    final target = _indexOfBlock(blocks, afterBlockId);
+    if (target >= 0) index = target + 1;
+  }
+  blocks.insert(index.clamp(0, blocks.length), block);
+}
+
+void _applyDeleteBlock(
+  List<NoteBlock> blocks,
+  String? blockId,
+  Map<String, dynamic> payload,
+) {
+  final index = _indexOfBlock(blocks, blockId ?? payload['blockId'] as String?);
+  if (index >= 0 && blocks.length > 1) blocks.removeAt(index);
+}
+
+void _applyMoveBlock(
+  List<NoteBlock> blocks,
+  String? blockId,
+  Map<String, dynamic> payload,
+) {
+  final moveId = payload['blockId'] as String? ?? blockId;
+  final source = _indexOfBlock(blocks, moveId);
+  if (source < 0 || blocks.length <= 1) return;
+  final afterId = payload['afterBlockId'] as String?;
+  if (afterId == moveId) return;
+  final target = _moveTarget(blocks, source, afterId);
+  final block = blocks.removeAt(source);
+  blocks.insert(target.clamp(0, blocks.length), block);
+}
+
+/// Index the block at [source] lands on, counted before it is removed.
+int _moveTarget(List<NoteBlock> blocks, int source, String? afterId) {
+  if (afterId == null) return 0;
+  final afterIndex = _indexOfBlock(blocks, afterId);
+  if (afterIndex < 0) return blocks.length - 1;
+  return source < afterIndex ? afterIndex : afterIndex + 1;
+}
+
+void _applySetBlockType(
+  List<NoteBlock> blocks,
+  String? blockId,
+  Map<String, dynamic> payload,
+) {
+  final index = _indexOfBlock(blocks, blockId);
+  if (index < 0) return;
+  blocks[index] = blocks[index].copyWith(
+    type: payload['type'] as String? ?? 'paragraph',
+  );
+}
+
+void _applySetBlockMetadata(
+  List<NoteBlock> blocks,
+  String? blockId,
+  Map<String, dynamic> payload,
+) {
+  final index = _indexOfBlock(blocks, blockId);
+  final updates = payload['metadata'];
+  if (index < 0 || updates is! Map) return;
+  blocks[index] = blocks[index].copyWith(
+    metadata: mergeNoteMetadata(
+      blocks[index].metadata,
+      Map<String, dynamic>.from(updates),
+    ),
+  );
+}
+
+void _applyCompleteTaskOccurrence(
+  List<NoteBlock> blocks,
+  String? blockId,
+  Map<String, dynamic> payload,
+) {
+  final index = _indexOfBlock(blocks, blockId ?? payload['taskId'] as String?);
+  final scheduledAt = payload['scheduledAt'] as String?;
+  if (index < 0 || !blocks[index].isTask || scheduledAt == null) return;
+  final completions = Map<String, dynamic>.from(
+    blocks[index].metadata['completions'] as Map? ?? const {},
+  );
+  final completedAt = payload['completedAt'] as String?;
+  if (completedAt != null && completedAt.isNotEmpty) {
+    completions[scheduledAt] = completedAt;
+  } else {
+    completions.remove(scheduledAt);
+  }
+  blocks[index] = blocks[index].copyWith(
+    metadata: {...blocks[index].metadata, 'completions': completions},
+  );
 }
 
 /// Merges metadata [updates]; a `null` value removes the key.
@@ -289,21 +340,25 @@ List<Map<String, dynamic>>? composeBlockDelta(
     (sum, op) => sum + ((op['insert'] as String?)?.length ?? 0),
   );
   for (final op in ops) {
-    final keys = const ['insert', 'retain', 'delete'].where(op.containsKey);
-    if (keys.length != 1) return null;
-    final value = op[keys.single];
-    final attributes = op['attributes'];
-    if (attributes != null && attributes is! Map) return null;
-    if (keys.single == 'insert') {
-      if (value is! String) return null;
-    } else {
-      if (value is! int || value < 0) return null;
-      consumed += value;
-      if (consumed > length) return null;
-    }
+    final span = _textOpSpan(op);
+    if (span == null) return null;
+    consumed += span;
+    if (consumed > length) return null;
   }
   final composed = _toQuill(delta).compose(_toQuill(ops));
   return _fromQuill(composed);
+}
+
+/// How much existing text a change [op] retains or deletes (0 for an
+/// insert), or `null` when the op is malformed.
+int? _textOpSpan(Map<String, dynamic> op) {
+  final keys = const ['insert', 'retain', 'delete'].where(op.containsKey);
+  if (keys.length != 1) return null;
+  final attributes = op['attributes'];
+  if (attributes != null && attributes is! Map) return null;
+  final value = op[keys.single];
+  if (keys.single == 'insert') return value is String ? 0 : null;
+  return value is int && value >= 0 ? value : null;
 }
 
 /// The text change that turns block delta [before] into [after], or an empty
@@ -347,55 +402,18 @@ List<NoteBlockOperation> diffNoteBlocks(
   List<NoteBlock> after,
 ) {
   final beforeById = {for (final block in before) block.id: block};
-  final beforeIndex = {
-    for (var i = 0; i < before.length; i++) before[i].id: i,
-  };
   final afterIds = {for (final block in after) block.id};
   final operations = <NoteBlockOperation>[];
-
-  // Blocks present in both states keep their relative order except the ones
-  // that moved. The largest set that kept its order (longest increasing
-  // subsequence of previous positions) stays put; only the rest get a
-  // move_block, so one move yields one operation.
-  final survivors = [
-    for (final block in after)
-      if (beforeById.containsKey(block.id)) block.id,
-  ];
-  final stable = _longestIncreasingRun(
-    [for (final id in survivors) beforeIndex[id]!],
-  ).map((position) => survivors[position]).toSet();
+  final stable = _stableBlockIds(before, after, beforeById);
 
   for (var index = 0; index < after.length; index++) {
-    final block = after[index];
-    final afterBlockId = index == 0 ? null : after[index - 1].id;
-    final previous = beforeById[block.id];
-    if (previous == null) {
-      operations.add(
-        NoteBlockOperation(
-          kind: NoteOperationWireNames.createBlock,
-          blockId: block.id,
-          payload: NoteOperationPayloads.createBlock(
-            block: block.toJson()..['metadata'] = block.metadata,
-            afterBlockId: afterBlockId,
-          ),
-        ),
-      );
-      continue;
-    }
-
-    if (!stable.contains(block.id)) {
-      operations.add(
-        NoteBlockOperation(
-          kind: NoteOperationWireNames.moveBlock,
-          blockId: block.id,
-          payload: NoteOperationPayloads.moveBlock(
-            blockId: block.id,
-            afterBlockId: afterBlockId,
-          ),
-        ),
-      );
-    }
-    _appendContentOperations(previous, block, operations);
+    _appendBlockOperations(
+      previous: beforeById[after[index].id],
+      block: after[index],
+      afterBlockId: index == 0 ? null : after[index - 1].id,
+      stable: stable,
+      operations: operations,
+    );
   }
 
   // Deletions go last: a document never loses its final block, so deleting
@@ -411,6 +429,67 @@ List<NoteBlockOperation> diffNoteBlocks(
     );
   }
   return operations;
+}
+
+/// Ids of the blocks present in both states that do not need a move.
+///
+/// Blocks present in both states keep their relative order except the ones
+/// that moved. The largest set that kept its order (longest increasing
+/// subsequence of previous positions) stays put; only the rest get a
+/// move_block, so one move yields one operation.
+Set<String> _stableBlockIds(
+  List<NoteBlock> before,
+  List<NoteBlock> after,
+  Map<String, NoteBlock> beforeById,
+) {
+  final beforeIndex = {
+    for (var i = 0; i < before.length; i++) before[i].id: i,
+  };
+  final survivors = [
+    for (final block in after)
+      if (beforeById.containsKey(block.id)) block.id,
+  ];
+  return _longestIncreasingRun(
+    [for (final id in survivors) beforeIndex[id]!],
+  ).map((position) => survivors[position]).toSet();
+}
+
+/// Operations for one block of the new state: a create when it is new,
+/// otherwise a move (unless [stable]) and its content changes.
+void _appendBlockOperations({
+  required NoteBlock? previous,
+  required NoteBlock block,
+  required String? afterBlockId,
+  required Set<String> stable,
+  required List<NoteBlockOperation> operations,
+}) {
+  if (previous == null) {
+    operations.add(
+      NoteBlockOperation(
+        kind: NoteOperationWireNames.createBlock,
+        blockId: block.id,
+        payload: NoteOperationPayloads.createBlock(
+          block: block.toJson()..['metadata'] = block.metadata,
+          afterBlockId: afterBlockId,
+        ),
+      ),
+    );
+    return;
+  }
+
+  if (!stable.contains(block.id)) {
+    operations.add(
+      NoteBlockOperation(
+        kind: NoteOperationWireNames.moveBlock,
+        blockId: block.id,
+        payload: NoteOperationPayloads.moveBlock(
+          blockId: block.id,
+          afterBlockId: afterBlockId,
+        ),
+      ),
+    );
+  }
+  _appendContentOperations(previous, block, operations);
 }
 
 /// Positions (into [values]) of one longest strictly increasing subsequence.
@@ -475,51 +554,69 @@ void _appendContentOperations(
 
   if (_deepEquality.equals(before.metadata, after.metadata)) return;
 
+  final scheduleChanged = _scheduleChanged(before.metadata, after.metadata);
+
+  // Completing one occurrence is its own operation so two devices completing
+  // different occurrences merge instead of overwriting each other.
+  if (!scheduleChanged) _appendCompletionOperations(before, after, operations);
+
+  _appendOtherMetadataOperation(before, after, scheduleChanged, operations);
+}
+
+bool _scheduleChanged(
+  Map<String, dynamic> before,
+  Map<String, dynamic> after,
+) =>
+    before['dueDate'] != after['dueDate'] ||
+    (before['hasTime'] as bool? ?? false) !=
+        (after['hasTime'] as bool? ?? false) ||
+    before['recurrenceRule'] != after['recurrenceRule'];
+
+void _appendCompletionOperations(
+  NoteBlock before,
+  NoteBlock after,
+  List<NoteBlockOperation> operations,
+) {
   final beforeCompletions = Map<String, dynamic>.from(
     before.metadata['completions'] as Map? ?? const {},
   );
   final afterCompletions = Map<String, dynamic>.from(
     after.metadata['completions'] as Map? ?? const {},
   );
-  final scheduleChanged =
-      before.metadata['dueDate'] != after.metadata['dueDate'] ||
-      (before.metadata['hasTime'] as bool? ?? false) !=
-          (after.metadata['hasTime'] as bool? ?? false) ||
-      before.metadata['recurrenceRule'] != after.metadata['recurrenceRule'];
-
-  // Completing one occurrence is its own operation so two devices completing
-  // different occurrences merge instead of overwriting each other.
-  if (!scheduleChanged) {
-    for (final entry in afterCompletions.entries) {
-      if (beforeCompletions[entry.key] == entry.value) continue;
-      operations.add(
-        NoteBlockOperation(
-          kind: NoteOperationWireNames.completeTaskOccurrence,
-          blockId: after.id,
-          payload: NoteOperationPayloads.completeTaskOccurrence(
-            taskId: after.id,
-            scheduledAt: entry.key,
-            completedAt: entry.value as String?,
-          ),
-        ),
-      );
-    }
-    for (final key in beforeCompletions.keys) {
-      if (afterCompletions.containsKey(key)) continue;
-      operations.add(
-        NoteBlockOperation(
-          kind: NoteOperationWireNames.completeTaskOccurrence,
-          blockId: after.id,
-          payload: NoteOperationPayloads.completeTaskOccurrence(
-            taskId: after.id,
-            scheduledAt: key,
-            completedAt: null,
-          ),
-        ),
-      );
-    }
+  for (final entry in afterCompletions.entries) {
+    if (beforeCompletions[entry.key] == entry.value) continue;
+    operations.add(
+      _completeOccurrenceOperation(after.id, entry.key, entry.value as String?),
+    );
   }
+  for (final key in beforeCompletions.keys) {
+    if (afterCompletions.containsKey(key)) continue;
+    operations.add(_completeOccurrenceOperation(after.id, key, null));
+  }
+}
 
+NoteBlockOperation _completeOccurrenceOperation(
+  String taskId,
+  String scheduledAt,
+  String? completedAt,
+) => NoteBlockOperation(
+  kind: NoteOperationWireNames.completeTaskOccurrence,
+  blockId: taskId,
+  payload: NoteOperationPayloads.completeTaskOccurrence(
+    taskId: taskId,
+    scheduledAt: scheduledAt,
+    completedAt: completedAt,
+  ),
+);
+
+/// A set_block_metadata for every metadata change other than completions;
+/// a schedule change also clears the completions.
+void _appendOtherMetadataOperation(
+  NoteBlock before,
+  NoteBlock after,
+  bool scheduleChanged,
+  List<NoteBlockOperation> operations,
+) {
   final afterOther = Map<String, dynamic>.from(after.metadata)
     ..remove('completions');
   final beforeOther = Map<String, dynamic>.from(before.metadata)

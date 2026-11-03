@@ -115,20 +115,57 @@ final class NoteTaskEditorCommands {
         : recurrence ?? previousRecurrence;
     final nextHasTime = hasTime ?? previousHasTime;
     final nextReminder = clearReminder ? null : reminder ?? previousReminder;
-    final dueDateChanged = previousDueDate == null
-        ? nextDueDate != null
-        : nextDueDate == null ||
-              !sameScheduledAt(
-                previousDueDate,
-                nextDueDate,
-                hasTime: nextHasTime,
-              );
     final scheduleChanged =
-        dueDateChanged ||
+        _dueDateChanged(previousDueDate, nextDueDate, hasTime: nextHasTime) ||
         nextRecurrence != previousRecurrence ||
         nextHasTime != previousHasTime;
     if (nextReminder == previousReminder && !scheduleChanged) return null;
 
+    _applyMetadataEdits(
+      metadata,
+      dueDate: dueDate,
+      recurrence: recurrence,
+      clearDueDate: clearDueDate,
+      clearRecurrence: clearRecurrence,
+      hasTime: hasTime,
+      nextHasTime: nextHasTime,
+      reminder: reminder,
+      clearReminder: clearReminder,
+    );
+    if (scheduleChanged) {
+      _archiveCompletions(
+        metadata,
+        scheduledAt: previousDueDate,
+        hasTime: previousHasTime,
+        isCompleted: node.isComplete,
+      );
+    }
+    return (
+      isComplete: scheduleChanged ? false : node.isComplete,
+      metadata: metadata,
+    );
+  }
+
+  static bool _dueDateChanged(
+    DateTime? previous,
+    DateTime? next, {
+    required bool hasTime,
+  }) => previous == null
+      ? next != null
+      : next == null || !sameScheduledAt(previous, next, hasTime: hasTime);
+
+  /// Writes the requested schedule and reminder edits into [metadata].
+  static void _applyMetadataEdits(
+    Map<String, dynamic> metadata, {
+    required DateTime? dueDate,
+    required String? recurrence,
+    required bool clearDueDate,
+    required bool clearRecurrence,
+    required bool? hasTime,
+    required bool nextHasTime,
+    required String? reminder,
+    required bool clearReminder,
+  }) {
     if (clearDueDate) {
       metadata.remove('dueDate');
       metadata.remove('hasTime');
@@ -146,25 +183,29 @@ final class NoteTaskEditorCommands {
     } else if (reminder != null) {
       metadata['reminder'] = reminder;
     }
-    if (scheduleChanged) {
-      final lastCompletedAt = metadata['lastCompletedAt'] is String
-          ? DateTime.tryParse(metadata['lastCompletedAt'] as String)
-          : null;
-      metadata['completionHistory'] = archiveTaskCompletionHistory(
-        history: parseTaskCompletionHistory(metadata['completionHistory']),
-        completions: _completions(metadata),
-        scheduledAt: previousDueDate,
-        hasTime: previousHasTime,
-        isCompleted: node.isComplete,
-        lastCompletedAt: lastCompletedAt,
-      ).map((record) => record.toJson()).toList(growable: false);
-      metadata.remove('completions');
-      metadata.remove('lastCompletedAt');
-    }
-    return (
-      isComplete: scheduleChanged ? false : node.isComplete,
-      metadata: metadata,
-    );
+  }
+
+  /// Moves the current completions into the completion history, as a schedule
+  /// change does.
+  void _archiveCompletions(
+    Map<String, dynamic> metadata, {
+    required DateTime? scheduledAt,
+    required bool hasTime,
+    required bool isCompleted,
+  }) {
+    final lastCompletedAt = metadata['lastCompletedAt'] is String
+        ? DateTime.tryParse(metadata['lastCompletedAt'] as String)
+        : null;
+    metadata['completionHistory'] = archiveTaskCompletionHistory(
+      history: parseTaskCompletionHistory(metadata['completionHistory']),
+      completions: _completions(metadata),
+      scheduledAt: scheduledAt,
+      hasTime: hasTime,
+      isCompleted: isCompleted,
+      lastCompletedAt: lastCompletedAt,
+    ).map((record) => record.toJson()).toList(growable: false);
+    metadata.remove('completions');
+    metadata.remove('lastCompletedAt');
   }
 
   Map<String, dynamic> _completions(Map<String, dynamic> metadata) =>

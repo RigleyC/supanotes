@@ -238,36 +238,41 @@ final class NoteAppFlowyCodec {
     final ops = <Map<String, dynamic>>[];
     for (final op in raw) {
       if (op is! Map || op['insert'] is! String || op['insert'] == '') continue;
-      final renamed = _renameAttributes(
-        Map<String, dynamic>.from(op),
-        _storedNames,
-      );
-      // Toggling a style off can leave `{bold: null}` behind; it means "no
-      // attribute", and keeping it would make equal text look different.
-      final attributes = renamed['attributes'];
-      final cleaned = attributes is Map
-          ? {
-              for (final entry in attributes.entries)
-                if (entry.value != null &&
-                    _storedAttributes.contains(entry.key))
-                  entry.key as String: entry.value,
-            }
-          : const <String, dynamic>{};
-      final text = renamed['insert'] as String;
-      if (ops.isNotEmpty &&
-          _sameAttributes(
-            ops.last['attributes'] as Map<String, dynamic>?,
-            cleaned,
-          )) {
-        ops.last = {...ops.last, 'insert': '${ops.last['insert']}$text'};
-      } else {
-        ops.add({
-          'insert': text,
-          if (cleaned.isNotEmpty) 'attributes': cleaned,
-        });
-      }
+      _appendStoredOp(ops, Map<String, dynamic>.from(op));
     }
     return ops;
+  }
+
+  /// Adds editor text [op] to [ops] in the stored form, merged into the last
+  /// op when their attributes match.
+  static void _appendStoredOp(
+    List<Map<String, dynamic>> ops,
+    Map<String, dynamic> op,
+  ) {
+    final renamed = _renameAttributes(op, _storedNames);
+    final cleaned = _storedAttributesOf(renamed['attributes']);
+    final text = renamed['insert'] as String;
+    if (ops.isNotEmpty &&
+        _sameAttributes(
+          ops.last['attributes'] as Map<String, dynamic>?,
+          cleaned,
+        )) {
+      ops.last = {...ops.last, 'insert': '${ops.last['insert']}$text'};
+    } else {
+      ops.add({'insert': text, if (cleaned.isNotEmpty) 'attributes': cleaned});
+    }
+  }
+
+  /// The stored attributes among [attributes].
+  static Map<String, dynamic> _storedAttributesOf(Object? attributes) {
+    if (attributes is! Map) return const <String, dynamic>{};
+    // Toggling a style off can leave `{bold: null}` behind; it means "no
+    // attribute", and keeping it would make equal text look different.
+    return {
+      for (final entry in attributes.entries)
+        if (entry.value != null && _storedAttributes.contains(entry.key))
+          entry.key as String: entry.value,
+    };
   }
 
   static bool _sameAttributes(Map<String, dynamic>? a, Map<String, dynamic> b) {

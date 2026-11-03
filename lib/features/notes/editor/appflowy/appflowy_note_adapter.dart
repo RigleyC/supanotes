@@ -393,6 +393,21 @@ final class AppFlowyNoteAdapter
   /// affected nodes are updated in place so the caret, focus and widgets of
   /// untouched blocks survive; any change in shape rebuilds the tree once.
   Future<void> _replaceDocument(List<NoteBlock> whole) async {
+    final view = _computeView(whole);
+    final current = _readShown();
+    if (_sameShape(current, view.blocks)) {
+      await _updateInPlace(current, view.blocks);
+    } else {
+      await _rebuildTree(view.document);
+    }
+  }
+
+  /// The document the editor should show for [whole]: its visible blocks,
+  /// as a tree and read back as blocks. Records which blocks are hidden and
+  /// how far the editor moved each shown block's indentation.
+  ({Document document, List<NoteBlock> blocks}) _computeView(
+    List<NoteBlock> whole,
+  ) {
     final hides = _hides;
     final visible = hides == null
         ? whole
@@ -411,37 +426,43 @@ final class AppFlowyNoteAdapter
         if (visible[i].indent != target[i].indent)
           target[i].id: visible[i].indent - target[i].indent,
     };
+    return (document: next, blocks: target);
+  }
 
-    final current = _readShown();
-    if (_sameShape(current, target)) {
-      final transaction = editorState.transaction;
-      Selection? selection = editorState.selection;
-      for (var i = 0; i < target.length; i++) {
-        if (current[i] == target[i]) continue;
-        final node = _nodeForBlock(target[i].id);
-        if (node == null) continue;
-        final replacement = _codec.toNode(target[i]);
-        transaction.updateNode(node, {
-          ...replacement.attributes,
-          if (!replacement.attributes.containsKey(NoteNodeKeys.metadata))
-            NoteNodeKeys.metadata: null,
-        });
-        selection = _shiftSelection(selection, node, current[i], target[i]);
-      }
-      if (transaction.operations.isEmpty) return;
-      await editorState.apply(
-        transaction,
-        isRemote: true,
-        skipEditableCheck: true,
-      );
-      // Remote application computes its own selection; put back the caret
-      // shifted past remote text inserted before it.
-      _restoreSelection(selection);
-      return;
+  /// Same shape: updates only the blocks whose contents changed, keeping the
+  /// caret where the user was.
+  Future<void> _updateInPlace(
+    List<NoteBlock> current,
+    List<NoteBlock> target,
+  ) async {
+    final transaction = editorState.transaction;
+    Selection? selection = editorState.selection;
+    for (var i = 0; i < target.length; i++) {
+      if (current[i] == target[i]) continue;
+      final node = _nodeForBlock(target[i].id);
+      if (node == null) continue;
+      final replacement = _codec.toNode(target[i]);
+      transaction.updateNode(node, {
+        ...replacement.attributes,
+        if (!replacement.attributes.containsKey(NoteNodeKeys.metadata))
+          NoteNodeKeys.metadata: null,
+      });
+      selection = _shiftSelection(selection, node, current[i], target[i]);
     }
+    if (transaction.operations.isEmpty) return;
+    await editorState.apply(
+      transaction,
+      isRemote: true,
+      skipEditableCheck: true,
+    );
+    // Remote application computes its own selection; put back the caret
+    // shifted past remote text inserted before it.
+    _restoreSelection(selection);
+  }
 
-    // Shape changed: replace all top-level nodes in one transaction and put
-    // the caret back in the same block when it still exists.
+  /// Shape changed: replace all top-level nodes in one transaction and put
+  /// the caret back in the same block when it still exists.
+  Future<void> _rebuildTree(Document next) async {
     final selection = editorState.selection;
     final caretBlock = selection == null
         ? null
