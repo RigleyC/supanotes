@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_router.dart';
 import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
+import 'package:supanotes/features/tasks/application/task_source_preference.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/presentation/tasks_screen.dart';
@@ -65,6 +68,8 @@ GoRouter _router() => GoRouter(
   ],
 );
 
+late SharedPreferences _prefs;
+
 Widget _wrap(GoRouter router, {List<TaskListItem>? standaloneItems}) {
   final standalone =
       standaloneItems ?? [TaskListItem.task(_task('standalone'))];
@@ -81,6 +86,7 @@ Widget _wrap(GoRouter router, {List<TaskListItem>? standaloneItems}) {
   ];
   return ProviderScope(
     overrides: [
+      sharedPreferencesProvider.overrideWithValue(_prefs),
       taskListProvider(includeNoteTasks: false).overrideWith(
         (ref) => Stream.value(standalone),
       ),
@@ -105,6 +111,10 @@ Future<void> _toggleNoteTasks(WidgetTester tester, String label) async {
 
 void main() {
   setUpAll(() => initializeDateFormatting('pt_BR'));
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    _prefs = await SharedPreferences.getInstance();
+  });
 
   testWidgets('shows note tasks by default and can hide them', (
     tester,
@@ -116,6 +126,21 @@ void main() {
 
     expect(find.text('note task'), findsOneWidget);
     await _toggleNoteTasks(tester, 'Ocultar tarefas das notas');
+    expect(find.text('note task'), findsNothing);
+    expect(find.text('standalone'), findsOneWidget);
+  });
+
+  testWidgets('remembers hiding note tasks across visits', (tester) async {
+    await tester.pumpWidget(_wrap(_router()));
+    await tester.pump();
+    await _toggleNoteTasks(tester, 'Ocultar tarefas das notas');
+    expect(_prefs.getBool(IncludeNoteTasksPreference.storageKey), isFalse);
+
+    // A fresh app start reads the saved choice.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(_wrap(_router()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
     expect(find.text('note task'), findsNothing);
     expect(find.text('standalone'), findsOneWidget);
   });

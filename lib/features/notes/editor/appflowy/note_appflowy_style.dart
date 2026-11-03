@@ -156,7 +156,7 @@ Map<String, BlockComponentBuilder> noteBlockBuilders(
       configuration: _config(
         scheme,
         body,
-        padding: (_) => const EdgeInsets.only(top: 6),
+        padding: (_) => const EdgeInsets.only(top: 12),
       ),
     ),
     DividerBlockKeys.type: noteDividerBlockBuilder()

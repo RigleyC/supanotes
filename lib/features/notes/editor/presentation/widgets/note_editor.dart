@@ -67,6 +67,13 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
   /// the note does not move when they swap.
   double _keyboardHeight = 291;
 
+  /// The keyboard inset at the previous metrics change, to tell a rising
+  /// keyboard from one that is going away.
+  double _lastInset = 0;
+
+  /// Space the floating toolbar covers at the bottom of the editor.
+  static const _toolbarClearance = 88.0;
+
   NoteEditorController get _controller => widget.session.controller;
 
   @override
@@ -80,11 +87,18 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
   void didChangeMetrics() {
     final view = View.of(context);
     final inset = view.viewInsets.bottom / view.devicePixelRatio;
-    if (inset < 100) return;
-    _keyboardHeight = inset;
-    // The keyboard came back (the user tapped the text): it replaces the
-    // panel.
-    if (_panelOpen) setState(() => _panelOpen = false);
+    final rising = inset > _lastInset;
+    _lastInset = inset;
+    // Opening the panel hides the keyboard, and every frame of that animation
+    // reports a smaller inset. Only a keyboard coming up counts: it means the
+    // user tapped the text, so the keyboard replaces the panel.
+    if (rising && inset >= 100) {
+      _keyboardHeight = inset;
+      if (_panelOpen) setState(() => _panelOpen = false);
+    } else if (_panelOpen) {
+      // The panel grows into the space the keyboard frees.
+      setState(() {});
+    }
   }
 
   @override
@@ -185,9 +199,15 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
       header: widget.header,
       focusNode: _controller.focusNode,
       autoFocus: widget.requestInitialFocus && !widget.isReadOnly,
-      padding: const EdgeInsets.symmetric(
-        horizontal: NoteEditorMetrics.horizontalPadding,
+      // Room at the end so the last line can scroll clear of the toolbar,
+      // and the caret is kept above it while typing.
+      padding: EdgeInsets.fromLTRB(
+        NoteEditorMetrics.horizontalPadding,
+        0,
+        NoteEditorMetrics.horizontalPadding,
+        widget.isReadOnly ? 24 : _toolbarClearance,
       ),
+      autoScrollEdgeOffset: _toolbarClearance + 16,
       links: NoteLinkHandler(
         allowInternalNoteLinks: !widget.isReadOnly,
         onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
@@ -209,39 +229,64 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
       child: Column(
         children: [
           Expanded(
-            child: NoteSelectionMenu(
-              editorState: editorState,
-              editing: _controller.editing,
-              scrollController: _scrollController,
-              child: editor,
-            ),
-          ),
-          NoteSuggestionOverlay(
-            editorState: editorState,
-            currentNoteId: widget.noteId,
-          ),
-          // Rebuilds only when editing starts or stops, not on every caret
-          // move: the toolbar listens to the selection itself.
-          // Shown only while editing, and replaced by the format panel while
-          // that is open (the panel has its own close button).
-          ValueListenableBuilder<bool>(
-            valueListenable: _controller.editing,
-            builder: (context, editing, _) => !editing || _panelOpen
-                ? const SizedBox.shrink()
-                : NoteToolbar(
+            // The note scrolls behind the floating toolbar instead of ending
+            // above it.
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: NoteSelectionMenu(
                     editorState: editorState,
-                    panelOpen: _panelOpen,
-                    onTogglePanel: _togglePanel,
-                    onAttachFile: () => _attachFile(),
-                    onAttachImage: () => _attachFile(imageOnly: true),
-                    onHideKeyboard: _hideKeyboard,
-                    onLinkNote: () => unawaited(_linkNote()),
+                    editing: _controller.editing,
+                    scrollController: _scrollController,
+                    child: editor,
                   ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      NoteSuggestionOverlay(
+                        editorState: editorState,
+                        currentNoteId: widget.noteId,
+                      ),
+                      // Rebuilds only when editing starts or stops, not on
+                      // every caret move: the toolbar listens to the
+                      // selection itself. Shown only while editing, and
+                      // replaced by the format panel while that is open (the
+                      // panel has its own close button).
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _controller.editing,
+                        builder: (context, editing, _) => !editing || _panelOpen
+                            ? const SizedBox.shrink()
+                            : NoteToolbar(
+                                editorState: editorState,
+                                panelOpen: _panelOpen,
+                                onTogglePanel: _togglePanel,
+                                onAttachFile: () => _attachFile(),
+                                onAttachImage: () =>
+                                    _attachFile(imageOnly: true),
+                                onHideKeyboard: _hideKeyboard,
+                                onLinkNote: () => unawaited(_linkNote()),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           if (_panelOpen)
             NoteFormatPanel(
               editorState: editorState,
-              height: _keyboardHeight,
+              // Until the keyboard is gone the screen is still shortened by
+              // it, so the panel only fills what it has freed.
+              height: (_keyboardHeight - _lastInset).clamp(
+                0,
+                _keyboardHeight,
+              ),
               onClose: _togglePanel,
             ),
         ],
