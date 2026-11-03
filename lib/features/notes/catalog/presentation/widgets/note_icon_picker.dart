@@ -28,7 +28,9 @@ Future<void> showNoteIconPicker({
 
 class NoteIconPickerRootPage extends StatelessWidget {
   const NoteIconPickerRootPage({
-    required this.note, required this.onSelected, super.key,
+    required this.note,
+    required this.onSelected,
+    super.key,
   });
 
   final NoteModel note;
@@ -71,14 +73,14 @@ class NoteIconPickerRootPage extends StatelessWidget {
                 ),
               ),
             ),
-            if (hasIcon)
-            ...[
+            if (hasIcon) ...[
               const SizedBox(height: 8),
-                _PickerAction(
+              _PickerAction(
                 icon: Icons.remove_circle_outline,
                 label: 'Remover ícone',
                 onTap: () => _select(null),
-              ),]
+              ),
+            ],
           ],
         ),
       ),
@@ -88,7 +90,8 @@ class NoteIconPickerRootPage extends StatelessWidget {
 
 class NoteEmojiPickerPage extends StatefulWidget {
   const NoteEmojiPickerPage({
-    required this.onSelected, super.key,
+    required this.onSelected,
+    super.key,
     this.current,
     this.dismissOnSelection = false,
   });
@@ -160,7 +163,9 @@ class _NoteEmojiPickerPageState extends State<NoteEmojiPickerPage> {
 
 class NoteCatalogIconPickerPage extends StatefulWidget {
   const NoteCatalogIconPickerPage({
-    required this.current, required this.onSelected, super.key,
+    required this.current,
+    required this.onSelected,
+    super.key,
     this.dismissOnSelection = false,
   });
 

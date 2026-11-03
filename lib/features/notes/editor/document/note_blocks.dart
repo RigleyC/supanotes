@@ -138,7 +138,19 @@ Map<String, dynamic> noteSnapshotFromBlocks(
   int schemaVersion = 1,
 }) => {
   'schemaVersion': schemaVersion,
-  'blocks': [for (final block in blocks) block.toJson()],
+  'blocks': [
+    for (final block in blocks)
+      // Stored task blocks always state their completion, as readers of the
+      // materialized document expect.
+      if (block.type == 'task' && !block.metadata.containsKey('isCompleted'))
+        block
+            .copyWith(
+              metadata: {...block.metadata, 'isCompleted': false},
+            )
+            .toJson()
+      else
+        block.toJson(),
+  ],
 };
 
 /// Applies the canonical snapshot plus durable local operations that the

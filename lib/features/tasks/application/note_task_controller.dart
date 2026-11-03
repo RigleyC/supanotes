@@ -4,10 +4,9 @@ import 'package:supanotes/features/notes/editor/application/note_editor_session.
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 
 /// Resolves the shared editor session that owns a note document.
-typedef NoteEditorSessionReader =
-    Future<NoteEditorSession> Function(
-      String noteId,
-    );
+typedef NoteEditorSessionReader = Future<NoteEditorSession> Function(
+  String noteId,
+);
 
 /// Owns mutations for tasks that live inside a note document.
 ///

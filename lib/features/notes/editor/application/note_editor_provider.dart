@@ -69,7 +69,7 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
     final syncService = ref.read(noteOperationsSyncServiceProvider);
 
     final captureLocalOperations = _canCaptureLocalOperations(note);
-    final syncSession = NoteSyncSession.withAdapter(
+    final syncSession = NoteSyncSession(
       noteId: noteId,
       syncService: syncService,
       adapter: AppFlowyNoteAdapter(

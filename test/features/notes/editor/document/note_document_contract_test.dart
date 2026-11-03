@@ -2,16 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 
 void main() {
   test('Dart codec matches the shared canonical document corpus', () {
-    final corpus =
-        jsonDecode(
-              File('contracts/note_document/corpus.json').readAsStringSync(),
-            )
-            as List<dynamic>;
+    final corpus = jsonDecode(
+      File('contracts/note_document/corpus.json').readAsStringSync(),
+    ) as List<dynamic>;
 
     for (final rawCase in corpus) {
       final testCase = Map<String, dynamic>.from(rawCase as Map);
@@ -52,7 +51,7 @@ void main() {
       ],
     });
 
-    final encoded = codec.encodeDocument(snapshot.toMutableDocument());
+    final encoded = _throughEditor(snapshot);
 
     expect(encoded, hasLength(1));
     expect(encoded.single, {
@@ -93,41 +92,49 @@ void main() {
     });
   });
 
-  test('round-trips rich link with previewStatus, siteName, and faviconUrl', () {
-    const codec = NoteDocumentCodec();
-    final snapshot = codec.parseSnapshot({
-      'schemaVersion': 1,
-      'blocks': [
-        {
-          'id': 'link-2',
-          'type': 'rich_link',
-          'delta': <Map<String, dynamic>>[],
-          'metadata': {
-            'url': 'https://example.com/post',
-            'domain': 'example.com',
-            'title': 'Example Title',
-            'previewStatus': 'ready',
-            'siteName': 'Example Site',
-            'faviconUrl': 'https://example.com/favicon.ico',
+  test(
+    'round-trips rich link with previewStatus, siteName, and faviconUrl',
+    () {
+      const codec = NoteDocumentCodec();
+      final snapshot = codec.parseSnapshot({
+        'schemaVersion': 1,
+        'blocks': [
+          {
+            'id': 'link-2',
+            'type': 'rich_link',
+            'delta': <Map<String, dynamic>>[],
+            'metadata': {
+              'url': 'https://example.com/post',
+              'domain': 'example.com',
+              'title': 'Example Title',
+              'previewStatus': 'ready',
+              'siteName': 'Example Site',
+              'faviconUrl': 'https://example.com/favicon.ico',
+            },
           },
-        },
-      ],
-    });
+        ],
+      });
 
-    final doc = snapshot.toMutableDocument();
-    final node = doc.getNodeById('link-2')! as RichLinkNode;
-    expect(node.previewStatus, 'ready');
-    expect(node.siteName, 'Example Site');
-    expect(node.faviconUrl, 'https://example.com/favicon.ico');
+      final encoded = _throughEditor(snapshot);
+      expect(encoded.single['metadata'], {
+        'url': 'https://example.com/post',
+        'domain': 'example.com',
+        'title': 'Example Title',
+        'previewStatus': 'ready',
+        'siteName': 'Example Site',
+        'faviconUrl': 'https://example.com/favicon.ico',
+      });
+    },
+  );
+}
 
-    final encoded = codec.encodeDocument(doc);
-    expect(encoded.single['metadata'], {
-      'url': 'https://example.com/post',
-      'domain': 'example.com',
-      'title': 'Example Title',
-      'previewStatus': 'ready',
-      'siteName': 'Example Site',
-      'faviconUrl': 'https://example.com/favicon.ico',
-    });
-  });
+/// The blocks after loading [snapshot] into the editor and reading it back.
+List<Map<String, dynamic>> _throughEditor(NoteDocumentSnapshot snapshot) {
+  const codec = NoteAppFlowyCodec();
+  return [
+    for (final block in codec.toBlocks(
+      codec.toDocument(noteBlocksFromSnapshot(snapshot.toJson())),
+    ))
+      block.toJson(),
+  ];
 }

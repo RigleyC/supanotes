@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'package:appflowy_editor/appflowy_editor.dart' hide Operation;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/editor/appflowy/appflowy_note_adapter.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
-import 'package:super_editor/super_editor.dart';
 
 class _MockNoteSyncClient extends Mock implements NoteSyncClient {}
 
@@ -67,53 +70,32 @@ void main() {
         clientId: 'client-1',
         actorId: 'user-1',
       );
-      final document = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: MutableDocumentComposer(),
-      );
+      final editor = _editorState();
       final session = NoteSyncSession(
         noteId: 'debounce-note',
         syncService: syncService,
-        document: document,
-        editor: editor,
+        adapter: AppFlowyNoteAdapter(
+          editorState: editor,
+          syncService: syncService,
+          noteId: 'debounce-note',
+          captureLocalOperations: false,
+        ),
         captureLocalOperations: false,
         networkCoalescingWindow: const Duration(milliseconds: 300),
       );
       addTearDown(() async {
         await session.dispose();
         editor.dispose();
-        document.dispose();
         await database.close();
       });
 
       await session.start();
       session.setCaptureLocalOperations(true);
 
-      editor.execute([
-        InsertTextRequest(
-          documentPosition: const DocumentPosition(
-            nodeId: 'init',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-          textToInsert: 'a',
-          attributions: const {},
-        ),
-      ]);
+      await _type(editor, 0, 'a');
       await Future<void>.delayed(const Duration(milliseconds: 80));
 
-      editor.execute([
-        InsertTextRequest(
-          documentPosition: const DocumentPosition(
-            nodeId: 'init',
-            nodePosition: TextNodePosition(offset: 1),
-          ),
-          textToInsert: 'b',
-          attributions: const {},
-        ),
-      ]);
+      await _type(editor, 1, 'b');
       await Future<void>.delayed(const Duration(milliseconds: 180));
 
       expect(networkCalls, 0);
@@ -143,34 +125,23 @@ void main() {
         clientId: 'client-1',
         actorId: 'user-1',
       );
-      final document = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: MutableDocumentComposer(),
-      );
+      final editor = _editorState();
       final session = NoteSyncSession(
         noteId: 'flush-note',
         syncService: syncService,
-        document: document,
-        editor: editor,
+        adapter: AppFlowyNoteAdapter(
+          editorState: editor,
+          syncService: syncService,
+          noteId: 'flush-note',
+          captureLocalOperations: false,
+        ),
         captureLocalOperations: false,
         networkCoalescingWindow: const Duration(seconds: 5),
       );
 
       await session.start();
       session.setCaptureLocalOperations(true);
-      editor.execute([
-        InsertTextRequest(
-          documentPosition: const DocumentPosition(
-            nodeId: 'init',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-          textToInsert: 'durable',
-          attributions: const {},
-        ),
-      ]);
+      await _type(editor, 0, 'durable');
 
       await session.flushNow().timeout(const Duration(milliseconds: 250));
 
@@ -193,7 +164,6 @@ void main() {
 
       await session.dispose();
       editor.dispose();
-      document.dispose();
       await database.close();
     },
   );
@@ -223,25 +193,22 @@ void main() {
         clientId: 'client-1',
         actorId: 'user-1',
       );
-      final document = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: MutableDocumentComposer(),
-      );
+      final editor = _editorState();
       final session = NoteSyncSession(
         noteId: 'poll-note',
         syncService: syncService,
-        document: document,
-        editor: editor,
+        adapter: AppFlowyNoteAdapter(
+          editorState: editor,
+          syncService: syncService,
+          noteId: 'poll-note',
+          captureLocalOperations: false,
+        ),
         captureLocalOperations: false,
         networkCoalescingWindow: const Duration(seconds: 5),
       );
       addTearDown(() async {
         await session.dispose();
         editor.dispose();
-        document.dispose();
         await database.close();
       });
 
@@ -264,3 +231,15 @@ void main() {
     },
   );
 }
+
+EditorState _editorState() => EditorState(
+  document: const NoteAppFlowyCodec().toDocument([
+    NoteBlock(id: 'init', type: 'paragraph'),
+  ]),
+);
+
+Future<void> _type(EditorState editorState, int offset, String text) =>
+    editorState.apply(
+      editorState.transaction
+        ..insertText(editorState.getNodeAtPath([0])!, offset, text),
+    );

@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
+import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:supanotes/features/notes/sharing/model/share_link_document.dart';
-import 'package:super_editor/super_editor.dart';
 
 void main() {
   test('keeps the canonical block payload and derives its text', () {
@@ -219,12 +220,16 @@ void main() {
       },
     });
 
-    final mutableDocument = document.snapshot.toMutableDocument();
+    final nodes = const NoteAppFlowyCodec()
+        .toDocument(noteBlocksFromSnapshot(document.snapshot.toJson()))
+        .root
+        .children
+        .toList();
 
-    expect(mutableDocument.getNodeById('header-1'), isA<ParagraphNode>());
-    expect(mutableDocument.getNodeById('link-1'), isA<RichLinkNode>());
+    expect(nodes.first.type, HeadingBlockKeys.type);
+    expect(nodes.last.type, NoteNodeTypes.richLink);
     expect(
-      (mutableDocument.getNodeById('link-1')! as RichLinkNode).domain,
+      (nodes.last.attributes[NoteNodeKeys.metadata] as Map)['domain'],
       'example.com',
     );
   });

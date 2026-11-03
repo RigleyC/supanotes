@@ -1,10 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
+import 'package:appflowy_editor/appflowy_editor.dart' hide Operation;
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:super_editor/super_editor.dart';
 
 void main() {
   group('Go-to-Dart Contract Integration Test', () {
@@ -54,34 +55,46 @@ void main() {
       ''';
 
       final decodedMap = jsonDecode(goDocumentJson) as Map<String, dynamic>;
-      final blocks = decodedMap['blocks'] as List<dynamic>;
+      // The document passes the client's contract validation...
+      expect(codec.parseSnapshot(decodedMap).blocks, hasLength(4));
 
-      final headerNode = codec.decodeNode(blocks[0] as Map<String, dynamic>);
-      expect(headerNode, isA<ParagraphNode>());
-      expect((headerNode as ParagraphNode).text.toPlainText(), 'Project Notes');
-      expect(headerNode.metadata['blockType'], header1Attribution);
+      // ...and becomes the nodes the editor renders.
+      final nodes = const NoteAppFlowyCodec()
+          .toDocument(noteBlocksFromSnapshot(decodedMap))
+          .root
+          .children
+          .toList();
 
-      final taskNode = codec.decodeNode(blocks[1] as Map<String, dynamic>);
-      expect(taskNode, isA<TaskNode>());
-      final task = taskNode as TaskNode;
-      expect(task.text.toPlainText(), 'Buy milk');
-      expect(task.isComplete, true);
-      expect(task.metadata['dueDate'], '2026-07-25T10:00:00.000');
+      expect(nodes[0].type, HeadingBlockKeys.type);
+      expect(nodes[0].attributes[HeadingBlockKeys.level], 1);
+      expect(nodes[0].delta!.toPlainText(), 'Project Notes');
 
-      final dividerNode = codec.decodeNode(blocks[2] as Map<String, dynamic>);
-      expect(dividerNode, isA<HorizontalRuleNode>());
+      expect(nodes[1].type, TodoListBlockKeys.type);
+      expect(nodes[1].delta!.toPlainText(), 'Buy milk');
+      expect(nodes[1].attributes[TodoListBlockKeys.checked], isTrue);
+      expect(
+        nodes[1].attributes[NoteNodeKeys.metadata],
+        {'dueDate': '2026-07-25T10:00:00.000'},
+      );
 
-      final attachNode = codec.decodeNode(blocks[3] as Map<String, dynamic>);
-      expect(attachNode, isA<DocumentAttachmentNode>());
-      final attach = attachNode as DocumentAttachmentNode;
-      expect(attach.metadata['attachmentId'], 'att-123');
-      expect(attach.metadata['filename'], 'specs.pdf');
-      expect(attach.metadata['fileSize'], 1048576);
-      expect(attach.metadata['url'], 'https://example.com/specs.pdf');
+      expect(nodes[2].type, DividerBlockKeys.type);
+
+      expect(nodes[3].type, NoteNodeTypes.attachment);
+      final attachment = nodes[3].attributes[NoteNodeKeys.metadata] as Map;
+      expect(attachment['attachmentId'], 'att-123');
+      expect(attachment['filename'], 'specs.pdf');
+      expect(attachment['fileSize'], 1048576);
+      expect(attachment['url'], 'https://example.com/specs.pdf');
+      expect(
+        nodes.map((node) => node.attributes[NoteNodeKeys.blockId]),
+        ['b-header', 'b-task-1', 'b-div', 'b-attach'],
+      );
     });
 
-    test('deserializes Go operation JSON payloads including set_block_metadata', () {
-      const goOperationJson = '''
+    test(
+      'deserializes Go operation JSON payloads including set_block_metadata',
+      () {
+        const goOperationJson = '''
       {
         "operationId": "e1b2c3d4-0000-0000-0000-000000000001",
         "noteId": "a1b2c3d4-0000-0000-0000-000000000001",
@@ -99,17 +112,18 @@ void main() {
       }
       ''';
 
-      final opMap = jsonDecode(goOperationJson) as Map<String, dynamic>;
-      final op = Operation.fromJson(opMap);
+        final opMap = jsonDecode(goOperationJson) as Map<String, dynamic>;
+        final op = Operation.fromJson(opMap);
 
-      expect(op.operationId, 'e1b2c3d4-0000-0000-0000-000000000001');
-      expect(op.noteId, 'a1b2c3d4-0000-0000-0000-000000000001');
-      expect(op.revision, 12);
-      expect(op.baseRevision, 11);
-      expect(op.actorId, 'u1b2c3d4-0000-0000-0000-000000000001');
-      expect(op.kind, 'set_block_metadata');
-      expect(op.blockId, 'b-task-1');
-      expect(op.payload['metadata']['isCompleted'], true);
-    });
+        expect(op.operationId, 'e1b2c3d4-0000-0000-0000-000000000001');
+        expect(op.noteId, 'a1b2c3d4-0000-0000-0000-000000000001');
+        expect(op.revision, 12);
+        expect(op.baseRevision, 11);
+        expect(op.actorId, 'u1b2c3d4-0000-0000-0000-000000000001');
+        expect(op.kind, 'set_block_metadata');
+        expect(op.blockId, 'b-task-1');
+        expect(op.payload['metadata']['isCompleted'], true);
+      },
+    );
   });
 }

@@ -1,8 +1,9 @@
 import 'dart:convert';
 
 import 'package:supanotes/core/database/database.dart';
-import 'package:supanotes/features/notes/editor/document/effective_document_projector.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_codec.dart';
+import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 
 /// The fully computed local representation of a canonical note snapshot.
 ///
@@ -24,10 +25,8 @@ final class NoteDocumentProjection {
 }
 
 final class NoteDocumentProjector {
-  NoteDocumentProjector({EffectiveDocumentProjector? effectiveProjector})
-    : _effectiveProjector = effectiveProjector ?? EffectiveDocumentProjector();
+  NoteDocumentProjector();
 
-  final EffectiveDocumentProjector _effectiveProjector;
   final NoteDocumentCodec _codec = const NoteDocumentCodec();
 
   NoteDocumentProjection project({
@@ -35,9 +34,25 @@ final class NoteDocumentProjector {
     required List<PendingNoteOperationData> pendingOperations,
   }) {
     _validateEnvelope(snapshot);
-    final materialized = _effectiveProjector.project(
-      snapshot: snapshot,
-      pendingOps: pendingOperations,
+    // A malformed block, in the snapshot or in a pending create, rejects the
+    // whole projection before anything is written.
+    for (final raw in snapshot['blocks'] as List<dynamic>) {
+      if (raw is! Map) {
+        throw const FormatException('Note document contains an invalid block');
+      }
+      _codec.parseBlock(Map<String, dynamic>.from(raw));
+    }
+    for (final operation in pendingOperations) {
+      if (operation.kind != NoteOperationWireNames.createBlock) continue;
+      final payload = jsonDecode(operation.payloadJson);
+      if (payload is! Map) {
+        throw const FormatException('Note operation payload must be an object');
+      }
+      _codec.parseBlock(Map<String, dynamic>.from(payload));
+    }
+    final materialized = noteSnapshotFromBlocks(
+      projectNoteBlocks(snapshot: snapshot, pendingOps: pendingOperations),
+      schemaVersion: snapshot['schemaVersion'] as int? ?? 1,
     );
     final summary = _codec.projectContent(
       materialized['blocks'] as List<dynamic>,

@@ -19,7 +19,9 @@ String formatDueDate(
   final today = (now ?? DateTime.now()).startOfDay;
   final tomorrow = today.add(const Duration(days: 1));
   final date = dueDate.startOfDay;
-  final timeStr = hasTime ? ' \u22c5 ${DateFormat('HH:mm').format(dueDate)}' : '';
+  final timeStr = hasTime
+      ? ' \u22c5 ${DateFormat('HH:mm').format(dueDate)}'
+      : '';
 
   if (date.isSameDayAs(today)) return 'Hoje$timeStr';
   if (date.isSameDayAs(tomorrow)) return 'Amanhã$timeStr';

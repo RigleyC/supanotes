@@ -1,7 +1,6 @@
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
 
 class ShareModel {
-
   const ShareModel({
     required this.id,
     required this.noteId,

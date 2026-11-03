@@ -10,7 +10,12 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 /// layout (e.g. a [Column]) and provides scroll constraints via [Expanded].
 class NotesGridView extends StatelessWidget {
   const NotesGridView({
-    required this.notes, required this.onTap, required this.onDelete, required this.onToggleFavorite, required this.onEditIcon, super.key,
+    required this.notes,
+    required this.onTap,
+    required this.onDelete,
+    required this.onToggleFavorite,
+    required this.onEditIcon,
+    super.key,
   });
 
   final List<NoteModel> notes;

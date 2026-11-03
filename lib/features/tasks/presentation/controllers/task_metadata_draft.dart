@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_reminder_option.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
-import 'package:super_editor/super_editor.dart';
 
 const _unset = Object();
 
@@ -19,9 +18,6 @@ class TaskMetadataDraft {
     required this.reminder,
     this.completions = const {},
   });
-
-  factory TaskMetadataDraft.fromTaskNode(TaskNode node) =>
-      TaskMetadataDraft.fromMetadata(node.metadata);
 
   /// Reads a task block's metadata, whatever editor holds the block.
   factory TaskMetadataDraft.fromMetadata(Map<String, dynamic> metadata) {

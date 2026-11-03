@@ -120,12 +120,11 @@ Map<String, dynamic> _asJsonObject(Object? value) {
   return object;
 }
 
-typedef SyncChangesFetcher =
-    Future<SyncChangePage> Function({
-      required int after,
-      required int limit,
-      SyncFeedScope scope,
-    });
+typedef SyncChangesFetcher = Future<SyncChangePage> Function({
+  required int after,
+  required int limit,
+  SyncFeedScope scope,
+});
 
 final class SyncFeedClient {
   const SyncFeedClient(this._api);

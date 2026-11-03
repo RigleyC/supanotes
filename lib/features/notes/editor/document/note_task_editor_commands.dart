@@ -2,14 +2,6 @@ import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_record.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
-import 'package:super_editor/super_editor.dart';
-
-final class NoteTaskCompletion {
-  const NoteTaskCompletion({required this.node, required this.result});
-
-  final TaskNode node;
-  final TaskCompletionResult result;
-}
 
 /// A task block's editable state, independent of the editor's node type.
 typedef NoteTaskState = ({bool isComplete, Map<String, dynamic> metadata});
@@ -23,25 +15,6 @@ final class NoteTaskEditorCommands {
   const NoteTaskEditorCommands({DateTime Function()? clock}) : _clock = clock;
 
   final DateTime Function()? _clock;
-
-  NoteTaskCompletion complete(
-    TaskNode node, {
-    DateTime? now,
-    DateTime? scheduledAt,
-  }) {
-    final (state, result) = completeState(
-      (isComplete: node.isComplete, metadata: node.metadata),
-      now: now,
-      scheduledAt: scheduledAt,
-    );
-    return NoteTaskCompletion(
-      node: node.copyTaskWith(
-        isComplete: state.isComplete,
-        metadata: state.metadata,
-      ),
-      result: result,
-    );
-  }
 
   /// Completes the current occurrence of a task in [state].
   (NoteTaskState, TaskCompletionResult) completeState(
@@ -92,19 +65,6 @@ final class NoteTaskEditorCommands {
     return ((isComplete: result.completed, metadata: metadata), result);
   }
 
-  TaskNode reopen(
-    TaskNode node, {
-    DateTime? previousDue,
-    DateTime? scheduledAt,
-  }) {
-    final state = reopenState(
-      (isComplete: node.isComplete, metadata: node.metadata),
-      previousDue: previousDue,
-      scheduledAt: scheduledAt,
-    );
-    return node.copyTaskWith(isComplete: false, metadata: state.metadata);
-  }
-
   /// Reopens a task (or one occurrence of a recurring task) in [state].
   NoteTaskState reopenState(
     NoteTaskState node, {
@@ -127,33 +87,6 @@ final class NoteTaskEditorCommands {
     }
     metadata.remove('lastCompletedAt');
     return (isComplete: false, metadata: metadata);
-  }
-
-  TaskNode updateMetadata(
-    TaskNode node, {
-    DateTime? dueDate,
-    String? recurrence,
-    bool clearDueDate = false,
-    bool clearRecurrence = false,
-    bool? hasTime,
-    String? reminder,
-    bool clearReminder = false,
-  }) {
-    final state = updateMetadataState(
-      (isComplete: node.isComplete, metadata: node.metadata),
-      dueDate: dueDate,
-      recurrence: recurrence,
-      clearDueDate: clearDueDate,
-      clearRecurrence: clearRecurrence,
-      hasTime: hasTime,
-      reminder: reminder,
-      clearReminder: clearReminder,
-    );
-    if (state == null) return node;
-    return node.copyTaskWith(
-      isComplete: state.isComplete,
-      metadata: state.metadata,
-    );
   }
 
   /// Changes a task's schedule or reminder in [node]; `null` when nothing
