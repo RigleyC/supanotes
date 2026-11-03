@@ -150,7 +150,7 @@ void main() {
     await pumpScreen(tester);
     expect(find.byType(NoteToolbar), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await _tapBelowText(tester);
     await tester.pumpAndSettle();
 
     final selection = controller.editorState.selection!;
@@ -166,7 +166,7 @@ void main() {
     expect(controller.editorState.selection, isNull);
     expect(find.byType(NoteToolbar), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await _tapBelowText(tester);
     await tester.pumpAndSettle();
     expect(controller.editorState.selection, isNotNull);
   });
@@ -198,7 +198,7 @@ void main() {
     tester,
   ) async {
     await pumpScreen(tester);
-    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await _tapBelowText(tester);
     await tester.pumpAndSettle();
 
     await tester.tap(find.bySemanticsLabel('Formatar'));
@@ -223,7 +223,7 @@ void main() {
 
   testWidgets('hiding the keyboard ends editing', (tester) async {
     await pumpScreen(tester);
-    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await _tapBelowText(tester);
     await tester.pumpAndSettle();
 
     await tester.tap(find.bySemanticsLabel('Esconder teclado'));
@@ -263,9 +263,18 @@ void main() {
     expect(find.byType(NoteToolbar), findsNothing);
     expect(find.byTooltip('Remover foco'), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await _tapBelowText(tester);
     await tester.pumpAndSettle();
     expect(controller.editing.value, isTrue);
     expect(find.byType(NoteToolbar), findsOneWidget);
   });
+}
+
+/// Taps the empty part of the note, below its last block.
+Future<void> _tapBelowText(WidgetTester tester) async {
+  final editor = tester.getRect(find.byType(AppFlowyEditor));
+  await tester.tapAt(
+    Offset(editor.center.dx, editor.top + editor.height * 0.6),
+  );
+  await tester.pumpAndSettle();
 }
