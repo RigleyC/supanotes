@@ -165,35 +165,6 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
     }
   }
 
-  /// Tapping below the last block continues writing at the end of the note,
-  /// adding an empty line when the note ends with a divider or attachment.
-  void _focusEnd() {
-    if (widget.isReadOnly) return;
-    final editorState = _controller.editorState;
-    final last = editorState.document.root.children.lastOrNull;
-    if (last == null || last.delta == null) {
-      final path = [editorState.document.root.children.length];
-      unawaited(
-        editorState
-            .apply(editorState.transaction..insertNode(path, paragraphNode()))
-            .then(
-              (_) =>
-                  _controller.editAt(Selection.collapsed(Position(path: path))),
-            ),
-      );
-      return;
-    }
-    var node = last;
-    while (node.children.isNotEmpty) {
-      node = node.children.last;
-    }
-    _controller.editAt(
-      Selection.collapsed(
-        Position(path: node.path, offset: node.delta?.length ?? 0),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final editorState = _controller.editorState;
@@ -223,21 +194,6 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
                   delegate.onTaskReopen?.call(id, scheduledAt),
               onOpenDetails: (id) => delegate.onTaskLongPress?.call(id),
             ),
-      footer: GestureDetector(
-        key: const ValueKey('note-editor-end'),
-        behavior: HitTestBehavior.opaque,
-        // AppFlowy clears the selection after a pointer goes down on its
-        // header or footer (in a post-frame callback); place the caret in a
-        // later one so it wins.
-        onTap: () {
-          WidgetsBinding.instance
-            ..addPostFrameCallback((_) {
-              if (mounted) _focusEnd();
-            })
-            ..scheduleFrame();
-        },
-        child: const SizedBox(height: 160, width: double.infinity),
-      ),
     );
     if (widget.isReadOnly) return editor;
 
