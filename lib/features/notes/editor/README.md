@@ -19,7 +19,7 @@ sincroniza dados. O formato sincronizado é uma lista plana de blocos
 
 1. `noteEditorSessionProvider` pede uma sessão ao `NoteSessionCoordinator`.
 2. `NoteEditorSession` cria e possui o `NoteEditorController` (que possui o
-   `NoteEditorState`) e a `NoteSyncSession` com um `AppFlowyNoteAdapter`.
+   `EditorState`) e a `NoteSyncSession` com um `AppFlowyNoteAdapter`.
 3. `NoteSyncSession.start()` hidrata o documento confirmado mais as operações
    pendentes locais (`projectNoteBlocks`) e marca a sessão como pronta; sync
    roda em segundo plano, sem bloquear o primeiro frame.
@@ -44,8 +44,9 @@ sincroniza dados. O formato sincronizado é uma lista plana de blocos
   reconciliação.
 - `appflowy/note_format_commands.dart`: toolbar (estilos, listas, tarefas,
   recuo, divisória) reescrevendo só os blocos de topo tocados, sem reordenar.
-- `appflowy/note_editor_state.dart`: impede editar tarefas concluídas
-  ocultas.
+- Tarefas concluídas ocultas não entram no documento do editor: o adapter
+  guarda a nota inteira e devolve os blocos ocultos ao seu lugar a cada
+  edição (`NoteBlockVisibility`). Assim não há como editá-las por engano.
 - `sync/note_operation_rebaser.dart`: ajusta operações locais restantes após
   operações remotas ou confirmação do servidor.
 

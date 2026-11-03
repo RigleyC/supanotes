@@ -7,6 +7,7 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/appflowy/appflowy_note_adapter.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_block_visibility.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_task_commands.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
@@ -243,5 +244,118 @@ void main() {
       NoteOperationWireNames.completeTaskOccurrence,
     ]);
     expect(ops.single.blockId, 't');
+  });
+
+  group('hidden completed tasks', () {
+    Future<void> openHiding(List<Map<String, dynamic>> blocks) async {
+      await open(_doc(blocks));
+      await adapter.hideBlocks(isCompletedTaskBlock);
+    }
+
+    List<String> shownIds() => [
+      for (final block in const NoteAppFlowyCodec().toBlocks(
+        editorState.document,
+      ))
+        block.id,
+    ];
+
+    test('are left out of the editor but stay in the note', () async {
+      await openHiding([
+        _block('a', 'paragraph', 'antes'),
+        _block('t', 'task', 'feita', {'isCompleted': true}),
+        _block('b', 'paragraph', 'depois'),
+      ]);
+
+      expect(shownIds(), ['a', 'b']);
+      expect(adapter.blocks.map((block) => block.id), ['a', 't', 'b']);
+      expect(adapter.hiddenBlock('t')?.text, 'feita');
+    });
+
+    test('editing around them keeps them in place and untouched', () async {
+      await openHiding([
+        _block('a', 'paragraph', 'antes'),
+        _block('t', 'task', 'feita', {'isCompleted': true}),
+        _block('b', 'paragraph', 'depois'),
+      ]);
+
+      // Backspace at the start of "depois" merges it into the visible line
+      // above; the hidden task is not in the editor to merge into.
+      editorState.selection = Selection.collapsed(
+        Position(path: [1]),
+      );
+      backspaceCommand.execute(editorState);
+      await pumpEventQueue();
+
+      final ops = await pending();
+      expect(ops.map((op) => op.blockId), isNot(contains('t')));
+      expect(adapter.blocks.map((block) => block.id), ['a', 't']);
+      expect(adapter.blocks.first.text, 'antesdepois');
+      expect(adapter.blocks.last.text, 'feita');
+    });
+
+    test('a visible subtask of a hidden task keeps its indentation', () async {
+      await openHiding([
+        _block('p', 'task', 'pai', {'isCompleted': true}),
+        _block('c', 'task', 'filha', {'indent': 1}),
+      ]);
+      expect(shownIds(), ['c']);
+
+      editorState.selection = Selection.collapsed(
+        Position(path: [0], offset: 5),
+      );
+      await editorState.insertTextAtCurrentSelection('!');
+
+      final ops = await pending();
+      expect(ops.single.kind, NoteOperationWireNames.textDelta);
+      expect(adapter.blocks.last.indent, 1);
+    });
+
+    test('reopening a hidden task syncs it and shows it again', () async {
+      await openHiding([
+        _block('a', 'paragraph', 'antes'),
+        _block('t', 'task', 'feita', {'isCompleted': true}),
+        _block('b', 'paragraph', 'depois'),
+      ]);
+
+      final hidden = adapter.hiddenBlock('t')!;
+      await adapter.replaceHiddenBlock(
+        't',
+        hidden.copyWith(metadata: {'isCompleted': false}),
+      );
+
+      final ops = await pending();
+      expect(ops.single.kind, NoteOperationWireNames.setBlockMetadata);
+      expect(ops.single.blockId, 't');
+      expect(shownIds(), ['a', 't', 'b']);
+    });
+
+    test('a task completed in the editor leaves once refreshed', () async {
+      await openHiding([
+        _block('a', 'paragraph', 'antes'),
+        _block('t', 'task', 'tarefa'),
+      ]);
+      expect(shownIds(), ['a', 't']);
+
+      await editorState.completeNoteTask('t');
+      // Still shown while its exit animation plays.
+      expect(shownIds(), ['a', 't']);
+
+      await adapter.refreshHidden();
+      expect(shownIds(), ['a']);
+      expect(adapter.blocks.map((block) => block.id), ['a', 't']);
+    });
+
+    test('showing completed tasks again puts them back in order', () async {
+      await openHiding([
+        _block('a', 'paragraph', 'antes'),
+        _block('t', 'task', 'feita', {'isCompleted': true}),
+        _block('b', 'paragraph', 'depois'),
+      ]);
+
+      await adapter.hideBlocks(null);
+
+      expect(shownIds(), ['a', 't', 'b']);
+      expect(await pending(), isEmpty);
+    });
   });
 }

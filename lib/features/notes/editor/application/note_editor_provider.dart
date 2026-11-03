@@ -69,15 +69,17 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
     final syncService = ref.read(noteOperationsSyncServiceProvider);
 
     final captureLocalOperations = _canCaptureLocalOperations(note);
+    final adapter = AppFlowyNoteAdapter(
+      editorState: controller.editorState,
+      syncService: syncService,
+      noteId: noteId,
+      captureLocalOperations: captureLocalOperations,
+    );
+    controller.attachVisibility(adapter);
     final syncSession = NoteSyncSession(
       noteId: noteId,
       syncService: syncService,
-      adapter: AppFlowyNoteAdapter(
-        editorState: controller.editorState,
-        syncService: syncService,
-        noteId: noteId,
-        captureLocalOperations: captureLocalOperations,
-      ),
+      adapter: adapter,
       captureLocalOperations: captureLocalOperations,
       appLifecycleStates: appLifecycleStates,
     );

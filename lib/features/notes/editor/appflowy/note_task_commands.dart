@@ -1,5 +1,6 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:supanotes/features/notes/editor/document/note_task_editor_commands.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 
@@ -108,3 +109,20 @@ extension NoteTaskCommands on EditorState {
     return apply(transaction, withUpdateSelection: false);
   }
 }
+
+/// The task state of a synced task block.
+NoteTaskState taskStateOfBlock(NoteBlock block) => (
+  isComplete: block.metadata['isCompleted'] as bool? ?? false,
+  metadata: Map<String, dynamic>.from(block.metadata)
+    ..remove('isCompleted')
+    ..remove('indent'),
+);
+
+/// [block] with the task state [state], keeping its text and indentation.
+NoteBlock withTaskState(NoteBlock block, NoteTaskState state) => block.copyWith(
+  metadata: {
+    ...state.metadata,
+    'isCompleted': state.isComplete,
+    if (block.indent > 0) 'indent': block.indent,
+  },
+);

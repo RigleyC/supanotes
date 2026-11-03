@@ -193,6 +193,7 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
               onReopen: (id, scheduledAt) async =>
                   delegate.onTaskReopen?.call(id, scheduledAt),
               onOpenDetails: (id) => delegate.onTaskLongPress?.call(id),
+              onHidden: (_) => unawaited(_controller.refreshHidden()),
             ),
     );
     if (widget.isReadOnly) return editor;
