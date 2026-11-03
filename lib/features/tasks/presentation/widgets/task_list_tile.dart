@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/task_text_style_resolver.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_metadata_badges.dart';
@@ -19,6 +20,8 @@ class TaskListTile extends StatefulWidget {
     this.onDelete,
     this.checked = false,
     this.completedAt,
+    this.trailingLabel,
+    this.trailingColor,
     super.key,
   });
 
@@ -28,6 +31,16 @@ class TaskListTile extends StatefulWidget {
   final Future<void> Function()? onDelete;
   final bool checked;
   final DateTime? completedAt;
+
+  /// Short schedule shown at the end of a compact row ("14:30", "sáb").
+  final String? trailingLabel;
+
+  /// Color of [trailingLabel]; defaults to the secondary grey.
+  final Color? trailingColor;
+
+  /// Rows with a [completedAt] (completion history) keep the detailed layout
+  /// with source and schedule metadata; open-task rows are a single line.
+  bool get _detailed => completedAt != null;
 
   @override
   State<TaskListTile> createState() => _TaskListTileState();
@@ -68,24 +81,23 @@ class _TaskListTileState extends State<TaskListTile> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final title = item.isStandalone ? item.task?.title : item.note?.title;
-    final recurrence = TaskRecurrence.parse(
-      item.isStandalone ? item.task?.recurrenceRule : item.note?.recurrenceRule,
-    );
-    final reminder = item.isStandalone && item.task?.reminder != null;
-    final hasMetadata = item.dueDate != null || recurrence != null || reminder;
+    final isChecked = _optimisticChecked ?? widget.checked;
 
     final tile = TaskExitAnimator(
       hideCompleted: false,
-      isComplete: _optimisticChecked ?? widget.checked,
+      isComplete: isChecked,
       onAnimationComplete: null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        padding: EdgeInsets.symmetric(
+          vertical: widget._detailed ? AppSpacing.xs : 0,
+        ),
         child: Row(
-          spacing: AppSpacing.md,
+          spacing: widget._detailed ? AppSpacing.md : 0,
           children: [
             Semantics(
               button: widget.onToggle != null,
               enabled: widget.onToggle != null,
+              checked: isChecked,
               child: GestureDetector(
                 key: ValueKey('task-toggle-${item.uiKey}'),
                 behavior: HitTestBehavior.opaque,
@@ -96,7 +108,7 @@ class _TaskListTileState extends State<TaskListTile> {
                   child: Center(
                     child: AppTaskCheckbox(
                       size: 20,
-                      value: _optimisticChecked ?? widget.checked,
+                      value: isChecked,
                       shape: AppTaskCheckboxShape.rounded,
                     ),
                   ),
@@ -107,36 +119,9 @@ class _TaskListTileState extends State<TaskListTile> {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: widget.onTap,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: AppSpacing.xs,
-                  children: [
-                    if (title != null && title.isNotEmpty)
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    TaskSourceLabel(item: item),
-                    if (hasMetadata)
-                      TaskMetadataBadges(
-                        dueDate: item.dueDate,
-                        recurrence: recurrence,
-                        hasReminder: reminder,
-                        hasTime: item.hasTime,
-                        isCompleted: widget.checked || item.isCompleted,
-                        now: DateTime.now(),
-                      ),
-                    if (widget.completedAt != null)
-                      Text(
-                        'Concluída em ${_completedAtFormat.format(widget.completedAt!.toLocal())}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
+                child: widget._detailed
+                    ? _buildDetails(context, title)
+                    : _buildCompact(context, title, isChecked),
               ),
             ),
           ],
@@ -174,6 +159,94 @@ class _TaskListTileState extends State<TaskListTile> {
       },
       onDismissed: (_) => unawaited(widget.onDelete!()),
       child: tile,
+    );
+  }
+
+  Widget _buildCompact(BuildContext context, String? title, bool isChecked) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final titleStyle = resolveTaskTextStyle(
+      (theme.textTheme.titleLarge ?? const TextStyle()).copyWith(
+        fontSize: 18,
+        height: 1.3,
+        fontWeight: FontWeight.w400,
+        letterSpacing: -0.1,
+      ),
+      scheme.onSurface,
+      isChecked,
+    );
+    final trailing = widget.trailingLabel;
+    return Padding(
+      padding: const EdgeInsets.only(left: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: titleStyle,
+            ),
+          ),
+          if (trailing != null && trailing.isNotEmpty) ...[
+            const SizedBox(width: AppSpacing.md),
+            Text(
+              trailing,
+              key: ValueKey('task-trailing-${widget.item.uiKey}'),
+              maxLines: 1,
+              style: (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
+                fontSize: 14,
+                height: 1.3,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 0,
+                color:
+                    widget.trailingColor ??
+                    scheme.onSurfaceVariant.withValues(alpha: 0.8),
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetails(BuildContext context, String? title) {
+    final item = widget.item;
+    final recurrence = TaskRecurrence.parse(
+      item.isStandalone ? item.task?.recurrenceRule : item.note?.recurrenceRule,
+    );
+    final reminder = item.isStandalone && item.task?.reminder != null;
+    final hasMetadata = item.dueDate != null || recurrence != null || reminder;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: AppSpacing.xs,
+      children: [
+        if (title != null && title.isNotEmpty)
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+        TaskSourceLabel(item: item),
+        if (hasMetadata)
+          TaskMetadataBadges(
+            dueDate: item.dueDate,
+            recurrence: recurrence,
+            hasReminder: reminder,
+            hasTime: item.hasTime,
+            isCompleted: widget.checked || item.isCompleted,
+            now: DateTime.now(),
+          ),
+        Text(
+          'Concluída em '
+          '${_completedAtFormat.format(widget.completedAt!.toLocal())}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
