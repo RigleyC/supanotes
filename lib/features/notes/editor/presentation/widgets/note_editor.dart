@@ -16,6 +16,7 @@ import 'package:supanotes/features/notes/editor/application/note_editor_session.
 import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_format_panel.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_picker_sheet.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_selection_menu.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -202,7 +203,14 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
       groupId: noteEditorToolbarTapRegionGroup,
       child: Column(
         children: [
-          Expanded(child: editor),
+          Expanded(
+            child: NoteSelectionMenu(
+              editorState: editorState,
+              editing: _controller.editing,
+              scrollController: _scrollController,
+              child: editor,
+            ),
+          ),
           NoteSuggestionOverlay(
             editorState: editorState,
             currentNoteId: widget.noteId,
