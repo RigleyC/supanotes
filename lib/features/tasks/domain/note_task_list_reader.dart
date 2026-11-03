@@ -16,12 +16,12 @@ class NoteTaskListReader {
   List<NoteTask> read({
     required String noteId,
     required String noteTitle,
-    required String documentJson,
+    required Iterable<ParsedNoteTask> tasks,
     DateTime? createdAt,
   }) {
     final policy = TaskOccurrencePolicy(clock: clock);
     final result = <NoteTask>[];
-    for (final parsed in parseNoteTaskBlocks(documentJson)) {
+    for (final parsed in tasks) {
       final occurrence = policy.resolveCurrent(
         taskId: parsed.blockId,
         anchor: parsed.dueDate,
@@ -62,11 +62,11 @@ class NoteTaskListReader {
   List<NoteTask> readForHistory({
     required String noteId,
     required String noteTitle,
-    required String documentJson,
+    required Iterable<ParsedNoteTask> tasks,
     DateTime? createdAt,
   }) {
     return [
-      for (final parsed in parseNoteTaskBlocks(documentJson))
+      for (final parsed in tasks)
         NoteTask(
           noteId: noteId,
           blockId: parsed.blockId,

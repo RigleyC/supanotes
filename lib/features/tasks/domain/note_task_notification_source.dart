@@ -6,8 +6,9 @@ import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/features/tasks/domain/note_task_reader.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_entry.dart';
 import 'package:supanotes/features/tasks/domain/task_notification_source.dart';
+import 'package:supanotes/features/tasks/domain/visible_note_tasks.dart';
 
-/// Reads reminders from effective note documents.
+/// Reads reminders from the tasks of the notes visible to the account.
 ///
 /// This source intentionally does not consume the task-list provider. The
 /// list's "include note tasks" preference is a presentation filter and must
@@ -19,50 +20,42 @@ class NoteTaskNotificationSource implements TaskNotificationSource {
   final DateTime Function()? clock;
 
   Stream<List<TaskNotificationEntry>> watchOpenTasks(String userId) {
-    // Materialized documents are shared local cache rows, so they must be
-    // intersected with the same effective note selection used by the notes
-    // list. That selection enforces ownership and current membership before a
-    // document can become a reminder for this account.
-    final notes = _database.notesDao.watchAllActiveNotes(userId);
-    final documents = _database.noteOperationsDao.watchMaterializedDocuments();
+    // The projection query applies the notes catalog visibility (ownership
+    // and current membership), so a shared document cannot become a reminder
+    // for an account that no longer has access to it.
+    // Reminders do not show the note title, so title edits are not observed.
+    final notes = watchVisibleNoteTasks(
+      _database,
+      userId,
+      withNoteTitle: false,
+    );
     final reader = NoteTaskReader(clock: clock);
     return Stream.multi((controller) {
-      var latestAuthorizedNoteIds = const <String>{};
-      var latestDocuments = const <LocalNoteDocumentData>[];
-      var notesReady = false;
-      var documentsReady = false;
+      List<VisibleNoteTasks>? latest;
 
       void emit() {
-        if (!notesReady || !documentsReady) return;
-        controller.add([
-          for (final document in latestDocuments)
-            if (latestAuthorizedNoteIds.contains(document.noteId) &&
-                document.materializedDocumentJson != null)
-              ...reader.read(
-                document.materializedDocumentJson!,
-                noteId: document.noteId,
-              ),
-        ]);
+        final visible = latest;
+        if (visible == null) return;
+        try {
+          controller.add([
+            for (final note in visible)
+              ...reader.read(note.tasks, noteId: note.noteId),
+          ]);
+        } on Object catch (error, stackTrace) {
+          controller.addError(error, stackTrace);
+        }
       }
 
-      final notesSubscription = notes.listen((authorizedNotes) {
-        latestAuthorizedNoteIds = {
-          for (final note in authorizedNotes) note.note.id,
-        };
-        notesReady = true;
+      final subscription = notes.listen((visible) {
+        latest = visible;
         emit();
       }, onError: controller.addError);
-      final documentsSubscription = documents.listen((nextDocuments) {
-        latestDocuments = nextDocuments;
-        documentsReady = true;
-        emit();
-      }, onError: controller.addError);
+      // Occurrences move with the clock even when no note changes.
       final timer = Timer.periodic(const Duration(minutes: 1), (_) => emit());
 
       controller.onCancel = () async {
         timer.cancel();
-        await notesSubscription.cancel();
-        await documentsSubscription.cancel();
+        await subscription.cancel();
       };
     });
   }

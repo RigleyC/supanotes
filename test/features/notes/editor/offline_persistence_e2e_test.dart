@@ -2,16 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
+import 'package:appflowy_editor/appflowy_editor.dart' hide Operation;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/editor/appflowy/appflowy_note_adapter.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supanotes/core/database/daos/note_operations_pending_query.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/core/sync/note_outbox_worker.dart';
-import 'package:supanotes/features/notes/editor/sync/note_operation_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
-import 'package:super_editor/super_editor.dart';
 
 class _OfflineNoteSyncClient extends Mock implements NoteSyncClient {}
 
@@ -79,33 +81,22 @@ void main() {
         ),
       );
 
-      final document = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: MutableDocumentComposer(),
-      );
+      final editor = _editorState();
       final session = NoteSyncSession(
         noteId: 'close-note',
         syncService: syncService,
-        document: document,
-        editor: editor,
+        adapter: AppFlowyNoteAdapter(
+          editorState: editor,
+          syncService: syncService,
+          noteId: 'close-note',
+          captureLocalOperations: false,
+        ),
         captureLocalOperations: false,
       );
 
       await session.start();
       session.setCaptureLocalOperations(true);
-      editor.execute([
-        InsertTextRequest(
-          documentPosition: const DocumentPosition(
-            nodeId: 'init',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-          textToInsert: 'Última edição',
-          attributions: const {},
-        ),
-      ]);
+      await _type(editor, 0, 'Última edição');
       await session.dispose();
 
       verifyNever(() => client.syncOperations(any(), any()));
@@ -120,7 +111,6 @@ void main() {
         'Última edição',
       );
       editor.dispose();
-      document.dispose();
     },
   );
 
@@ -137,31 +127,15 @@ void main() {
       );
       addTearDown(database.close);
 
-      final firstDocument = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final firstEditor = createDefaultDocumentEditor(
-        document: firstDocument,
-        composer: MutableDocumentComposer(),
-      );
-      final firstAdapter = NoteOperationAdapter(
-        document: firstDocument,
+      final firstEditor = _editorState();
+      final firstAdapter = AppFlowyNoteAdapter(
+        editorState: firstEditor,
         syncService: syncService,
         noteId: 'offline-note',
-        editor: firstEditor,
       );
 
       await firstAdapter.start();
-      firstEditor.execute([
-        InsertTextRequest(
-          documentPosition: const DocumentPosition(
-            nodeId: 'init',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-          textToInsert: 'Rascunho offline',
-          attributions: const {},
-        ),
-      ]);
+      await _type(firstEditor, 0, 'Rascunho offline');
       await firstAdapter.flushNow();
       firstAdapter.dispose();
 
@@ -173,25 +147,18 @@ void main() {
         hasLength(1),
       );
 
-      final restartedDocument = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final restartedEditor = createDefaultDocumentEditor(
-        document: restartedDocument,
-        composer: MutableDocumentComposer(),
-      );
-      final restartedAdapter = NoteOperationAdapter(
-        document: restartedDocument,
+      final restartedEditor = _editorState();
+      final restartedAdapter = AppFlowyNoteAdapter(
+        editorState: restartedEditor,
         syncService: syncService,
         noteId: 'offline-note',
-        editor: restartedEditor,
       );
       addTearDown(restartedAdapter.dispose);
 
       await restartedAdapter.start();
 
       expect(
-        (restartedDocument.first as TextNode).text.toPlainText(),
+        _text(restartedEditor),
         'Rascunho offline',
       );
     },
@@ -213,31 +180,15 @@ void main() {
       );
       addTearDown(database.close);
 
-      final firstDocument = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final firstEditor = createDefaultDocumentEditor(
-        document: firstDocument,
-        composer: MutableDocumentComposer(),
-      );
-      final firstAdapter = NoteOperationAdapter(
-        document: firstDocument,
+      final firstEditor = _editorState();
+      final firstAdapter = AppFlowyNoteAdapter(
+        editorState: firstEditor,
         syncService: syncService,
         noteId: 'in-flight-note',
-        editor: firstEditor,
       );
 
       await firstAdapter.start();
-      firstEditor.execute([
-        InsertTextRequest(
-          documentPosition: const DocumentPosition(
-            nodeId: 'init',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-          textToInsert: 'Edição durante queda',
-          attributions: const {},
-        ),
-      ]);
+      await _type(firstEditor, 0, 'Edição durante queda');
       await firstAdapter.flushNow();
 
       await expectLater(
@@ -253,25 +204,18 @@ void main() {
       );
       firstAdapter.dispose();
 
-      final restartedDocument = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final restartedEditor = createDefaultDocumentEditor(
-        document: restartedDocument,
-        composer: MutableDocumentComposer(),
-      );
-      final restartedAdapter = NoteOperationAdapter(
-        document: restartedDocument,
+      final restartedEditor = _editorState();
+      final restartedAdapter = AppFlowyNoteAdapter(
+        editorState: restartedEditor,
         syncService: syncService,
         noteId: 'in-flight-note',
-        editor: restartedEditor,
       );
       addTearDown(restartedAdapter.dispose);
 
       await restartedAdapter.start();
 
       expect(
-        (restartedDocument.first as TextNode).text.toPlainText(),
+        _text(restartedEditor),
         'Edição durante queda',
       );
     },
@@ -285,17 +229,18 @@ void main() {
       var online = false;
       final offlineAttempted = Completer<void>();
 
-      when(() => client.syncOperations(any(), any())).thenAnswer((invocation) async {
-        if (!online) {
-          if (!offlineAttempted.isCompleted) offlineAttempted.complete();
-          throw NoteOperationsException(
-            errorCode: 'NETWORK_ERROR',
-            message: 'offline',
-          );
-        }
-        final request = invocation.positionalArguments[1] as SyncRequest;
-        return _acceptedResponse(request, 'Rascunho global');
-      });
+      when(() => client.syncOperations(any(), any()))
+          .thenAnswer((invocation) async {
+            if (!online) {
+              if (!offlineAttempted.isCompleted) offlineAttempted.complete();
+              throw NoteOperationsException(
+                errorCode: 'NETWORK_ERROR',
+                message: 'offline',
+              );
+            }
+            final request = invocation.positionalArguments[1] as SyncRequest;
+            return _acceptedResponse(request, 'Rascunho global');
+          });
 
       final syncService = NoteOperationsSyncService(
         syncClient: client,
@@ -315,41 +260,29 @@ void main() {
         ),
       );
 
-      final document = MutableDocument(
-        nodes: [ParagraphNode(id: 'init', text: AttributedText())],
-      );
-      final editor = createDefaultDocumentEditor(
-        document: document,
-        composer: MutableDocumentComposer(),
-      );
+      final editor = _editorState();
       final session = NoteSyncSession(
         noteId: 'global-outbox-note',
         syncService: syncService,
-        document: document,
-        editor: editor,
+        adapter: AppFlowyNoteAdapter(
+          editorState: editor,
+          syncService: syncService,
+          noteId: 'global-outbox-note',
+          captureLocalOperations: false,
+        ),
         captureLocalOperations: false,
         networkCoalescingWindow: const Duration(seconds: 5),
       );
 
       await session.start();
       session.setCaptureLocalOperations(true);
-      editor.execute([
-        InsertTextRequest(
-          documentPosition: const DocumentPosition(
-            nodeId: 'init',
-            nodePosition: TextNodePosition(offset: 0),
-          ),
-          textToInsert: 'Rascunho global',
-          attributions: const {},
-        ),
-      ]);
+      await _type(editor, 0, 'Rascunho global');
 
       await session.flushNow();
       await offlineAttempted.future.timeout(const Duration(milliseconds: 500));
       await pumpEventQueue();
       await session.dispose();
       editor.dispose();
-      document.dispose();
 
       final durableBeforeReconnect = await database.noteOperationsDao
           .getPendingOperations(
@@ -398,3 +331,18 @@ void main() {
     },
   );
 }
+
+EditorState _editorState() => EditorState(
+  document: const NoteAppFlowyCodec().toDocument([
+    NoteBlock(id: 'init', type: 'paragraph'),
+  ]),
+);
+
+Future<void> _type(EditorState editorState, int offset, String text) =>
+    editorState.apply(
+      editorState.transaction
+        ..insertText(editorState.getNodeAtPath([0])!, offset, text),
+    );
+
+String _text(EditorState editorState) =>
+    editorState.getNodeAtPath([0])!.delta!.toPlainText();

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show immutable;
+
 // Covers the longest current Unicode emoji sequences, including ZWJ and skin
 // tone modifiers, while keeping arbitrary payloads out of note metadata.
 const maxNoteIconBytes = 64;
@@ -59,6 +61,7 @@ const noteIconColorKeys = <String>{
 
 enum NoteIconKind { emoji, catalog }
 
+@immutable
 class NoteIcon {
   const NoteIcon._({required this.kind, required this.value, this.colorKey});
 
@@ -127,6 +130,16 @@ class NoteIcon {
   final NoteIconKind kind;
   final String value;
   final String? colorKey;
+
+  @override
+  bool operator ==(Object other) =>
+      other is NoteIcon &&
+      other.kind == kind &&
+      other.value == value &&
+      other.colorKey == colorKey;
+
+  @override
+  int get hashCode => Object.hash(kind, value, colorKey);
 
   Map<String, dynamic> toJson() => {
     'kind': kind.name,

@@ -4,7 +4,6 @@ import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:super_editor/super_editor.dart';
 
 class MockNoteOperationsDao extends Mock implements NoteOperationsDao {}
 
@@ -74,6 +73,24 @@ void main() {
     when(
       () => mockDao.getNoteDocument(any()),
     ).thenAnswer((_) async => null);
+    when(
+      () => mockDao.isNoteLocalOnly(any()),
+    ).thenAnswer((_) async => false);
+    // The service reads only the outbox tail when appending. Derive it from
+    // the per-test getPendingOperations stubs so each scenario declares the
+    // outbox contents once.
+    when(
+      () => mockDao.getLastPendingOperation(
+        any(),
+        ownerUserId: any(named: 'ownerUserId'),
+      ),
+    ).thenAnswer((invocation) async {
+      final pending = await mockDao.getPendingOperations(
+        invocation.positionalArguments.first as String,
+        ownerUserId: invocation.namedArguments[#ownerUserId] as String?,
+      );
+      return pending.isEmpty ? null : pending.last;
+    });
     when(
       () =>
           mockDao.getSyncSession(any(), ownerUserId: any(named: 'ownerUserId')),
@@ -366,10 +383,10 @@ void main() {
 
   test('encodePayload converts editor values to JSON', () {
     final json = NoteOperationsSyncService.encodePayload({
-      'metadata': {'blockType': const NamedAttribution('task')},
+      'metadata': {'completedAt': DateTime.utc(2026, 9, 16, 12)},
     });
 
-    expect(json, '{"metadata":{"blockType":"task"}}');
+    expect(json, '{"metadata":{"completedAt":"2026-09-16T12:00:00.000Z"}}');
   });
 
   test('getConfirmedDocument returns document from dao', () async {

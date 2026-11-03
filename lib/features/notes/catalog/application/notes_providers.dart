@@ -10,3 +10,15 @@ final activeNotesProvider = StreamProvider.autoDispose<List<NoteModel>>((ref) {
 final noteProvider = StreamProvider.autoDispose.family<NoteModel?, String>(
   (ref, noteId) => ref.watch(notesRepositoryProvider).watchNoteById(noteId),
 );
+
+/// Ids of notes whose full content matches a lower-cased search query.
+///
+/// Re-evaluated when the catalog changes so results follow edits and syncs.
+final noteSearchMatchesProvider = FutureProvider.autoDispose
+    .family<Set<String>, String>((
+      ref,
+      normalizedQuery,
+    ) {
+      ref.watch(activeNotesProvider);
+      return ref.read(notesRepositoryProvider).searchNoteIds(normalizedQuery);
+    });

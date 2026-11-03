@@ -147,23 +147,6 @@ class ApiClient {
     );
   }
 
-  Future<Response<ResponseBody>> postStream(
-    String path, {
-    dynamic data,
-    Options? options,
-    CancelToken? cancelToken,
-  }) async {
-    final opts = (options ?? Options()).copyWith(
-      responseType: ResponseType.stream,
-    );
-    return _dio.post<ResponseBody>(
-      path,
-      data: data,
-      options: opts,
-      cancelToken: cancelToken,
-    );
-  }
-
   static Dio _buildDio() {
     final dio = Dio();
 

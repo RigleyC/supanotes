@@ -4,10 +4,9 @@ import 'package:supanotes/features/notes/editor/application/note_editor_session.
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 
 /// Resolves the shared editor session that owns a note document.
-typedef NoteEditorSessionReader =
-    Future<NoteEditorSession> Function(
-      String noteId,
-    );
+typedef NoteEditorSessionReader = Future<NoteEditorSession> Function(
+  String noteId,
+);
 
 /// Owns mutations for tasks that live inside a note document.
 ///
@@ -31,7 +30,7 @@ class NoteTaskController {
       throw StateError('Esta nota não permite concluir a tarefa.');
     }
 
-    final result = session.controller.completeTaskInEditor(
+    final result = await session.controller.completeTaskInEditor(
       task.blockId,
       scheduledAt: scheduledAt,
     );
@@ -51,7 +50,7 @@ class NoteTaskController {
     if (!session.captureLocalOperations) {
       throw StateError('Esta nota não permite reabrir a tarefa.');
     }
-    session.controller.reopenTaskInEditor(
+    await session.controller.reopenTaskInEditor(
       task.blockId,
       scheduledAt: scheduledAt,
     );
@@ -64,7 +63,7 @@ class NoteTaskController {
     if (!session.captureLocalOperations) {
       throw StateError('Esta nota não permite excluir a tarefa.');
     }
-    session.controller.deleteTaskInEditor(task.blockId);
+    await session.controller.deleteTaskInEditor(task.blockId);
     await session.flushNow();
   }
 }

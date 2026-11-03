@@ -1,12 +1,17 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/core/database/tables/local_note_documents.dart';
 import 'package:supanotes/core/database/tables/note_sync_errors.dart';
+import 'package:supanotes/core/database/tables/note_tasks.dart';
 import 'package:supanotes/core/database/tables/notes.dart';
 import 'package:supanotes/core/database/tables/pending_note_operations.dart';
 import 'package:supanotes/core/database/tables/sync_sessions.dart';
+import 'package:supanotes/core/database/tables/user_note_preferences.dart';
+import 'package:supanotes/features/tasks/domain/note_task_reader.dart';
 
 part 'note_operations_dao.g.dart';
 
@@ -17,6 +22,8 @@ part 'note_operations_dao.g.dart';
     NoteSyncErrors,
     Notes,
     SyncSessions,
+    NoteTasks,
+    UserNotePreferences,
   ],
 )
 class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
@@ -39,19 +46,6 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     )..where((t) => t.noteId.equals(noteId))).getSingleOrNull();
   }
 
-  Stream<List<LocalNoteDocumentData>> watchMaterializedDocuments() {
-    final query =
-        select(localNoteDocuments).join([
-          innerJoin(notes, notes.id.equalsExp(localNoteDocuments.noteId)),
-        ])..where(
-          localNoteDocuments.materializedDocumentJson.isNotNull() &
-              notes.deletedAt.isNull(),
-        );
-    return query.watch().map(
-      (rows) => rows.map((row) => row.readTable(localNoteDocuments)).toList(),
-    );
-  }
-
   Future<void> upsertNoteDocument(LocalNoteDocumentsCompanion doc) async {
     await transaction(() => upsertNoteDocumentInTransaction(doc));
   }
@@ -62,6 +56,12 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     await into(
       localNoteDocuments,
     ).insert(doc, onConflict: DoUpdate((_) => doc));
+    if (doc.noteId.present && doc.materializedDocumentJson.present) {
+      await replaceNoteTasksInTransaction(
+        doc.noteId.value,
+        doc.materializedDocumentJson.value,
+      );
+    }
     if (doc.noteId.present) {
       await attachedDatabase.noteLifecycleDao.markMaterialized(
         doc.noteId.value,
@@ -122,12 +122,108 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
       materialized: content.isNotEmpty,
       updatedAt: updatedAt,
     );
+    await replaceNoteTasksInTransaction(noteId, documentJson);
   }
 
   Future<void> deleteNoteDocument(String noteId) async {
     await (delete(
       localNoteDocuments,
     )..where((t) => t.noteId.equals(noteId))).go();
+    await deleteNoteTasks(noteId);
+  }
+
+  /// Rewrites the `note_tasks` projection of [noteId] from its materialized
+  /// document, touching the table only when the task blocks changed.
+  ///
+  /// Typing in a paragraph therefore leaves the projection (and every query
+  /// that watches it) untouched; only edits to task blocks rewrite one note's
+  /// rows. Must run inside the transaction that stores the document.
+  Future<void> replaceNoteTasksInTransaction(
+    String noteId,
+    String? materializedDocumentJson,
+  ) async {
+    final next = projectNoteTaskRows(noteId, materializedDocumentJson);
+    final current =
+        await (select(noteTasks)
+              ..where((t) => t.noteId.equals(noteId))
+              ..orderBy([(t) => OrderingTerm(expression: t.position)]))
+            .get();
+    if (_sameRows(current, next)) return;
+    await deleteNoteTasks(noteId);
+    if (next.isEmpty) return;
+    await batch((batch) => batch.insertAll(noteTasks, next));
+  }
+
+  Future<void> deleteNoteTasks(String noteId) async {
+    await (delete(noteTasks)..where((t) => t.noteId.equals(noteId))).go();
+  }
+
+  static bool _sameRows(List<NoteTaskRow> a, List<NoteTaskRow> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  /// Streams the projected tasks of every note visible to [userId].
+  ///
+  /// Visibility mirrors the notes catalog: owned or currently shared,
+  /// materialized, not archived and not deleted. Only the first line of the
+  /// note text is read (for the note title), and rows are ordered by stable
+  /// identity, so saves that do not touch tasks or the title produce an
+  /// identical result that consumers can drop with `distinct`.
+  ///
+  /// Pass `withNoteTitle: false` when the note title is not shown (reminders),
+  /// so editing a note's first line does not wake that consumer either.
+  Stream<List<VisibleNoteTaskRow>> watchVisibleNoteTasks(
+    String userId, {
+    bool withNoteTitle = true,
+  }) {
+    return customSelect(
+      'SELECT t.note_id, t.block_id, t.position, t.title, t.metadata_json, '
+      't.invalid_reason, n.created_at, '
+      '${withNoteTitle ? withNoteTitleSql : "''"} AS first_line '
+      'FROM note_tasks t '
+      'JOIN notes n ON n.id = t.note_id '
+      'LEFT JOIN user_note_preferences unp '
+      'ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
+      "AND n.lifecycle_state <> '$emptyDraftLifecycleState' "
+      'AND (n.user_id = ? OR '
+      "(n.permission IN ('view', 'edit') AND unp.note_id IS NOT NULL)) "
+      'ORDER BY t.note_id, t.position',
+      variables: [Variable.withString(userId), Variable.withString(userId)],
+      readsFrom: {noteTasks, notes, userNotePreferences},
+    ).watch().map(
+      (rows) => [
+        for (final row in rows)
+          (
+            noteId: row.read<String>('note_id'),
+            blockId: row.read<String>('block_id'),
+            position: row.read<int>('position'),
+            title: row.read<String>('title'),
+            metadataJson: row.read<String>('metadata_json'),
+            invalidReason: row.read<String?>('invalid_reason'),
+            noteCreatedAt: row.read<DateTime>('created_at'),
+            noteFirstLine: row.read<String>('first_line'),
+          ),
+      ],
+    );
+  }
+
+  /// Whether [noteId] was created on this device and has not reached the
+  /// server yet.
+  ///
+  /// Such a note exists only locally until its first sync is accepted, and
+  /// asking the server about it is answered with 403/404, which the editor
+  /// session must not mistake for a revoked permission. Notes known only
+  /// through a server document (no local note row) are not local-only.
+  Future<bool> isNoteLocalOnly(String noteId) async {
+    final row = await (select(
+      notes,
+    )..where((t) => t.id.equals(noteId))).getSingleOrNull();
+    return row != null && !row.hasRemoteCopy;
   }
 
   Future<void> markNoteHasRemoteCopy(String noteId) async {
@@ -234,6 +330,28 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     return query.get();
   }
 
+  /// Returns the highest-ordinal pending operation for [noteId], or `null`.
+  ///
+  /// Appending a batch only needs the tail of the outbox; reading every
+  /// pending row (with payloads) made each keystroke batch O(outbox size)
+  /// while offline.
+  Future<PendingNoteOperationData?> getLastPendingOperation(
+    String noteId, {
+    String? ownerUserId,
+  }) {
+    final query = select(pendingNoteOperations)
+      ..where((t) => t.noteId.equals(noteId));
+    if (ownerUserId != null) {
+      query.where((t) => t.ownerUserId.equals(ownerUserId));
+    }
+    query
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.ordinal, mode: OrderingMode.desc),
+      ])
+      ..limit(1);
+    return query.getSingleOrNull();
+  }
+
   Future<String?> getNoteOwnerId(String noteId) async {
     final note = await (select(
       notes,
@@ -271,15 +389,6 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     await (delete(
       pendingNoteOperations,
     )..where((t) => t.noteId.equals(noteId))).go();
-  }
-
-  Future<void> deleteStalePendingOps(String noteId, int minBaseRevision) async {
-    await (delete(pendingNoteOperations)..where(
-          (t) =>
-              t.noteId.equals(noteId) &
-              t.baseRevision.isSmallerThanValue(minBaseRevision),
-        ))
-        .go();
   }
 
   Future<void> incrementAttempt(String operationId) async {
@@ -477,5 +586,57 @@ class NoteOperationsDao extends DatabaseAccessor<AppDatabase>
     await (delete(
       noteSyncErrors,
     )..where((t) => t.operationId.equals(operationId))).go();
+  }
+}
+
+/// SQL expression for the first line of a note's plain text (its title).
+const withNoteTitleSql =
+    "substr(ltrim(n.content, char(10)), 1, "
+    "instr(ltrim(n.content, char(10)) || char(10), char(10)) - 1)";
+
+/// One projected task joined with the note fields its readers need.
+typedef VisibleNoteTaskRow = ({
+  String noteId,
+  String blockId,
+  int position,
+  String title,
+  String metadataJson,
+  String? invalidReason,
+  DateTime noteCreatedAt,
+  String noteFirstLine,
+});
+
+/// Builds the projection rows for one materialized document.
+///
+/// A document that cannot be read becomes a single marker row carrying the
+/// error, so the failure stays visible to readers instead of hiding the note.
+List<NoteTaskRow> projectNoteTaskRows(
+  String noteId,
+  String? materializedDocumentJson,
+) {
+  if (materializedDocumentJson == null) return const [];
+  try {
+    final blocks = extractNoteTaskBlocks(materializedDocumentJson);
+    return [
+      for (var i = 0; i < blocks.length; i++)
+        NoteTaskRow(
+          noteId: noteId,
+          blockId: blocks[i].blockId,
+          position: i,
+          title: blocks[i].title,
+          metadataJson: jsonEncode(blocks[i].metadata),
+        ),
+    ];
+  } on Object catch (error) {
+    return [
+      NoteTaskRow(
+        noteId: noteId,
+        blockId: '',
+        position: 0,
+        title: '',
+        metadataJson: '{}',
+        invalidReason: error.toString(),
+      ),
+    ];
   }
 }

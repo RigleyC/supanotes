@@ -1,0 +1,34 @@
+name: block_editor
+description: >-
+  A Notion-inspired, block-based rich text editor for Flutter. Built from
+  scratch with a plugin system, inline embeds, variables, tags, and export
+  to JSON, Markdown, and HTML.
+version: 0.0.4-dev.1
+resolution: workspace
+homepage: https://github.com/stanlysilas/block_editor
+repository: https://github.com/stanlysilas/block_editor
+issue_tracker: https://github.com/stanlysilas/block_editor/issues
+
+topics:
+  - editor
+  - rich-text
+  - blocks
+  - markdown
+  - flutter
+
+environment:
+  sdk: ">=3.11.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  uuid: ^4.5.3
+  meta: ^1.17.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  test: ^1.25.0
+  lints: ^6.1.0
+  mocktail: ^1.0.4

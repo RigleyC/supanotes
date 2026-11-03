@@ -291,6 +291,9 @@ class _FakeSessionHandle implements NoteSessionHandle {
   }
 
   @override
+  Future<bool> reconcileRemote() async => true;
+
+  @override
   Future<void> flushNow() async {
     flushCalls++;
     _status = NoteSessionStatus.syncing;

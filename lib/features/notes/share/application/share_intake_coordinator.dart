@@ -9,7 +9,9 @@ import 'package:supanotes/core/constants/api_constants.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/auth/domain/user.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
+import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/share/application/native_share_bridge.dart';
 import 'package:supanotes/features/notes/share/application/shared_link_delivery.dart';
 import 'package:supanotes/features/notes/share/domain/share_note_index.dart';
 
@@ -55,9 +57,25 @@ class ShareIntakeCoordinator {
   String? _publishedForUserId;
   String? _publishedAccessToken;
 
-  /// Best-effort refresh of the note index exposed to the share extension.
-  /// A stale index only affects what the extension suggests; failures are
-  /// logged and retried on the next notes emission.
+  /// Mirrors the current notes catalog to the native share extension.
+  ///
+  /// The extension only runs while the app is in the background, so the
+  /// index is published when the app leaves the foreground and after sign-in,
+  /// instead of on every catalog change (every autosave while typing), which
+  /// serialized the whole index over a platform channel and wrote it to disk
+  /// on the platform thread. A stale index only affects what the extension
+  /// suggests; failures are logged and retried at the next publish.
+  Future<void> publishCurrentNotesIndex() async {
+    if (_ref.read(authControllerProvider).asData?.value == null) return;
+    try {
+      final notes = await _ref.read(notesRepositoryProvider).watchNotes().first;
+      await publishNotesIndex(notes);
+    } catch (error) {
+      debugPrint('Error reading notes for the native share index: $error');
+    }
+  }
+
+  /// Publishes [notes] as the index exposed to the share extension.
   Future<void> publishNotesIndex(List<NoteModel> notes) async {
     final user = _ref.read(authControllerProvider).asData?.value;
     if (user == null) return;
@@ -67,6 +85,16 @@ class ShareIntakeCoordinator {
           .publishNotesIndex(ShareNoteIndex.fromNotes(user.id, notes));
     } catch (error) {
       debugPrint('Error publishing native share index: $error');
+    }
+  }
+
+  /// Best-effort nudge for native durable deliveries; a failure must never
+  /// escape as an unhandled async error.
+  Future<void> _retryPendingShares(NativeShareBridge bridge) async {
+    try {
+      await bridge.retryPendingShares();
+    } on Object catch (error) {
+      debugPrint('Error retrying pending native shares: $error');
     }
   }
 
@@ -103,17 +131,12 @@ class ShareIntakeCoordinator {
           apiBaseUrl: ApiConstants.baseUrl,
         );
         // Fresh credentials make previously-queued durable deliveries viable.
-        unawaited(bridge.retryPendingShares());
+        unawaited(_retryPendingShares(bridge));
       } catch (error) {
         debugPrint('Error publishing native share session: $error');
       }
     }
-    try {
-      final currentNotes = _ref.read(activeNotesProvider).asData?.value;
-      if (currentNotes != null && currentNotes.isNotEmpty) {
-        await publishNotesIndex(currentNotes);
-      }
-    } catch (_) {}
+    await publishCurrentNotesIndex();
   }
 
   /// Reads and delivers at most one pending shared link. Concurrent calls
@@ -132,7 +155,7 @@ class ShareIntakeCoordinator {
     final bridge = _ref.read(nativeShareBridgeProvider);
     // Native durable deliveries (WorkManager) resume independently of the
     // in-app flow below; both paths are idempotent by shareId.
-    unawaited(bridge.retryPendingShares());
+    unawaited(_retryPendingShares(bridge));
     final pending = await bridge.readPendingShare();
     if (pending == null ||
         pending.text.trim().isEmpty ||

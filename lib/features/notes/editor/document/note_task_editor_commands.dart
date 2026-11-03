@@ -2,14 +2,9 @@ import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_record.dart';
 import 'package:supanotes/features/tasks/domain/task_recurrence.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
-import 'package:super_editor/super_editor.dart';
 
-final class NoteTaskCompletion {
-  const NoteTaskCompletion({required this.node, required this.result});
-
-  final TaskNode node;
-  final TaskCompletionResult result;
-}
+/// A task block's editable state, independent of the editor's node type.
+typedef NoteTaskState = ({bool isComplete, Map<String, dynamic> metadata});
 
 /// Applies task-domain transitions to a note block and returns a new block.
 ///
@@ -21,11 +16,13 @@ final class NoteTaskEditorCommands {
 
   final DateTime Function()? _clock;
 
-  NoteTaskCompletion complete(
-    TaskNode node, {
+  /// Completes the current occurrence of a task in [state].
+  (NoteTaskState, TaskCompletionResult) completeState(
+    NoteTaskState state, {
     DateTime? now,
     DateTime? scheduledAt,
   }) {
+    final node = state;
     final hasTime = node.metadata['hasTime'] as bool? ?? false;
     final result =
         TaskCompletionCommand(
@@ -65,17 +62,12 @@ final class NoteTaskEditorCommands {
       metadata['completions'] = completions;
     }
 
-    return NoteTaskCompletion(
-      node: node.copyTaskWith(
-        isComplete: result.completed,
-        metadata: metadata,
-      ),
-      result: result,
-    );
+    return ((isComplete: result.completed, metadata: metadata), result);
   }
 
-  TaskNode reopen(
-    TaskNode node, {
+  /// Reopens a task (or one occurrence of a recurring task) in [state].
+  NoteTaskState reopenState(
+    NoteTaskState node, {
     DateTime? previousDue,
     DateTime? scheduledAt,
   }) {
@@ -94,11 +86,13 @@ final class NoteTaskEditorCommands {
       metadata['completions'] = completions;
     }
     metadata.remove('lastCompletedAt');
-    return node.copyTaskWith(isComplete: false, metadata: metadata);
+    return (isComplete: false, metadata: metadata);
   }
 
-  TaskNode updateMetadata(
-    TaskNode node, {
+  /// Changes a task's schedule or reminder in [node]; `null` when nothing
+  /// changes. A schedule change archives completions and reopens the task.
+  NoteTaskState? updateMetadataState(
+    NoteTaskState node, {
     DateTime? dueDate,
     String? recurrence,
     bool clearDueDate = false,
@@ -121,20 +115,57 @@ final class NoteTaskEditorCommands {
         : recurrence ?? previousRecurrence;
     final nextHasTime = hasTime ?? previousHasTime;
     final nextReminder = clearReminder ? null : reminder ?? previousReminder;
-    final dueDateChanged = previousDueDate == null
-        ? nextDueDate != null
-        : nextDueDate == null ||
-              !sameScheduledAt(
-                previousDueDate,
-                nextDueDate,
-                hasTime: nextHasTime,
-              );
     final scheduleChanged =
-        dueDateChanged ||
+        _dueDateChanged(previousDueDate, nextDueDate, hasTime: nextHasTime) ||
         nextRecurrence != previousRecurrence ||
         nextHasTime != previousHasTime;
-    if (nextReminder == previousReminder && !scheduleChanged) return node;
+    if (nextReminder == previousReminder && !scheduleChanged) return null;
 
+    _applyMetadataEdits(
+      metadata,
+      dueDate: dueDate,
+      recurrence: recurrence,
+      clearDueDate: clearDueDate,
+      clearRecurrence: clearRecurrence,
+      hasTime: hasTime,
+      nextHasTime: nextHasTime,
+      reminder: reminder,
+      clearReminder: clearReminder,
+    );
+    if (scheduleChanged) {
+      _archiveCompletions(
+        metadata,
+        scheduledAt: previousDueDate,
+        hasTime: previousHasTime,
+        isCompleted: node.isComplete,
+      );
+    }
+    return (
+      isComplete: scheduleChanged ? false : node.isComplete,
+      metadata: metadata,
+    );
+  }
+
+  static bool _dueDateChanged(
+    DateTime? previous,
+    DateTime? next, {
+    required bool hasTime,
+  }) => previous == null
+      ? next != null
+      : next == null || !sameScheduledAt(previous, next, hasTime: hasTime);
+
+  /// Writes the requested schedule and reminder edits into [metadata].
+  static void _applyMetadataEdits(
+    Map<String, dynamic> metadata, {
+    required DateTime? dueDate,
+    required String? recurrence,
+    required bool clearDueDate,
+    required bool clearRecurrence,
+    required bool? hasTime,
+    required bool nextHasTime,
+    required String? reminder,
+    required bool clearReminder,
+  }) {
     if (clearDueDate) {
       metadata.remove('dueDate');
       metadata.remove('hasTime');
@@ -152,25 +183,29 @@ final class NoteTaskEditorCommands {
     } else if (reminder != null) {
       metadata['reminder'] = reminder;
     }
-    if (scheduleChanged) {
-      final lastCompletedAt = metadata['lastCompletedAt'] is String
-          ? DateTime.tryParse(metadata['lastCompletedAt'] as String)
-          : null;
-      metadata['completionHistory'] = archiveTaskCompletionHistory(
-        history: parseTaskCompletionHistory(metadata['completionHistory']),
-        completions: _completions(metadata),
-        scheduledAt: previousDueDate,
-        hasTime: previousHasTime,
-        isCompleted: node.isComplete,
-        lastCompletedAt: lastCompletedAt,
-      ).map((record) => record.toJson()).toList(growable: false);
-      metadata.remove('completions');
-      metadata.remove('lastCompletedAt');
-    }
-    return node.copyTaskWith(
-      isComplete: scheduleChanged ? false : null,
-      metadata: metadata,
-    );
+  }
+
+  /// Moves the current completions into the completion history, as a schedule
+  /// change does.
+  void _archiveCompletions(
+    Map<String, dynamic> metadata, {
+    required DateTime? scheduledAt,
+    required bool hasTime,
+    required bool isCompleted,
+  }) {
+    final lastCompletedAt = metadata['lastCompletedAt'] is String
+        ? DateTime.tryParse(metadata['lastCompletedAt'] as String)
+        : null;
+    metadata['completionHistory'] = archiveTaskCompletionHistory(
+      history: parseTaskCompletionHistory(metadata['completionHistory']),
+      completions: _completions(metadata),
+      scheduledAt: scheduledAt,
+      hasTime: hasTime,
+      isCompleted: isCompleted,
+      lastCompletedAt: lastCompletedAt,
+    ).map((record) => record.toJson()).toList(growable: false);
+    metadata.remove('completions');
+    metadata.remove('lastCompletedAt');
   }
 
   Map<String, dynamic> _completions(Map<String, dynamic> metadata) =>

@@ -8,19 +8,22 @@ final class SyncInboxWorker {
     required this.userId,
     required SyncInboxStore store,
     required SyncChangesFetcher fetchChanges,
-    required bool Function(String noteId) isNoteActive,
+    required bool Function(SyncInboxEntry change) deferChange,
     required Future<void> Function(SyncInboxEntry change) applyChange,
     this.pageSize = 100,
     this.scope = SyncFeedScope.notes,
   }) : _store = store,
        _fetchChanges = fetchChanges,
-       _isNoteActive = isNoteActive,
+       _deferChange = deferChange,
        _applyChange = applyChange;
 
   final String userId;
   final SyncInboxStore _store;
   final SyncChangesFetcher _fetchChanges;
-  final bool Function(String noteId) _isNoteActive;
+
+  /// Changes that must stay in the inbox for now (e.g. deleting a note that
+  /// is open in the editor); they are retried on the next pass.
+  final bool Function(SyncInboxEntry change) _deferChange;
   final Future<void> Function(SyncInboxEntry change) _applyChange;
   final int pageSize;
   SyncFeedScope scope;
@@ -28,15 +31,17 @@ final class SyncInboxWorker {
   Future<void> _tail = Future<void>.value();
   bool _disposed = false;
 
-  Future<void> syncOnce() {
-    if (_disposed) return Future<void>.value();
+  /// Fetches and applies feed changes; completes with the number of changes
+  /// applied, which lets the caller pace the next run.
+  Future<int> syncOnce() {
+    if (_disposed) return Future<int>.value(0);
     final run = _tail.then((_) => _syncOnce());
     _tail = run.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return run;
   }
 
-  Future<void> _syncOnce() async {
-    await drainInbox();
+  Future<int> _syncOnce() async {
+    var applied = await drainInbox();
 
     while (!_disposed) {
       final before = await _store.getCursor(userId);
@@ -55,23 +60,25 @@ final class SyncInboxWorker {
       }
 
       await _store.ingestPage(userId: userId, page: page);
-      await drainInbox();
-      if (!page.hasMore) return;
+      applied += await drainInbox();
+      if (!page.hasMore) return applied;
     }
+    return applied;
   }
 
-  Future<void> drainInbox() async {
-    if (_disposed) return;
+  /// Applies pending inbox changes and returns how many were applied.
+  Future<int> drainInbox() async {
+    if (_disposed) return 0;
     final pending = await _store.listPending(userId);
+    var applied = 0;
     for (final change in pending) {
-      if (_disposed) return;
-      final noteId = change.noteId;
-      if (noteId != null && noteId.isNotEmpty && _isNoteActive(noteId)) {
-        continue;
-      }
+      if (_disposed) return applied;
+      if (_deferChange(change)) continue;
       await _applyChange(change);
       await _store.markApplied(userId: userId, sequence: change.sequence);
+      applied++;
     }
+    return applied;
   }
 
   void wake() {

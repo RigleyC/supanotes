@@ -148,7 +148,6 @@ void main() {
             'dueDate': '2026-08-12T09:00:00.000',
             'hasTime': true,
             'reminder': 'at_time',
-            'blockType': 'task',
           },
         },
       ],

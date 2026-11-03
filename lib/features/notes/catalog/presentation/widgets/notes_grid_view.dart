@@ -3,6 +3,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_card.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
+import 'package:supanotes/shared/widgets/app_navigation_bar.dart';
 
 /// Grid representation of the notes list.
 ///
@@ -10,7 +11,12 @@ import 'package:supanotes/shared/theme/app_spacing.dart';
 /// layout (e.g. a [Column]) and provides scroll constraints via [Expanded].
 class NotesGridView extends StatelessWidget {
   const NotesGridView({
-    required this.notes, required this.onTap, required this.onDelete, required this.onToggleFavorite, required this.onEditIcon, super.key,
+    required this.notes,
+    required this.onTap,
+    required this.onDelete,
+    required this.onToggleFavorite,
+    required this.onEditIcon,
+    super.key,
   });
 
   final List<NoteModel> notes;
@@ -25,11 +31,11 @@ class NotesGridView extends StatelessWidget {
       crossAxisCount: 2,
       mainAxisSpacing: AppSpacing.sm,
       crossAxisSpacing: AppSpacing.sm,
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.sm,
         AppSpacing.sm,
         AppSpacing.sm,
-        80 + AppSpacing.sm,
+        AppNavigationBar.contentBottomPadding(context),
       ),
       itemCount: notes.length,
       itemBuilder: (context, index) {

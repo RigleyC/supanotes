@@ -1,6 +1,8 @@
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
@@ -9,7 +11,8 @@ import 'package:supanotes/features/notes/editor/application/note_editor_provider
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/presentation/note_editor_screen.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
-import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 
 class _ReadySyncHandle implements NoteEditorSyncHandle {
   @override
@@ -28,6 +31,9 @@ class _ReadySyncHandle implements NoteEditorSyncHandle {
   Future<void> dispose() async {}
 
   @override
+  Future<bool> reconcileRemote() async => true;
+
+  @override
   Future<void> flushNow() async {}
 
   @override
@@ -40,6 +46,8 @@ class _ReadySyncHandle implements NoteEditorSyncHandle {
 }
 
 void main() {
+  setUpAll(() => initializeDateFormatting('pt_BR'));
+
   late NoteEditorController controller;
   late NoteEditorSession session;
 
@@ -47,11 +55,13 @@ void main() {
     controller = NoteEditorController(
       userId: 'user-1',
       noteId: 'note-1',
-      nodes: [
-        TaskNode(
+      blocks: [
+        NoteBlock(
           id: 'task-1',
-          text: AttributedText('Target task'),
-          isComplete: false,
+          type: 'task',
+          delta: const [
+            {'insert': 'Target task'},
+          ],
         ),
       ],
     );
@@ -84,6 +94,12 @@ void main() {
         overrides: [
           currentUserIdProvider.overrideWithValue('user-1'),
           noteProvider('note-1').overrideWith((ref) => Stream.value(note)),
+          activeNotesProvider.overrideWith(
+            (ref) => Stream.value([
+              note,
+              note.copyWith(id: 'note-2', title: 'Mercado'),
+            ]),
+          ),
           noteEditorSessionProvider(
             'note-1',
           ).overrideWith((ref) async => session),
@@ -92,6 +108,7 @@ void main() {
           ).overrideWith((ref) => Stream.value(true)),
         ],
         child: MaterialApp(
+          localizationsDelegates: const [AppFlowyEditorLocalizations.delegate],
           home: NoteEditorScreen(noteId: 'note-1', blockId: blockId),
         ),
       ),
@@ -105,22 +122,66 @@ void main() {
     addTearDown(tester.view.reset);
     await pumpScreen(tester);
 
-    expect(find.byType(KeyboardScaffoldSafeArea), findsOneWidget);
-
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-    expect(scaffold.resizeToAvoidBottomInset, isFalse);
     expect(scaffold.extendBodyBehindAppBar, isFalse);
 
     final appBarBottom = tester.getBottomLeft(find.byType(AppBar)).dy;
-    final editorTop = tester.getTopLeft(find.byType(SuperEditor)).dy;
+    final editorTop = tester.getTopLeft(find.byType(AppFlowyEditor)).dy;
     expect(editorTop, greaterThanOrEqualTo(appBarBottom));
 
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pumpAndSettle();
 
     final keyboardAppBarBottom = tester.getBottomLeft(find.byType(AppBar)).dy;
-    final keyboardEditorTop = tester.getTopLeft(find.byType(SuperEditor)).dy;
+    final keyboardEditorTop = tester.getTopLeft(find.byType(AppFlowyEditor)).dy;
     expect(keyboardEditorTop, greaterThanOrEqualTo(keyboardAppBarBottom));
+    // The editor ends above the keyboard instead of under it.
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final editorBottom = tester.getBottomLeft(find.byType(AppFlowyEditor)).dy;
+    expect(
+      editorBottom,
+      lessThanOrEqualTo(
+        screenHeight - 300 / tester.view.devicePixelRatio + 0.5,
+      ),
+    );
+  });
+
+  testWidgets('tapping below the text focuses the note and shows the toolbar', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    expect(find.byType(NoteToolbar), findsNothing);
+
+    await _tapBelowText(tester);
+    await tester.pumpAndSettle();
+
+    final selection = controller.editorState.selection!;
+    expect(selection.isCollapsed, isTrue);
+    expect(selection.end.path, [0]);
+    expect(selection.end.offset, 'Target task'.length);
+    expect(find.byType(NoteToolbar), findsOneWidget);
+
+    // Dismissing the keyboard keeps the note focusable again (the
+    // "can't focus a new note" regression).
+    await tester.tap(find.byTooltip('Remover foco'));
+    await tester.pumpAndSettle();
+    expect(controller.editorState.selection, isNull);
+    expect(find.byType(NoteToolbar), findsNothing);
+
+    await _tapBelowText(tester);
+    await tester.pumpAndSettle();
+    expect(controller.editorState.selection, isNotNull);
+  });
+
+  testWidgets('shows when the note was last edited above it', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    // updatedAt is 2026-01-01T00:00Z, shown in local time (São Paulo).
+    expect(find.text('31 de dezembro de 2025 às 21:00'), findsOneWidget);
+    expect(find.text('Notas'), findsOneWidget);
   });
 
   testWidgets('selects an existing task block from the route state', (
@@ -128,7 +189,7 @@ void main() {
   ) async {
     await pumpScreen(tester, blockId: 'task-1');
 
-    expect(controller.composer.selection?.extent.nodeId, 'task-1');
+    expect(controller.editorState.selection?.end.path, [0]);
   });
 
   testWidgets(
@@ -142,7 +203,91 @@ void main() {
         find.byKey(const ValueKey('missing-block:missing-task')),
         findsOneWidget,
       );
-      expect(find.byType(SuperEditor), findsOneWidget);
+      expect(find.byType(AppFlowyEditor), findsOneWidget);
     },
   );
+
+  testWidgets('Aa swaps the keyboard for the format panel and back', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await _tapBelowText(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Formatar'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('note-format-panel')), findsOneWidget);
+    expect(find.byType(NoteToolbar), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('Título'));
+    await tester.pumpAndSettle();
+    expect(
+      controller.editorState.getNodeAtPath([0])!.type,
+      HeadingBlockKeys.type,
+    );
+
+    await tester.tap(find.bySemanticsLabel('Fechar formatação'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('note-format-panel')), findsNothing);
+    expect(find.byType(NoteToolbar), findsOneWidget);
+    // Still editing: the caret stays.
+    expect(controller.editorState.selection, isNotNull);
+  });
+
+  testWidgets('hiding the keyboard ends editing', (tester) async {
+    await pumpScreen(tester);
+    await _tapBelowText(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Esconder teclado'));
+    await tester.pumpAndSettle();
+
+    expect(controller.editorState.selection, isNull);
+    expect(find.byType(NoteToolbar), findsNothing);
+  });
+
+  testWidgets('selected text links to a picked note', (tester) async {
+    await pumpScreen(tester);
+    controller.editorState.selection = Selection.single(
+      path: [0],
+      startOffset: 0,
+      endOffset: 6,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Criar link para outra nota'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mercado'));
+    await tester.pumpAndSettle();
+
+    final delta = controller.editorState.getNodeAtPath([0])!.delta!.toJson();
+    expect(delta.first, {
+      'insert': 'Target',
+      'attributes': {'href': 'note://note-2'},
+    });
+  });
+
+  testWidgets('a caret placed by code alone shows no toolbar', (tester) async {
+    await pumpScreen(tester, blockId: 'task-1');
+
+    // The deep link highlights the task without starting to edit.
+    expect(controller.editorState.selection, isNotNull);
+    expect(controller.editing.value, isFalse);
+    expect(find.byType(NoteToolbar), findsNothing);
+    expect(find.byTooltip('Remover foco'), findsNothing);
+
+    await _tapBelowText(tester);
+    await tester.pumpAndSettle();
+    expect(controller.editing.value, isTrue);
+    expect(find.byType(NoteToolbar), findsOneWidget);
+  });
+}
+
+/// Taps the empty part of the note, below its last block.
+Future<void> _tapBelowText(WidgetTester tester) async {
+  final editor = tester.getRect(find.byType(AppFlowyEditor));
+  await tester.tapAt(
+    Offset(editor.center.dx, editor.top + editor.height * 0.6),
+  );
+  await tester.pumpAndSettle();
 }

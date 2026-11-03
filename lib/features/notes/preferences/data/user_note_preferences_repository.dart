@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 
 class UserNotePreferencesRepository {
@@ -52,13 +51,4 @@ userNotePreferencesRepositoryProvider =
     Provider.autoDispose<UserNotePreferencesRepository>((ref) {
       final db = ref.watch(appDatabaseProvider);
       return UserNotePreferencesRepository(db);
-    });
-
-final userNotePreferenceStreamProvider = StreamProvider.autoDispose
-    .family<UserNotePreferenceData?, String>((ref, noteId) {
-      final userId = ref.watch(currentUserIdProvider);
-      if (userId == null) return Stream.value(null);
-      return ref
-          .watch(userNotePreferencesRepositoryProvider)
-          .watchPreference(userId, noteId);
     });

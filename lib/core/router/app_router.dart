@@ -1,4 +1,5 @@
-import 'package:cupertino_native_better/cupertino_native_better.dart';
+import 'dart:async';
+
 import 'package:cupertino_native_better/utils/transition_observer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -21,12 +22,29 @@ import 'package:supanotes/features/settings/presentation/settings_screen.dart';
 import 'package:supanotes/features/tasks/presentation/completed_tasks_screen.dart';
 import 'package:supanotes/features/tasks/presentation/task_editor_screen.dart';
 import 'package:supanotes/features/tasks/presentation/tasks_screen.dart';
+import 'package:supanotes/shared/widgets/app_navigation_bar.dart';
 import 'package:supanotes/shared/widgets/app_navigation_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// The primary destinations of [AppNavigationShell], in branch order. The
+/// shell's "+" button creates an item of the selected destination.
+final List<AppNavigationDestination> appNavigationDestinations = [
+  AppNavigationDestination(
+    label: 'Tarefas',
+    primaryActionLabel: 'Nova tarefa',
+    onPrimaryAction: (context) =>
+        unawaited(showTaskEditorSheet(context: context)),
+  ),
+  AppNavigationDestination(
+    label: 'Notas',
+    primaryActionLabel: 'Nova nota',
+    onPrimaryAction: (context) => unawaited(createAndOpenNote(context)),
+  ),
+];
+
 List<NavigatorObserver> _appNavigatorObservers() {
-  final observers = <NavigatorObserver>[CNTabBarRouteObserver()];
+  final observers = <NavigatorObserver>[];
   if (defaultTargetPlatform == TargetPlatform.iOS ||
       defaultTargetPlatform == TargetPlatform.macOS) {
     observers.add(CNTransitionObserver());
@@ -73,6 +91,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) => AppNavigationShell(
           navigationShell: navigationShell,
+          destinations: appNavigationDestinations,
         ),
         branches: [
           StatefulShellBranch(

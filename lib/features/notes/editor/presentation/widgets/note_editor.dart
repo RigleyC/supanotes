@@ -1,27 +1,27 @@
+import 'dart:async';
+
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_upload.dart';
+import 'package:supanotes/features/notes/editor/appflowy/blocks/note_task_block.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_editor.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_style.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
-import 'package:supanotes/features/notes/editor/presentation/note_mobile_stylesheet.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_components.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/custom_divider_component.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/custom_list_item_component.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/custom_task_component.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/hidden_task_trailing_tap_handler.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_config.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_tap_handler.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_format_panel.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_picker_sheet.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_selection_menu.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
-import 'package:supanotes/features/tasks/domain/task_completion_state.dart';
-import 'package:supanotes/features/tasks/domain/task_occurrence.dart';
-import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:super_editor/super_editor.dart';
 
+/// The note body: the document editor plus, while editing, its toolbar.
 class NoteEditor extends StatefulWidget {
   const NoteEditor({
     required this.noteId,
@@ -34,7 +34,9 @@ class NoteEditor extends StatefulWidget {
     this.attachmentDelivery,
     this.requestInitialFocus = false,
     this.isReadOnly = false,
+    this.header,
   });
+
   final String noteId;
   final NoteEditorSession session;
   final bool hideCompleted;
@@ -48,136 +50,108 @@ class NoteEditor extends StatefulWidget {
   /// capability stream. The editor only renders the resulting mode.
   final bool isReadOnly;
 
+  /// Shown above the first block, scrolling with the note.
+  final Widget? header;
+
   @override
   State<NoteEditor> createState() => _NoteEditorState();
 }
 
-class _NoteEditorState extends State<NoteEditor> {
-  NoteEditorController? _controller;
-  final GlobalKey<State<StatefulWidget>> _docLayoutKey = GlobalKey();
-  final _selectionLayerLinks = SelectionLayerLinks();
-  final _softwareKeyboardController = SoftwareKeyboardController();
-  final _isImeConnected = ValueNotifier<bool>(false);
-  late final KeyboardPanelController<Object> _keyboardPanelController;
-  EditorControls? _controls;
-  Stylesheet? _cachedStylesheet;
-  ColorScheme? _cachedColorScheme;
+class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
+  late EditorScrollController _scrollController;
 
-  CustomTaskComponentBuilder? _taskComponentBuilder;
-  List<ComponentBuilder>? _componentBuilders;
-  List<SuperEditorContentTapDelegateFactory>? _contentTapDelegateFactories;
-  NoteEditorSession? _attachedSession;
+  /// The "Formatar" panel is showing in the keyboard's place.
+  bool _panelOpen = false;
 
-  bool get _isReadOnly => widget.isReadOnly;
+  /// Last height of the on-screen keyboard; the panel takes the same space so
+  /// the note does not move when they swap.
+  double _keyboardHeight = 291;
+
+  NoteEditorController get _controller => widget.session.controller;
 
   @override
   void initState() {
     super.initState();
-    _keyboardPanelController = KeyboardPanelController<Object>(
-      _softwareKeyboardController,
+    WidgetsBinding.instance.addObserver(this);
+    _attach();
+  }
+
+  @override
+  void didChangeMetrics() {
+    final view = View.of(context);
+    final inset = view.viewInsets.bottom / view.devicePixelRatio;
+    if (inset < 100) return;
+    _keyboardHeight = inset;
+    // The keyboard came back (the user tapped the text): it replaces the
+    // panel.
+    if (_panelOpen) setState(() => _panelOpen = false);
+  }
+
+  @override
+  void didUpdateWidget(NoteEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session) {
+      oldWidget.session.controller.editing.removeListener(_onSelection);
+      _scrollController.dispose();
+      _panelOpen = false;
+      _attach();
+    }
+    _controller.hideCompleted = widget.hideCompleted;
+  }
+
+  void _attach() {
+    _controller.editing.addListener(_onSelection);
+    _controller.hideCompleted = widget.hideCompleted;
+    _scrollController = EditorScrollController(
+      editorState: _controller.editorState,
     );
-    _attachSession(widget.session);
   }
 
-  void _attachSession(NoteEditorSession session) {
-    if (identical(_attachedSession, session)) return;
-    _controller?.focusNode.removeListener(_syncToolbarVisibility);
-    _attachedSession = session;
-    _controller = session.controller;
-    _controller!.focusNode.addListener(_syncToolbarVisibility);
-    _scheduleInitialToolbarSync();
-    _configureHiddenTaskEditing();
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.editing.removeListener(_onSelection);
+    _scrollController.dispose();
+    super.dispose();
   }
 
-  void _initControls() {
-    if (_controls != null) return;
-    final controller = _controller!;
-
-    final editorControlsColor = Theme.of(context).colorScheme.primary;
-    _controls = createEditorControls(
-      editor: controller.editor,
-      composer: controller.composer,
-      documentLayoutResolver: () =>
-          _docLayoutKey.currentState! as DocumentLayout,
-      handleColor: editorControlsColor,
-    );
-
-    _initStableBuilders();
+  /// Editing ended: the panel goes away with the toolbar.
+  void _onSelection() {
+    if (_panelOpen && !_controller.editing.value) {
+      setState(() => _panelOpen = false);
+    }
   }
 
-  void _initStableBuilders() {
-    if (_componentBuilders != null) return;
-    final controller = _controller!;
-
-    _contentTapDelegateFactories = [
-      (editContext) => NoteLinkTapHandler(
-        editContext.document,
-        allowInternalNoteLinks: !_isReadOnly,
-        onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
+  void _togglePanel() {
+    final open = !_panelOpen;
+    setState(() => _panelOpen = open);
+    unawaited(
+      SystemChannels.textInput.invokeMethod<void>(
+        open ? 'TextInput.hide' : 'TextInput.show',
       ),
-      if (!_isReadOnly)
-        (editContext) => HiddenTaskTrailingTapHandler(
-          editContext: editContext,
-          isHiddenTask: _isHiddenTask,
-          openSoftwareKeyboard: () {
-            if (_softwareKeyboardController.hasDelegate) {
-              _softwareKeyboardController.open(viewId: View.of(context).viewId);
-            }
-          },
-        ),
-      if (!_isReadOnly) superEditorAddEmptyParagraphTapHandlerFactory,
-    ];
-
-    _taskComponentBuilder = CustomTaskComponentBuilder(
-      hideCompleted: widget.hideCompleted,
-      readOnly: _isReadOnly,
-      onTaskLongPress: _isReadOnly ? null : widget.delegate.onTaskLongPress,
-      onTaskComplete: widget.delegate.onTaskComplete,
-      onTaskReopen: widget.delegate.onTaskReopen,
     );
-
-    _componentBuilders = [
-      const CustomDividerComponentBuilder(),
-      _taskComponentBuilder!,
-      const CustomListItemComponentBuilder(),
-      AttachmentComponentBuilder(
-        editor: controller.editor,
-        collapseImages: widget.collapseImages,
-        readOnly: _isReadOnly,
-        allowInternalNoteLinks: !_isReadOnly,
-        attachmentDelivery: widget.attachmentDelivery,
-      ),
-      ...defaultComponentBuilders,
-    ];
   }
 
-  void _configureHiddenTaskEditing() {
-    final controller = _controller;
-    if (controller == null) return;
-
-    controller.setHiddenTaskPredicate(_isHiddenTask);
+  void _hideKeyboard() {
+    setState(() => _panelOpen = false);
+    _controller.editorState.selection = null;
+    _controller.focusNode.unfocus();
+    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
   }
 
-  bool _isHiddenTask(TaskNode node) {
-    if (!widget.hideCompleted) return false;
-    final metadata = TaskMetadataDraft.fromTaskNode(node);
-    final occurrence = const TaskOccurrencePolicy().resolveCurrent(
-      taskId: node.id,
-      anchor: metadata.scheduleAnchor,
-      recurrence: metadata.recurrence,
-      hasTime: metadata.hasTime,
-      completedAtByScheduledAt: metadata.completions,
-    );
-    return isTaskOccurrenceCompleted(
-      isComplete: node.isComplete,
-      recurrence: metadata.recurrence,
-      occurrence: occurrence,
-    );
+  Future<void> _linkNote() async {
+    final editorState = _controller.editorState;
+    final selection = editorState.selection;
+    if (selection == null || selection.isCollapsed) return;
+    final note = await pickNoteToLink(context, currentNoteId: widget.noteId);
+    if (note == null || !mounted) return;
+    _controller.editAt(selection);
+    await editorState.linkSelectionToNote(note.id);
   }
 
   Future<void> _attachFile({bool imageOnly = false}) async {
     try {
-      await _controller!.pickAndAttachFile(
+      await _controller.pickAndAttachFile(
         uploader: widget.attachmentUploader,
         imageOnly: imageOnly,
       );
@@ -197,212 +171,81 @@ class _NoteEditorState extends State<NoteEditor> {
   }
 
   @override
-  void didUpdateWidget(NoteEditor oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    _handleSessionUpdate(oldWidget);
-    _handleReadOnlyUpdate(oldWidget);
-    _handleHiddenTaskUpdate(oldWidget);
-    _handleBuilderUpdate(oldWidget);
-  }
-
-  void _handleSessionUpdate(NoteEditor oldWidget) {
-    if (widget.session == oldWidget.session) return;
-
-    _controls?.dispose();
-    _controls = null;
-    _resetStableBuilders();
-    _attachSession(widget.session);
-  }
-
-  void _handleReadOnlyUpdate(NoteEditor oldWidget) {
-    if (widget.isReadOnly == oldWidget.isReadOnly) return;
-    if (widget.isReadOnly) {
-      _controls?.dispose();
-      _controls = null;
-    }
-    _resetStableBuilders();
-    _configureHiddenTaskEditing();
-  }
-
-  void _handleHiddenTaskUpdate(NoteEditor oldWidget) {
-    if (widget.hideCompleted != oldWidget.hideCompleted) {
-      _configureHiddenTaskEditing();
-    }
-  }
-
-  void _handleBuilderUpdate(NoteEditor oldWidget) {
-    final builderInputsChanged =
-        widget.hideCompleted != oldWidget.hideCompleted ||
-        widget.collapseImages != oldWidget.collapseImages ||
-        widget.attachmentDelivery != oldWidget.attachmentDelivery;
-
-    if (!builderInputsChanged) return;
-
-    if (widget.hideCompleted && !oldWidget.hideCompleted) {
-      _clearSelectionFromCompletedTask();
-    }
-    _resetStableBuilders();
-  }
-
-  void _clearSelectionFromCompletedTask() {
-    final selection = _controller?.composer.selection;
-    final selectedNode = selection == null
-        ? null
-        : _controller?.editor.document.getNodeById(selection.extent.nodeId);
-    if (selectedNode is TaskNode && _isHiddenTask(selectedNode)) {
-      _controller?.composer.clearSelection();
-      _controller?.focusNode.unfocus();
-    }
-  }
-
-  void _resetStableBuilders() {
-    _componentBuilders = null;
-    _contentTapDelegateFactories = null;
-    _taskComponentBuilder = null;
-  }
-
-  void _syncToolbarVisibility() {
-    if (!_keyboardPanelController.hasDelegate) return;
-    final controller = _controller;
-    if (controller == null) return;
-    _keyboardPanelController.toolbarVisibility = controller.focusNode.hasFocus
-        ? KeyboardToolbarVisibility.visible
-        : KeyboardToolbarVisibility.hidden;
-  }
-
-  void _scheduleInitialToolbarSync() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _syncToolbarVisibility();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller?.focusNode.removeListener(_syncToolbarVisibility);
-    _softwareKeyboardController.detach();
-    _keyboardPanelController.dispose();
-    _isImeConnected.dispose();
-    _controls?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final controller = widget.session.controller;
-
-    if (!_isReadOnly) {
-      _initControls();
-    }
-    _initStableBuilders();
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const docPadding = EdgeInsets.only(
-          left: 24,
-          right: 24,
-          bottom: 24,
-        );
-
-        if (_cachedStylesheet == null ||
-            !identical(
-              _cachedColorScheme,
-              Theme.of(context).colorScheme,
-            ) ||
-            _cachedStylesheet!.documentPadding != docPadding) {
-          _cachedColorScheme = Theme.of(context).colorScheme;
-          _cachedStylesheet = mobileNoteStylesheet(
-            context,
-            documentPadding: docPadding,
-          );
-        }
-
-        if (_isReadOnly) {
-          return SuperReader(
-            key: ValueKey<bool>(_isReadOnly),
-            editor: controller.editor,
-            documentLayoutKey: _docLayoutKey,
-            selectionLayerLinks: _selectionLayerLinks,
-            stylesheet: _cachedStylesheet,
-            selectionStyle: editorSelectionStyle(
-              Theme.of(context).colorScheme,
+    final editorState = _controller.editorState;
+    final delegate = widget.delegate;
+    final editor = NoteAppFlowyEditor(
+      key: ValueKey<bool>(widget.isReadOnly),
+      editorState: editorState,
+      readOnly: widget.isReadOnly,
+      hideCompleted: widget.hideCompleted,
+      collapseImages: widget.collapseImages,
+      attachmentDelivery: widget.attachmentDelivery,
+      scrollController: _scrollController,
+      header: widget.header,
+      focusNode: _controller.focusNode,
+      autoFocus: widget.requestInitialFocus && !widget.isReadOnly,
+      padding: const EdgeInsets.symmetric(
+        horizontal: NoteEditorMetrics.horizontalPadding,
+      ),
+      links: NoteLinkHandler(
+        allowInternalNoteLinks: !widget.isReadOnly,
+        onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
+      ),
+      taskActions: widget.isReadOnly
+          ? const NoteTaskActions()
+          : NoteTaskActions(
+              onComplete: (id) async => delegate.onTaskComplete?.call(id),
+              onReopen: (id, scheduledAt) async =>
+                  delegate.onTaskReopen?.call(id, scheduledAt),
+              onOpenDetails: (id) => delegate.onTaskLongPress?.call(id),
+              onHidden: (_) => unawaited(_controller.refreshHidden()),
             ),
-            componentBuilders: _componentBuilders,
-            contentTapDelegateFactory: (readerContext) => NoteLinkTapHandler(
-              readerContext.document,
-              allowInternalNoteLinks: !_isReadOnly,
-              onNoteTap: (targetId) => context.push(AppRoutes.note(targetId)),
-            ),
-          );
-        }
+    );
+    if (widget.isReadOnly) return editor;
 
-        return KeyboardPanelScaffold<Object>(
-          controller: _keyboardPanelController,
-          isImeConnected: _isImeConnected,
-          contentBuilder: (context, _) => PopScope(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SuperEditorAndroidControlsScope(
-                    controller: _controls!.androidController,
-                    child: SuperEditorIosControlsScope(
-                      controller: _controls!.iosController,
-                      child: TapRegion(
-                        groupId: noteEditorToolbarTapRegionGroup,
-                        child: SuperEditor(
-                          key: ValueKey<bool>(_isReadOnly),
-                          editor: controller.editor,
-                          focusNode: controller.focusNode,
-                          autofocus: widget.requestInitialFocus,
-                          inputSource: TextInputSource.ime,
-                          softwareKeyboardController:
-                              _softwareKeyboardController,
-                          isImeConnected: _isImeConnected,
-                          documentLayoutKey: _docLayoutKey,
-                          selectionLayerLinks: _selectionLayerLinks,
-                          stylesheet: _cachedStylesheet,
-                          selectionStyle: editorSelectionStyle(
-                            Theme.of(context).colorScheme,
-                          ),
-                          documentOverlayBuilders: [
-                            ...defaultSuperEditorDocumentOverlayBuilders.where(
-                              (builder) =>
-                                  builder is! DefaultCaretOverlayBuilder,
-                            ),
-                            DefaultCaretOverlayBuilder(
-                              caretStyle: CaretStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                width: 1.5,
-                              ),
-                            ),
-                          ],
-                          contentTapDelegateFactories:
-                              _contentTapDelegateFactories,
-                          keyboardActions: editorKeyboardActions(),
-                          componentBuilders: _componentBuilders,
-                        ),
-                      ),
-                    ),
+    return TapRegion(
+      groupId: noteEditorToolbarTapRegionGroup,
+      child: Column(
+        children: [
+          Expanded(
+            child: NoteSelectionMenu(
+              editorState: editorState,
+              editing: _controller.editing,
+              scrollController: _scrollController,
+              child: editor,
+            ),
+          ),
+          NoteSuggestionOverlay(
+            editorState: editorState,
+            currentNoteId: widget.noteId,
+          ),
+          // Rebuilds only when editing starts or stops, not on every caret
+          // move: the toolbar listens to the selection itself.
+          // Shown only while editing, and replaced by the format panel while
+          // that is open (the panel has its own close button).
+          ValueListenableBuilder<bool>(
+            valueListenable: _controller.editing,
+            builder: (context, editing, _) => !editing || _panelOpen
+                ? const SizedBox.shrink()
+                : NoteToolbar(
+                    editorState: editorState,
+                    panelOpen: _panelOpen,
+                    onTogglePanel: _togglePanel,
+                    onAttachFile: () => _attachFile(),
+                    onAttachImage: () => _attachFile(imageOnly: true),
+                    onHideKeyboard: _hideKeyboard,
+                    onLinkNote: () => unawaited(_linkNote()),
                   ),
-                ),
-                NoteSuggestionOverlay(
-                  editor: controller.editor,
-                  composer: controller.composer,
-                  currentNoteId: widget.noteId,
-                ),
-              ],
+          ),
+          if (_panelOpen)
+            NoteFormatPanel(
+              editorState: editorState,
+              height: _keyboardHeight,
+              onClose: _togglePanel,
             ),
-          ),
-          toolbarBuilder: (context, _) => NoteToolbar(
-            editor: controller.editor,
-            composer: controller.composer,
-            onAttachFile: () => _attachFile(),
-            onAttachImage: () => _attachFile(imageOnly: true),
-          ),
-          keyboardPanelBuilder: (_, _) => const SizedBox.shrink(),
-        );
-      },
+        ],
+      ),
     );
   }
 }

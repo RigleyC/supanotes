@@ -3,21 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_interaction_policy.dart';
-import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_view.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/app_tile.dart';
+import 'package:supanotes/shared/widgets/app_navigation_bar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
-/// List representation of the notes list, anchored to the bottom.
+/// Typographic list of note titles, anchored to the bottom of the screen.
 ///
 /// A reverse [ListView] pins the rows to the bottom edge when they fit the
-/// viewport and scrolls lazily when they overflow. Because a reversed list
-/// renders the first item at the bottom, the input order is inverted so the
-/// visual order stays top-to-bottom. The parent owns the layout (e.g. a
-/// [Column]) and provides scroll constraints via [Expanded].
+/// viewport and scrolls lazily when they overflow. The first (most relevant)
+/// note of [notes] is the row nearest the navigation bar. The parent owns
+/// the layout and provides scroll constraints.
 class NotesListView extends StatelessWidget {
   const NotesListView({
-    required this.notes, required this.onTap, required this.onDelete, required this.onToggleFavorite, required this.onEditIcon, super.key,
+    required this.notes,
+    required this.onTap,
+    required this.onDelete,
+    required this.onToggleFavorite,
+    required this.onEditIcon,
+    super.key,
   });
 
   final List<NoteModel> notes;
@@ -32,59 +34,18 @@ class NotesListView extends StatelessWidget {
 
     return ListView.builder(
       reverse: true,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.sm,
-        0,
+      padding: EdgeInsets.only(
+        top: 8,
+        bottom: AppNavigationBar.contentBottomPadding(context),
       ),
       itemCount: notes.length,
       itemBuilder: (context, index) {
-        final note = notes[notes.length - 1 - index];
+        final note = notes[index];
         final canLongPressToEditIcon =
             NoteIconInteractionPolicy.canUseLongPress(
-          note: note,
-          onEditIcon: () => onEditIcon(note),
-        );
-
-        final Widget? leading = note.noteIcon != null
-            ? NoteIconView(icon: note.noteIcon!)
-            : null;
-
-        final Widget? subtitleWidget = note.sharedByEmail != null
-            ? Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.person_outline,
-                      size: 14,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        '${NoteStrings.sharedFromPrefix} ${note.sharedByEmail}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : null;
-
-        final Widget? trailing = note.favorite
-            ? Icon(
-                Icons.star_rate_rounded,
-                size: 18,
-                color: scheme.tertiary,
-              )
-            : null;
+              note: note,
+              onEditIcon: () => onEditIcon(note),
+            );
 
         return Dismissible(
           key: ValueKey('note-${note.id}'),
@@ -118,16 +79,77 @@ class NotesListView extends StatelessWidget {
             if (confirmed) onDelete(note);
             return confirmed;
           },
-          child: AppTile(
-            title: note.title,
-            leading: leading,
-            trailing: trailing,
-            subtitleWidget: subtitleWidget,
+          child: NoteTitleRow(
+            note: note,
             onTap: () => onTap(note),
             onLongPress: canLongPressToEditIcon ? () => onEditIcon(note) : null,
           ),
         );
       },
+    );
+  }
+}
+
+/// One note in the list: only its title, in large type.
+class NoteTitleRow extends StatelessWidget {
+  const NoteTitleRow({
+    required this.note,
+    required this.onTap,
+    this.onLongPress,
+    super.key,
+  });
+
+  final NoteModel note;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final untitled = note.title.trim().isEmpty;
+    final title = untitled ? NoteStrings.fallbackTitle : note.title;
+    final sharedBy = note.sharedByEmail;
+    final semanticsLabel = sharedBy == null
+        ? title
+        : '$title. ${NoteStrings.sharedByPrefix} $sharedBy';
+
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 52),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppNavigationBar.contentInset,
+              vertical: 10,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: (theme.textTheme.titleLarge ?? const TextStyle())
+                    .copyWith(
+                      fontSize: 20,
+                      height: 1.25,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -0.2,
+                      color: untitled
+                          ? scheme.onSurfaceVariant.withValues(alpha: 0.8)
+                          : scheme.onSurface,
+                    ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

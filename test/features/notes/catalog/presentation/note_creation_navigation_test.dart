@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supanotes/core/router/app_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/presentation/notes_list_screen.dart';
 import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
-import 'package:supanotes/shared/widgets/empty_state.dart';
+import 'package:supanotes/shared/widgets/app_navigation_shell.dart';
 
 class _RecordingNotesRepository implements INotesRepository {
   String? createdNoteId;
@@ -37,21 +38,28 @@ class _RecordingNotesRepository implements INotesRepository {
 
 GoRouter _routerFor(Widget screen) {
   return GoRouter(
-    initialLocation: AppRoutes.home,
+    initialLocation: AppRoutes.notes,
     routes: [
-      ShellRoute(
-        builder: (_, _, child) => child,
-        routes: [
-          GoRoute(path: AppRoutes.home, builder: (_, _) => screen),
-          GoRoute(
-            path: AppRoutes.note(':id'),
-            builder: (_, state) => Text(state.uri.toString()),
-          ),
-          GoRoute(
-            path: AppRoutes.completedTasks,
-            builder: (_, _) => const Text('completed-tasks'),
+      StatefulShellRoute.indexedStack(
+        builder: (_, _, navigationShell) => AppNavigationShell(
+          navigationShell: navigationShell,
+          destinations: [appNavigationDestinations.last],
+        ),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: AppRoutes.notes, builder: (_, _) => screen),
+            ],
           ),
         ],
+      ),
+      GoRoute(
+        path: AppRoutes.note(':id'),
+        builder: (_, state) => Text(state.uri.toString()),
+      ),
+      GoRoute(
+        path: AppRoutes.completedTasks,
+        builder: (_, _) => const Text('completed-tasks'),
       ),
     ],
   );
@@ -74,7 +82,7 @@ Widget _app({
 }
 
 void main() {
-  testWidgets('mobile new-note action creates an id and navigates', (
+  testWidgets('shell new-note action creates an id and navigates', (
     tester,
   ) async {
     final repository = _RecordingNotesRepository();
@@ -83,7 +91,10 @@ void main() {
     await tester.pumpWidget(_app(router: router, repository: repository));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(FloatingActionButton));
+    expect(find.byType(FloatingActionButton), findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('app-navigation-primary-action')),
+    );
     await tester.pumpAndSettle();
 
     expect(repository.createdNoteId, isNotNull);
@@ -99,7 +110,8 @@ void main() {
     await tester.pumpWidget(_app(router: router, repository: repository));
     await tester.pumpAndSettle();
 
-    expect(find.byType(EmptyState), findsOneWidget);
+    expect(find.byKey(const ValueKey('notes-empty-state')), findsOneWidget);
+    expect(find.text('Nenhuma nota ainda'), findsOneWidget);
     expect(find.byKey(const ValueKey('completed-notes-entry')), findsNothing);
   });
 }

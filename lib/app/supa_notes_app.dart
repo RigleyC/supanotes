@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:appflowy_editor/appflowy_editor.dart'
+    show AppFlowyEditorLocalizations;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +12,6 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_link_provider.dart';
 import 'package:supanotes/core/router/app_router.dart';
 import 'package:supanotes/core/sync/note_remote_sync_runtime.dart';
-import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/share/application/share_intake_coordinator.dart';
 import 'package:supanotes/features/notes/share/domain/share_strings.dart';
@@ -40,10 +41,6 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
           ref.read(authControllerProvider).asData?.value,
         ),
       );
-      final notes = ref.read(activeNotesProvider).asData?.value;
-      if (notes != null && notes.isNotEmpty) {
-        unawaited(coordinator.publishNotesIndex(notes));
-      }
       unawaited(_processPendingShare());
     });
   }
@@ -58,6 +55,12 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_handleAppResumed());
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      // The share extension runs while the app is in the background.
+      unawaited(
+        ref.read(shareIntakeCoordinatorProvider).publishCurrentNotesIndex(),
+      );
     }
   }
 
@@ -76,11 +79,6 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
 
     ref.read(noteOutboxWorkerProvider)?.wake();
     ref.read(noteRemoteSyncCoordinatorProvider)?.wake();
-    final coordinator = ref.read(shareIntakeCoordinatorProvider);
-    final notes = ref.read(activeNotesProvider).asData?.value;
-    if (notes != null && notes.isNotEmpty) {
-      unawaited(coordinator.publishNotesIndex(notes));
-    }
     unawaited(_processPendingShare());
   }
 
@@ -132,13 +130,6 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
         },
       );
     });
-    ref.listen(activeNotesProvider, (_, next) {
-      next.whenData((notes) {
-        unawaited(
-          ref.read(shareIntakeCoordinatorProvider).publishNotesIndex(notes),
-        );
-      });
-    });
 
     final router = ref.watch(goRouterProvider);
     ref.listen(appLinkProvider, (_, next) {
@@ -157,6 +148,7 @@ class _SupaNotesAppState extends ConsumerState<SupaNotesApp>
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
+        AppFlowyEditorLocalizations.delegate,
       ],
       supportedLocales: const [Locale('pt', 'BR'), Locale('en', 'US')],
       theme: AppTheme.lightTheme,

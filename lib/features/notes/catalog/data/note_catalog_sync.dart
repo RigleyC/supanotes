@@ -14,12 +14,11 @@ import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart
 import 'package:supanotes/features/notes/editor/sync/note_session_activity_tracker.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
-typedef NoteIconUpdater =
-    Future<void> Function(
-      String noteId,
-      NoteIcon? icon,
-      DateTime? expectedUpdatedAt,
-    );
+typedef NoteIconUpdater = Future<void> Function(
+  String noteId,
+  NoteIcon? icon,
+  DateTime? expectedUpdatedAt,
+);
 
 final class _LocalRemoteNoteState {
   const _LocalRemoteNoteState({

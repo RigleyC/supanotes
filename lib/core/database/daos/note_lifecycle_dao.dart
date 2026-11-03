@@ -60,6 +60,9 @@ final class NoteLifecycleDao extends DatabaseAccessor<AppDatabase> {
       attachedDatabase.localNoteDocuments,
     )..where((document) => document.noteId.equals(noteId))).go();
     await (delete(
+      attachedDatabase.noteTasks,
+    )..where((task) => task.noteId.equals(noteId))).go();
+    await (delete(
       attachedDatabase.pendingNoteOperations,
     )..where((operation) => operation.noteId.equals(noteId))).go();
     await (delete(

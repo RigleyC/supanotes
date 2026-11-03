@@ -372,6 +372,7 @@ NoteRemoteSyncNoteApplier _noteApplier({
 }) {
   return NoteRemoteSyncNoteApplier(
     isActive: (_) => false,
+    reconcileActive: (_) async => false,
     syncPending: syncPending,
     confirmedRevision: confirmedRevision,
     pollAndReconcile: pollAndReconcile,

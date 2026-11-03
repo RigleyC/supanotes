@@ -7,13 +7,21 @@ enum TaskReminderOption {
   at9Am('9am', isRelative: false, label: '9:00 AM'),
   at12Pm('12pm', isRelative: false, label: '12:00 PM'),
   at6Pm('6pm', isRelative: false, label: '6:00 PM'),
-  oneDayBeforeAbsolute('1d_before_9am', isRelative: false, label: '1 dia antes, 9:00 AM');
+  oneDayBeforeAbsolute(
+    '1d_before_9am',
+    isRelative: false,
+    label: '1 dia antes, 9:00 AM',
+  );
 
   final String value;
   final bool isRelative;
   final String label;
 
-  const TaskReminderOption(this.value, {required this.isRelative, required this.label});
+  const TaskReminderOption(
+    this.value, {
+    required this.isRelative,
+    required this.label,
+  });
 
   /// When the task loses its time (e.g. user clears time or picks date-only),
   /// relative reminders become meaningless. This transitions to a safe default.

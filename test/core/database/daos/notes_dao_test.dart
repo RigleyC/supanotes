@@ -32,6 +32,90 @@ void main() {
     test('returns fallback when content is empty', () {
       expect(deriveNoteTitle(''), NoteStrings.fallbackTitle);
     });
+
+    test('returns fallback when every line is only markers or blanks', () {
+      expect(deriveNoteTitle('\n  \n# \n- [ ] \n'), NoteStrings.fallbackTitle);
+    });
+
+    test(
+      'ignores carriage returns and reads the last line without newline',
+      () {
+        expect(deriveNoteTitle('\r\n\r\nTitle\r\nBody'), 'Title');
+        expect(deriveNoteTitle('\n\n## Last'), 'Last');
+      },
+    );
+  });
+
+  group('catalog content prefix and full-content search', () {
+    Future<AppDatabase> seed() async {
+      final db = AppDatabase.test();
+      final now = DateTime(2026, 7, 6);
+      final longBody = List.filled(catalogContentPrefixLength, 'x').join();
+      await db.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'long-note',
+          userId: 'user-1',
+          content: 'Mercado\n$longBody\nComprar FEIJÃO e açaí',
+          excerpt: const Value('Mercado'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await db.notesDao.createNote(
+        NotesCompanion.insert(
+          id: 'other-note',
+          userId: 'user-1',
+          content: 'Outra nota',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      return db;
+    }
+
+    test('catalog rows carry only a bounded content prefix', () async {
+      final db = await seed();
+      addTearDown(db.close);
+
+      final rows = await db.notesDao.watchAllActiveNotes('user-1').first;
+      final long = rows.singleWhere((row) => row.note.id == 'long-note');
+
+      expect(long.title, 'Mercado');
+      expect(long.note.content.length, catalogContentPrefixLength);
+    });
+
+    test(
+      'search matches text beyond the prefix, ignoring accented case',
+      () async {
+        final db = await seed();
+        addTearDown(db.close);
+
+        expect(
+          await db.notesDao.searchActiveNoteIds('user-1', 'feijão'),
+          {'long-note'},
+        );
+        expect(
+          await db.notesDao.searchActiveNoteIds('user-1', 'nota'),
+          {'other-note'},
+        );
+        expect(
+          await db.notesDao.searchActiveNoteIds('user-2', 'nota'),
+          isEmpty,
+        );
+        expect(await db.notesDao.searchActiveNoteIds('user-1', ''), isEmpty);
+      },
+    );
+
+    test('search excludes deleted notes', () async {
+      final db = await seed();
+      addTearDown(db.close);
+      await db.notesDao.softDeleteNote('long-note');
+
+      expect(
+        await db.notesDao.searchActiveNoteIds('user-1', 'feijão'),
+        isEmpty,
+      );
+    });
   });
   test('watchAllActiveNotes derives title from first text node', () async {
     final db = AppDatabase.test();

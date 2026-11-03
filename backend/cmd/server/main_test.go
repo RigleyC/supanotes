@@ -34,3 +34,30 @@ func TestRegisterRoutesExposesGoroutineDebugOnlyWhenExplicitlyEnabledInDev(t *te
 		t.Fatalf("explicit dev debug endpoint status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 }
+
+func TestSkipCompression(t *testing.T) {
+	e := echo.New()
+	cases := []struct {
+		path   string
+		accept string
+		skip   bool
+	}{
+		{path: "/api/v1/notes/abc/operations", skip: false},
+		{path: "/api/v1/sync/feed", skip: false},
+		{path: "/api/v1/attachments/abc/content", skip: true},
+		{path: "/s/token/attachments/abc", skip: true},
+		{path: "/api/v1/mcp", skip: true},
+		{path: "/api/v1/mcp/session", skip: true},
+		{path: "/api/v1/notes", accept: "text/event-stream", skip: true},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		if tc.accept != "" {
+			req.Header.Set(echo.HeaderAccept, tc.accept)
+		}
+		c := e.NewContext(req, httptest.NewRecorder())
+		if got := skipCompression(c); got != tc.skip {
+			t.Errorf("skipCompression(%q, accept=%q) = %v, want %v", tc.path, tc.accept, got, tc.skip)
+		}
+	}
+}

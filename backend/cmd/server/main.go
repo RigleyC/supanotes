@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime/pprof"
+	"strings"
 	"syscall"
 	"time"
 	_ "time/tzdata"
@@ -76,6 +77,15 @@ func main() {
 	e.Use(echomw.LoggerWithConfig(echomw.LoggerConfig{
 		Format: `{"time":"${time_rfc3339}","id":"${id}","method":"${method}","route":"${route}","status":${status},"latency":"${latency_human}","error":"${error}"}` + "\n",
 	}))
+	// Note snapshots and sync feeds are verbose JSON; compressing them cuts
+	// mobile transfer time substantially (Dart's HttpClient sends
+	// Accept-Encoding: gzip and decompresses transparently). Binary
+	// attachment downloads and the MCP streamable/SSE endpoint are skipped.
+	e.Use(echomw.GzipWithConfig(echomw.GzipConfig{
+		Level:     5,
+		MinLength: 1024,
+		Skipper:   skipCompression,
+	}))
 	if len(cfg.CORSOrigins) > 0 {
 		e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
 			AllowOrigins: cfg.CORSOrigins,
@@ -86,6 +96,13 @@ func main() {
 	}
 
 	registerRoutes(e, cfg, pool, cronCtx)
+
+	// Bound slow clients so they cannot hold connections open indefinitely.
+	// WriteTimeout is left unset because attachment downloads and MCP streams
+	// may legitimately run long.
+	e.Server.ReadHeaderTimeout = 10 * time.Second
+	e.Server.ReadTimeout = 60 * time.Second
+	e.Server.IdleTimeout = 120 * time.Second
 
 	go func() {
 		log.Info().Str("addr", cfg.Addr()).Str("env", cfg.Environment).Msg("supanotes backend starting")
@@ -106,6 +123,20 @@ func main() {
 	}
 
 	log.Info().Msg("server stopped cleanly")
+}
+
+// skipCompression keeps gzip off binary attachment downloads (already
+// compressed media, streamed bodies) and the MCP streamable HTTP endpoint,
+// whose server-sent events must be flushed as they are produced.
+func skipCompression(c echo.Context) bool {
+	path := c.Request().URL.Path
+	if strings.HasPrefix(path, "/api/v1/mcp") {
+		return true
+	}
+	if strings.Contains(path, "/attachments/") {
+		return true
+	}
+	return strings.Contains(c.Request().Header.Get(echo.HeaderAccept), "text/event-stream")
 }
 
 type CustomValidator struct {

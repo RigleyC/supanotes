@@ -7,23 +7,36 @@ import 'package:supanotes/shared/widgets/app_press_scale.dart';
 
 enum ToolbarHaptic { none, controlTap, selectionChange }
 
+/// How an active button looks: a light tint, or filled with the accent.
+enum ToolbarActiveStyle { tint, filled }
+
 class ToolbarButton extends StatefulWidget {
   const ToolbarButton({
     required this.isActive,
     super.key,
     this.icon,
     this.svgAsset,
+    this.label,
+    this.labelStyle,
     this.semanticLabel,
     this.spacious = false,
+    this.activeStyle = ToolbarActiveStyle.tint,
     this.haptic = ToolbarHaptic.none,
     this.onPressed,
   }) : assert(
-         icon != null || svgAsset != null,
-         'Provide either an icon or an svgAsset.',
+         icon != null || svgAsset != null || label != null,
+         'Provide an icon, an svgAsset or a label.',
        );
 
   final IconData? icon;
   final String? svgAsset;
+
+  /// A short text glyph shown instead of an icon ("Aa", "B").
+  final String? label;
+
+  /// Weight, style or decoration of [label]; its color follows the state.
+  final TextStyle? labelStyle;
+  final ToolbarActiveStyle activeStyle;
   final String? semanticLabel;
   final bool spacious;
   final ToolbarHaptic haptic;
@@ -110,6 +123,9 @@ class _ToolbarButtonState extends State<ToolbarButton>
         builder: (_, _) => _ToolbarButtonVisual(
           icon: widget.icon,
           svgAsset: widget.svgAsset,
+          label: widget.label,
+          labelStyle: widget.labelStyle,
+          activeStyle: widget.activeStyle,
           semanticLabel: widget.semanticLabel,
           spacious: widget.spacious,
           onPressed: onPressed,
@@ -141,6 +157,9 @@ class _ToolbarButtonVisual extends StatelessWidget {
   const _ToolbarButtonVisual({
     required this.icon,
     required this.svgAsset,
+    required this.label,
+    required this.labelStyle,
+    required this.activeStyle,
     required this.semanticLabel,
     required this.spacious,
     required this.onPressed,
@@ -151,6 +170,9 @@ class _ToolbarButtonVisual extends StatelessWidget {
 
   final IconData? icon;
   final String? svgAsset;
+  final String? label;
+  final TextStyle? labelStyle;
+  final ToolbarActiveStyle activeStyle;
   final String? semanticLabel;
   final bool spacious;
   final VoidCallback? onPressed;
@@ -158,28 +180,55 @@ class _ToolbarButtonVisual extends StatelessWidget {
   final double activeProgress;
   final double iconProgress;
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+  static const _labelBase = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+  );
+
+  bool get _filled => activeStyle == ToolbarActiveStyle.filled;
+
+  Color _foreground(ColorScheme colorScheme) {
     final inactiveColor = onPressed == null
         ? colorScheme.onSurface.withValues(alpha: 0.38)
         : colorScheme.onSurface;
-    final foreground = Color.lerp(
+    return Color.lerp(
       inactiveColor,
-      colorScheme.primary,
+      _filled ? colorScheme.onPrimary : colorScheme.primary,
       activeProgress,
     )!;
-    final background = colorScheme.primary.withValues(
-      alpha: 0.12 * activeProgress,
+  }
+
+  Color _background(ColorScheme colorScheme) => colorScheme.primary.withValues(
+    alpha: (_filled ? 1 : 0.12) * activeProgress,
+  );
+
+  /// The label, icon or SVG, in [foreground].
+  Widget _glyph(Color foreground) {
+    if (label != null) {
+      return Text(
+        label!,
+        textScaler: TextScaler.noScaling,
+        style: _labelBase
+            .merge(labelStyle)
+            .copyWith(color: foreground, decorationColor: foreground),
+      );
+    }
+    if (icon != null) {
+      return Icon(icon, size: spacious ? 28 : 26, color: foreground);
+    }
+    return SvgPicture.asset(
+      svgAsset!,
+      width: spacious ? 26 : 24,
+      height: spacious ? 26 : 24,
+      colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
     );
-    final buttonIcon = icon != null
-        ? Icon(icon, size: spacious ? 28 : 26, color: foreground)
-        : SvgPicture.asset(
-            svgAsset!,
-            width: spacious ? 26 : 24,
-            height: spacious ? 26 : 24,
-            colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
-          );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final background = _background(colorScheme);
+    final buttonIcon = _glyph(_foreground(colorScheme));
 
     return Semantics(
       button: true,
@@ -199,7 +248,9 @@ class _ToolbarButtonVisual extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.xs),
             decoration: BoxDecoration(
               color: background,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              borderRadius: BorderRadius.circular(
+                spacious ? 22 : AppSpacing.radiusSm,
+              ),
             ),
             child: Transform.scale(
               scale: 0.96 + (0.04 * activeProgress),
@@ -207,7 +258,11 @@ class _ToolbarButtonVisual extends StatelessWidget {
                 opacity: 0.7 + (0.3 * iconProgress),
                 child: Transform.scale(
                   scale: 0.9 + (0.1 * iconProgress),
-                  child: buttonIcon,
+                  // The button's label names it; the glyph is decoration.
+                  child: ExcludeSemantics(
+                    excluding: semanticLabel != null,
+                    child: buttonIcon,
+                  ),
                 ),
               ),
             ),

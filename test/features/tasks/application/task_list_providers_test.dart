@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
+import 'package:supanotes/features/tasks/domain/note_task_reader.dart';
+import 'package:supanotes/features/tasks/domain/visible_note_tasks.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 
@@ -34,7 +37,7 @@ Task _task(
   updatedAt: createdAt,
 );
 
-VisibleNoteDocument _noteDocument({
+VisibleNoteTasks _noteDocument({
   required String noteId,
   required String blockId,
   required String title,
@@ -42,28 +45,30 @@ VisibleNoteDocument _noteDocument({
   bool isCompleted = false,
   String? lastCompletedAt,
   DateTime? createdAt,
-}) => VisibleNoteDocument(
+}) => VisibleNoteTasks(
   noteId: noteId,
   noteTitle: 'Origem',
   createdAt: createdAt,
-  documentJson: jsonEncode({
-    'schemaVersion': 1,
-    'blocks': [
-      {
-        'id': blockId,
-        'type': 'task',
-        'delta': [
-          {'insert': title},
-        ],
-        'metadata': {
-          if (dueDate != null) 'dueDate': dueDate,
-          'hasTime': false,
-          'isCompleted': isCompleted,
-          if (lastCompletedAt != null) 'lastCompletedAt': lastCompletedAt,
+  tasks: parseNoteTaskBlocks(
+    jsonEncode({
+      'schemaVersion': 1,
+      'blocks': [
+        {
+          'id': blockId,
+          'type': 'task',
+          'delta': [
+            {'insert': title},
+          ],
+          'metadata': {
+            if (dueDate != null) 'dueDate': dueDate,
+            'hasTime': false,
+            'isCompleted': isCompleted,
+            if (lastCompletedAt != null) 'lastCompletedAt': lastCompletedAt,
+          },
         },
-      },
-    ],
-  }),
+      ],
+    }),
+  ),
 );
 
 class _ManualTimer implements Timer {
@@ -619,10 +624,15 @@ void main() {
       expect(timers.single.delay, expectedBoundary.difference(now));
       expect(timers.single.delay, const Duration(minutes: 30));
     },
+    // The 2018-11-04 transition skipped local midnight only in Brazil's
+    // America/Sao_Paulo zone; elsewhere the scenario does not exist.
+    skip: DateTime(2018, 11, 4).hour == 1
+        ? false
+        : 'Requires the America/Sao_Paulo time zone (TZ=America/Sao_Paulo)',
   );
 
   test(
-    'surfaces malformed effective note documents as a provider error',
+    'leaves out a note with an unreadable document and lists the rest',
     () async {
       final database = AppDatabase.test();
       final createdAt = DateTime.utc(2026, 9, 15);
@@ -645,6 +655,21 @@ void main() {
           materializedDocumentJson: const Value('{malformed'),
         ),
       );
+      await database
+          .into(database.tasks)
+          .insert(
+            TasksCompanion.insert(
+              id: 'still-listed',
+              ownerUserId: 'user-1',
+              title: 'Ainda aparece',
+              createdAt: createdAt,
+              updatedAt: createdAt,
+            ),
+          );
+      final reported = <FlutterErrorDetails>[];
+      final previousOnError = FlutterError.onError;
+      FlutterError.onError = reported.add;
+      addTearDown(() => FlutterError.onError = previousOnError);
       final container = ProviderContainer(
         overrides: [
           appDatabaseProvider.overrideWithValue(database),
@@ -652,10 +677,11 @@ void main() {
         ],
       );
       final provider = taskListProvider(includeNoteTasks: true);
-      final providerError = Completer<Object>();
+      final firstData = Completer<List<TaskListItem>>();
       final subscription = container.listen(provider, (_, next) {
-        if (next.hasError && !providerError.isCompleted) {
-          providerError.complete(next.error!);
+        if (next.hasError) fail('one bad note must not fail the list');
+        if (next.hasValue && !firstData.isCompleted) {
+          firstData.complete(next.requireValue);
         }
       });
       addTearDown(() {
@@ -664,10 +690,9 @@ void main() {
       });
       addTearDown(database.close);
 
-      final error = await providerError.future.timeout(
-        const Duration(seconds: 1),
-      );
-      expect(error, isA<FormatException>());
+      final items = await firstData.future.timeout(const Duration(seconds: 1));
+      expect(items.map((item) => item.task?.title), ['Ainda aparece']);
+      expect(reported.single.exception, isA<FormatException>());
     },
   );
 }

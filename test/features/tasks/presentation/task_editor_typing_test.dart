@@ -74,7 +74,7 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserIdProvider.overrideWithValue('user-1'),
-            taskListProvider(includeNoteTasks: false).overrideWith(
+            taskListProvider(includeNoteTasks: true).overrideWith(
               (ref) => Stream.value([TaskListItem.task(_task())]),
             ),
             taskControllerProvider.overrideWithValue(controller),

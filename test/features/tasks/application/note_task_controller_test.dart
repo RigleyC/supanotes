@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/sync/note_session_handle.dart';
 import 'package:supanotes/features/tasks/application/note_task_controller.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
-import 'package:super_editor/super_editor.dart';
+import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 
 void main() {
   test(
@@ -15,11 +16,13 @@ void main() {
       final controller = NoteEditorController(
         userId: 'user-1',
         noteId: 'note-1',
-        nodes: [
-          TaskNode(
+        blocks: [
+          NoteBlock(
             id: 'block-1',
-            text: AttributedText('Comprar leite'),
-            isComplete: false,
+            type: 'task',
+            delta: [
+              {'insert': 'Comprar leite'},
+            ],
           ),
         ],
       );
@@ -40,7 +43,7 @@ void main() {
       );
 
       expect(
-        (controller.document.getNodeById('block-1')! as TaskNode).isComplete,
+        _isComplete(controller),
         isTrue,
       );
       expect(sync.flushCalls, 1);
@@ -52,11 +55,13 @@ void main() {
     final controller = NoteEditorController(
       userId: 'user-1',
       noteId: 'note-1',
-      nodes: [
-        TaskNode(
+      blocks: [
+        NoteBlock(
           id: 'block-1',
-          text: AttributedText('Comprar leite'),
-          isComplete: false,
+          type: 'task',
+          delta: [
+            {'insert': 'Comprar leite'},
+          ],
         ),
       ],
     );
@@ -79,7 +84,7 @@ void main() {
       throwsA(isA<StateError>()),
     );
     expect(
-      (controller.document.getNodeById('block-1')! as TaskNode).isComplete,
+      _isComplete(controller),
       isFalse,
     );
     expect(sync.flushCalls, 0);
@@ -113,6 +118,9 @@ class _FakeNoteSyncHandle implements NoteEditorSyncHandle {
   Future<void> start() async {}
 
   @override
+  Future<bool> reconcileRemote() async => true;
+
+  @override
   Future<void> flushNow() async {
     flushCalls++;
   }
@@ -120,3 +128,10 @@ class _FakeNoteSyncHandle implements NoteEditorSyncHandle {
   @override
   Future<void> dispose() async {}
 }
+
+bool _isComplete(NoteEditorController controller) =>
+    const NoteAppFlowyCodec()
+        .toBlocks(controller.editorState.document)
+        .single
+        .metadata['isCompleted'] ==
+    true;

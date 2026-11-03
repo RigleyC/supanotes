@@ -10,7 +10,6 @@ import 'package:supanotes/core/sync/note_sync_persistence.dart';
 import 'package:supanotes/core/sync/note_sync_reconciler.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:uuid/uuid.dart';
 
 class SyncResult {
@@ -169,15 +168,15 @@ class NoteOperationsSyncService {
     String? materializedDocumentJson,
   }) async {
     await _prepareAccountScope(noteId);
-    final pending = await _dao.getPendingOperations(
+    final last = await _dao.getLastPendingOperation(
       noteId,
       ownerUserId: _actorId,
     );
-    var ordinal = pending.isEmpty ? 0 : pending.last.ordinal + 1;
-    var baseRevision = pending.isEmpty
+    var ordinal = last == null ? 0 : last.ordinal + 1;
+    var baseRevision = last == null
         ? (await getConfirmedDocument(noteId))?.revision ??
               requests.first.baseRevision
-        : pending.last.baseRevision + 1;
+        : last.baseRevision + 1;
     final now = DateTime.now().toUtc();
     final operations = <PendingNoteOperationsCompanion>[];
     for (final request in requests) {
@@ -241,11 +240,6 @@ class NoteOperationsSyncService {
 
   Future<List<PendingNoteOperationData>> getPendingOperations(String noteId) {
     return _dao.getPendingOperations(noteId, ownerUserId: _actorId);
-  }
-
-  /// Compatibility name retained for the integration sync harness.
-  Future<List<PendingNoteOperationData>> loadPendingProjection(String noteId) {
-    return getPendingOperations(noteId);
   }
 
   Future<NoteSyncTelemetrySnapshot> telemetrySnapshot(String noteId) async {
@@ -476,6 +470,13 @@ class NoteOperationsSyncService {
   }
 
   Future<SyncResult> _pollAndReconcileWithoutSessionGate(String noteId) async {
+    // A local-only note has nothing to pull. Its local materialization creates
+    // a document row at revision 0, so the row alone does not prove the note
+    // exists remotely; polling it made the server answer 403 and the open
+    // editor switched to read-only one poll after a new note was created.
+    if (await _dao.isNoteLocalOnly(noteId)) {
+      return SyncResult.empty();
+    }
     final confirmed = await _dao.getNoteDocument(noteId);
     if (confirmed == null) {
       return SyncResult.empty();
@@ -549,7 +550,6 @@ class NoteOperationsSyncService {
   }
 
   static dynamic _toJsonValue(dynamic value) {
-    if (value is Attribution) return value.id;
     if (value is DateTime) return value.toUtc().toIso8601String();
     if (value is Map) {
       return value.map(

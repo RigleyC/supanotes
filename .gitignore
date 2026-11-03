@@ -80,3 +80,9 @@ ios/Runner/GoogleService-Info.plist
 # deslop analysis cache
 .deslop/
 
+
+# Local build/profiling output and personal data exports — never commit
+backend/*.test
+backend/trace.out
+backend/mercado.txt
+backend/extracted_notes.md

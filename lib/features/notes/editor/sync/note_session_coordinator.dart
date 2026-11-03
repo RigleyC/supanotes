@@ -49,6 +49,16 @@ class NoteSessionCoordinator<T extends NoteSessionHandle> {
     return entry.session!.statusChanges;
   }
 
+  /// Lets the open session for [noteId] pull remote changes into its editor.
+  /// Completes with `false` when no usable session is open, in which case the
+  /// caller applies the change to local storage instead.
+  Future<bool> reconcileRemote(String noteId) async {
+    final entry = _entries[noteId];
+    final session = entry?.session;
+    if (entry == null || entry.isClosing || session == null) return false;
+    return session.reconcileRemote();
+  }
+
   NoteSessionSnapshot snapshot() {
     final counts = <NoteSessionStatus, int>{
       for (final status in NoteSessionStatus.values) status: 0,

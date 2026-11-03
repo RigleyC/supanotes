@@ -32,4 +32,7 @@ jobs:
         run: flutter analyze --no-fatal-infos
 
       - name: Flutter test
+        # Run in the app's target zone so DST-sensitive task tests execute.
+        env:
+          TZ: America/Sao_Paulo
         run: flutter test

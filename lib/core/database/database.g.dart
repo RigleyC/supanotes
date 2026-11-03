@@ -7237,6 +7237,438 @@ class PendingTaskOperationsCompanion
   }
 }
 
+class $NoteTasksTable extends NoteTasks
+    with TableInfo<$NoteTasksTable, NoteTaskRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NoteTasksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _blockIdMeta = const VerificationMeta(
+    'blockId',
+  );
+  @override
+  late final GeneratedColumn<String> blockId = GeneratedColumn<String>(
+    'block_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _metadataJsonMeta = const VerificationMeta(
+    'metadataJson',
+  );
+  @override
+  late final GeneratedColumn<String> metadataJson = GeneratedColumn<String>(
+    'metadata_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _invalidReasonMeta = const VerificationMeta(
+    'invalidReason',
+  );
+  @override
+  late final GeneratedColumn<String> invalidReason = GeneratedColumn<String>(
+    'invalid_reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    noteId,
+    blockId,
+    position,
+    title,
+    metadataJson,
+    invalidReason,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'note_tasks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NoteTaskRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('block_id')) {
+      context.handle(
+        _blockIdMeta,
+        blockId.isAcceptableOrUnknown(data['block_id']!, _blockIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_blockIdMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('metadata_json')) {
+      context.handle(
+        _metadataJsonMeta,
+        metadataJson.isAcceptableOrUnknown(
+          data['metadata_json']!,
+          _metadataJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_metadataJsonMeta);
+    }
+    if (data.containsKey('invalid_reason')) {
+      context.handle(
+        _invalidReasonMeta,
+        invalidReason.isAcceptableOrUnknown(
+          data['invalid_reason']!,
+          _invalidReasonMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {noteId, blockId};
+  @override
+  NoteTaskRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NoteTaskRow(
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      blockId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}block_id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      metadataJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metadata_json'],
+      )!,
+      invalidReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}invalid_reason'],
+      ),
+    );
+  }
+
+  @override
+  $NoteTasksTable createAlias(String alias) {
+    return $NoteTasksTable(attachedDatabase, alias);
+  }
+}
+
+class NoteTaskRow extends DataClass implements Insertable<NoteTaskRow> {
+  final String noteId;
+  final String blockId;
+  final int position;
+  final String title;
+
+  /// The task block's metadata object, as stored in the document.
+  final String metadataJson;
+  final String? invalidReason;
+  const NoteTaskRow({
+    required this.noteId,
+    required this.blockId,
+    required this.position,
+    required this.title,
+    required this.metadataJson,
+    this.invalidReason,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['note_id'] = Variable<String>(noteId);
+    map['block_id'] = Variable<String>(blockId);
+    map['position'] = Variable<int>(position);
+    map['title'] = Variable<String>(title);
+    map['metadata_json'] = Variable<String>(metadataJson);
+    if (!nullToAbsent || invalidReason != null) {
+      map['invalid_reason'] = Variable<String>(invalidReason);
+    }
+    return map;
+  }
+
+  NoteTasksCompanion toCompanion(bool nullToAbsent) {
+    return NoteTasksCompanion(
+      noteId: Value(noteId),
+      blockId: Value(blockId),
+      position: Value(position),
+      title: Value(title),
+      metadataJson: Value(metadataJson),
+      invalidReason: invalidReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(invalidReason),
+    );
+  }
+
+  factory NoteTaskRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NoteTaskRow(
+      noteId: serializer.fromJson<String>(json['noteId']),
+      blockId: serializer.fromJson<String>(json['blockId']),
+      position: serializer.fromJson<int>(json['position']),
+      title: serializer.fromJson<String>(json['title']),
+      metadataJson: serializer.fromJson<String>(json['metadataJson']),
+      invalidReason: serializer.fromJson<String?>(json['invalidReason']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'noteId': serializer.toJson<String>(noteId),
+      'blockId': serializer.toJson<String>(blockId),
+      'position': serializer.toJson<int>(position),
+      'title': serializer.toJson<String>(title),
+      'metadataJson': serializer.toJson<String>(metadataJson),
+      'invalidReason': serializer.toJson<String?>(invalidReason),
+    };
+  }
+
+  NoteTaskRow copyWith({
+    String? noteId,
+    String? blockId,
+    int? position,
+    String? title,
+    String? metadataJson,
+    Value<String?> invalidReason = const Value.absent(),
+  }) => NoteTaskRow(
+    noteId: noteId ?? this.noteId,
+    blockId: blockId ?? this.blockId,
+    position: position ?? this.position,
+    title: title ?? this.title,
+    metadataJson: metadataJson ?? this.metadataJson,
+    invalidReason: invalidReason.present
+        ? invalidReason.value
+        : this.invalidReason,
+  );
+  NoteTaskRow copyWithCompanion(NoteTasksCompanion data) {
+    return NoteTaskRow(
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      blockId: data.blockId.present ? data.blockId.value : this.blockId,
+      position: data.position.present ? data.position.value : this.position,
+      title: data.title.present ? data.title.value : this.title,
+      metadataJson: data.metadataJson.present
+          ? data.metadataJson.value
+          : this.metadataJson,
+      invalidReason: data.invalidReason.present
+          ? data.invalidReason.value
+          : this.invalidReason,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteTaskRow(')
+          ..write('noteId: $noteId, ')
+          ..write('blockId: $blockId, ')
+          ..write('position: $position, ')
+          ..write('title: $title, ')
+          ..write('metadataJson: $metadataJson, ')
+          ..write('invalidReason: $invalidReason')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    noteId,
+    blockId,
+    position,
+    title,
+    metadataJson,
+    invalidReason,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NoteTaskRow &&
+          other.noteId == this.noteId &&
+          other.blockId == this.blockId &&
+          other.position == this.position &&
+          other.title == this.title &&
+          other.metadataJson == this.metadataJson &&
+          other.invalidReason == this.invalidReason);
+}
+
+class NoteTasksCompanion extends UpdateCompanion<NoteTaskRow> {
+  final Value<String> noteId;
+  final Value<String> blockId;
+  final Value<int> position;
+  final Value<String> title;
+  final Value<String> metadataJson;
+  final Value<String?> invalidReason;
+  final Value<int> rowid;
+  const NoteTasksCompanion({
+    this.noteId = const Value.absent(),
+    this.blockId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.title = const Value.absent(),
+    this.metadataJson = const Value.absent(),
+    this.invalidReason = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NoteTasksCompanion.insert({
+    required String noteId,
+    required String blockId,
+    required int position,
+    required String title,
+    required String metadataJson,
+    this.invalidReason = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : noteId = Value(noteId),
+       blockId = Value(blockId),
+       position = Value(position),
+       title = Value(title),
+       metadataJson = Value(metadataJson);
+  static Insertable<NoteTaskRow> custom({
+    Expression<String>? noteId,
+    Expression<String>? blockId,
+    Expression<int>? position,
+    Expression<String>? title,
+    Expression<String>? metadataJson,
+    Expression<String>? invalidReason,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (noteId != null) 'note_id': noteId,
+      if (blockId != null) 'block_id': blockId,
+      if (position != null) 'position': position,
+      if (title != null) 'title': title,
+      if (metadataJson != null) 'metadata_json': metadataJson,
+      if (invalidReason != null) 'invalid_reason': invalidReason,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NoteTasksCompanion copyWith({
+    Value<String>? noteId,
+    Value<String>? blockId,
+    Value<int>? position,
+    Value<String>? title,
+    Value<String>? metadataJson,
+    Value<String?>? invalidReason,
+    Value<int>? rowid,
+  }) {
+    return NoteTasksCompanion(
+      noteId: noteId ?? this.noteId,
+      blockId: blockId ?? this.blockId,
+      position: position ?? this.position,
+      title: title ?? this.title,
+      metadataJson: metadataJson ?? this.metadataJson,
+      invalidReason: invalidReason ?? this.invalidReason,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (blockId.present) {
+      map['block_id'] = Variable<String>(blockId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (metadataJson.present) {
+      map['metadata_json'] = Variable<String>(metadataJson.value);
+    }
+    if (invalidReason.present) {
+      map['invalid_reason'] = Variable<String>(invalidReason.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteTasksCompanion(')
+          ..write('noteId: $noteId, ')
+          ..write('blockId: $blockId, ')
+          ..write('position: $position, ')
+          ..write('title: $title, ')
+          ..write('metadataJson: $metadataJson, ')
+          ..write('invalidReason: $invalidReason, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7258,6 +7690,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TasksTable tasks = $TasksTable(this);
   late final $PendingTaskOperationsTable pendingTaskOperations =
       $PendingTaskOperationsTable(this);
+  late final $NoteTasksTable noteTasks = $NoteTasksTable(this);
   late final Index idxSyncInboxPending = Index(
     'idx_sync_inbox_pending',
     'CREATE INDEX idx_sync_inbox_pending ON sync_inbox (user_id, applied_at, sequence)',
@@ -7277,6 +7710,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxPendingTaskOperationsOwnerStatus = Index(
     'idx_pending_task_operations_owner_status',
     'CREATE INDEX idx_pending_task_operations_owner_status ON pending_task_operations (owner_user_id, status, created_at)',
+  );
+  late final Index idxNoteTasksNote = Index(
+    'idx_note_tasks_note',
+    'CREATE INDEX idx_note_tasks_note ON note_tasks (note_id)',
   );
   late final NotesDao notesDao = NotesDao(this as AppDatabase);
   late final NoteLinksDao noteLinksDao = NoteLinksDao(this as AppDatabase);
@@ -7306,52 +7743,52 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncInbox,
     tasks,
     pendingTaskOperations,
+    noteTasks,
     idxSyncInboxPending,
     idxTasksOwnerAgenda,
     idxTasksOwnerUpdated,
     idxPendingTaskOperationsTaskOrder,
     idxPendingTaskOperationsOwnerStatus,
+    idxNoteTasksNote,
   ];
 }
 
-typedef $$NotesTableCreateCompanionBuilder =
-    NotesCompanion Function({
-      required String id,
-      required String userId,
-      required String content,
-      Value<String?> excerpt,
-      required DateTime createdAt,
-      required DateTime updatedAt,
-      Value<DateTime?> deletedAt,
-      Value<bool> isDirty,
-      Value<bool> hasRemoteCopy,
-      Value<bool> noteIconDirty,
-      Value<String> lifecycleState,
-      Value<String?> permission,
-      Value<String?> sharedByEmail,
-      Value<String?> sharedByName,
-      Value<String?> noteIconJson,
-      Value<int> rowid,
-    });
-typedef $$NotesTableUpdateCompanionBuilder =
-    NotesCompanion Function({
-      Value<String> id,
-      Value<String> userId,
-      Value<String> content,
-      Value<String?> excerpt,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<DateTime?> deletedAt,
-      Value<bool> isDirty,
-      Value<bool> hasRemoteCopy,
-      Value<bool> noteIconDirty,
-      Value<String> lifecycleState,
-      Value<String?> permission,
-      Value<String?> sharedByEmail,
-      Value<String?> sharedByName,
-      Value<String?> noteIconJson,
-      Value<int> rowid,
-    });
+typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
+  required String id,
+  required String userId,
+  required String content,
+  Value<String?> excerpt,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<bool> isDirty,
+  Value<bool> hasRemoteCopy,
+  Value<bool> noteIconDirty,
+  Value<String> lifecycleState,
+  Value<String?> permission,
+  Value<String?> sharedByEmail,
+  Value<String?> sharedByName,
+  Value<String?> noteIconJson,
+  Value<int> rowid,
+});
+typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
+  Value<String> id,
+  Value<String> userId,
+  Value<String> content,
+  Value<String?> excerpt,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<bool> isDirty,
+  Value<bool> hasRemoteCopy,
+  Value<bool> noteIconDirty,
+  Value<String> lifecycleState,
+  Value<String?> permission,
+  Value<String?> sharedByEmail,
+  Value<String?> sharedByName,
+  Value<String?> noteIconJson,
+  Value<int> rowid,
+});
 
 class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
   $$NotesTableFilterComposer({
@@ -7711,28 +8148,26 @@ typedef $$NotesTableProcessedTableManager =
       NoteData,
       PrefetchHooks Function()
     >;
-typedef $$NoteLinksTableCreateCompanionBuilder =
-    NoteLinksCompanion Function({
-      required String id,
-      required String sourceId,
-      required String targetId,
-      Value<String> relation,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<bool> isDirty,
-      Value<int> rowid,
-    });
-typedef $$NoteLinksTableUpdateCompanionBuilder =
-    NoteLinksCompanion Function({
-      Value<String> id,
-      Value<String> sourceId,
-      Value<String> targetId,
-      Value<String> relation,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<bool> isDirty,
-      Value<int> rowid,
-    });
+typedef $$NoteLinksTableCreateCompanionBuilder = NoteLinksCompanion Function({
+  required String id,
+  required String sourceId,
+  required String targetId,
+  Value<String> relation,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<bool> isDirty,
+  Value<int> rowid,
+});
+typedef $$NoteLinksTableUpdateCompanionBuilder = NoteLinksCompanion Function({
+  Value<String> id,
+  Value<String> sourceId,
+  Value<String> targetId,
+  Value<String> relation,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<bool> isDirty,
+  Value<int> rowid,
+});
 
 final class $$NoteLinksTableReferences
     extends BaseReferences<_$AppDatabase, $NoteLinksTable, NoteLinkData> {
@@ -8101,30 +8536,26 @@ class $$NoteLinksTableTableManager
                     >
                   >(state) {
                     if (sourceId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.sourceId,
-                                referencedTable: $$NoteLinksTableReferences
-                                    ._sourceIdTable(db),
-                                referencedColumn: $$NoteLinksTableReferences
-                                    ._sourceIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.sourceId,
+                        referencedTable: $$NoteLinksTableReferences
+                            ._sourceIdTable(db),
+                        referencedColumn: $$NoteLinksTableReferences
+                            ._sourceIdTable(db)
+                            .id,
+                      ) as T;
                     }
                     if (targetId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.targetId,
-                                referencedTable: $$NoteLinksTableReferences
-                                    ._targetIdTable(db),
-                                referencedColumn: $$NoteLinksTableReferences
-                                    ._targetIdTable(db)
-                                    .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.targetId,
+                        referencedTable: $$NoteLinksTableReferences
+                            ._targetIdTable(db),
+                        referencedColumn: $$NoteLinksTableReferences
+                            ._targetIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;
@@ -10017,30 +10448,28 @@ typedef $$SyncFeedCursorsTableProcessedTableManager =
       SyncFeedCursorData,
       PrefetchHooks Function()
     >;
-typedef $$SyncInboxTableCreateCompanionBuilder =
-    SyncInboxCompanion Function({
-      required String userId,
-      required int sequence,
-      required String type,
-      Value<String?> noteId,
-      Value<String?> taskId,
-      Value<int?> revision,
-      required DateTime createdAt,
-      Value<DateTime?> appliedAt,
-      Value<int> rowid,
-    });
-typedef $$SyncInboxTableUpdateCompanionBuilder =
-    SyncInboxCompanion Function({
-      Value<String> userId,
-      Value<int> sequence,
-      Value<String> type,
-      Value<String?> noteId,
-      Value<String?> taskId,
-      Value<int?> revision,
-      Value<DateTime> createdAt,
-      Value<DateTime?> appliedAt,
-      Value<int> rowid,
-    });
+typedef $$SyncInboxTableCreateCompanionBuilder = SyncInboxCompanion Function({
+  required String userId,
+  required int sequence,
+  required String type,
+  Value<String?> noteId,
+  Value<String?> taskId,
+  Value<int?> revision,
+  required DateTime createdAt,
+  Value<DateTime?> appliedAt,
+  Value<int> rowid,
+});
+typedef $$SyncInboxTableUpdateCompanionBuilder = SyncInboxCompanion Function({
+  Value<String> userId,
+  Value<int> sequence,
+  Value<String> type,
+  Value<String?> noteId,
+  Value<String?> taskId,
+  Value<int?> revision,
+  Value<DateTime> createdAt,
+  Value<DateTime?> appliedAt,
+  Value<int> rowid,
+});
 
 class $$SyncInboxTableFilterComposer
     extends Composer<_$AppDatabase, $SyncInboxTable> {
@@ -10274,46 +10703,44 @@ typedef $$SyncInboxTableProcessedTableManager =
       SyncInboxData,
       PrefetchHooks Function()
     >;
-typedef $$TasksTableCreateCompanionBuilder =
-    TasksCompanion Function({
-      required String id,
-      required String ownerUserId,
-      required String title,
-      Value<DateTime?> dueDate,
-      Value<bool> hasTime,
-      Value<String?> recurrenceRule,
-      Value<String?> reminder,
-      Value<String> completions,
-      Value<String> completionHistory,
-      Value<bool> isCompleted,
-      Value<DateTime?> lastCompletedAt,
-      Value<int> revision,
-      required DateTime createdAt,
-      required DateTime updatedAt,
-      Value<DateTime?> deletedAt,
-      Value<int> scheduleGeneration,
-      Value<int> rowid,
-    });
-typedef $$TasksTableUpdateCompanionBuilder =
-    TasksCompanion Function({
-      Value<String> id,
-      Value<String> ownerUserId,
-      Value<String> title,
-      Value<DateTime?> dueDate,
-      Value<bool> hasTime,
-      Value<String?> recurrenceRule,
-      Value<String?> reminder,
-      Value<String> completions,
-      Value<String> completionHistory,
-      Value<bool> isCompleted,
-      Value<DateTime?> lastCompletedAt,
-      Value<int> revision,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<DateTime?> deletedAt,
-      Value<int> scheduleGeneration,
-      Value<int> rowid,
-    });
+typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
+  required String id,
+  required String ownerUserId,
+  required String title,
+  Value<DateTime?> dueDate,
+  Value<bool> hasTime,
+  Value<String?> recurrenceRule,
+  Value<String?> reminder,
+  Value<String> completions,
+  Value<String> completionHistory,
+  Value<bool> isCompleted,
+  Value<DateTime?> lastCompletedAt,
+  Value<int> revision,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> scheduleGeneration,
+  Value<int> rowid,
+});
+typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
+  Value<String> id,
+  Value<String> ownerUserId,
+  Value<String> title,
+  Value<DateTime?> dueDate,
+  Value<bool> hasTime,
+  Value<String?> recurrenceRule,
+  Value<String?> reminder,
+  Value<String> completions,
+  Value<String> completionHistory,
+  Value<bool> isCompleted,
+  Value<DateTime?> lastCompletedAt,
+  Value<int> revision,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> scheduleGeneration,
+  Value<int> rowid,
+});
 
 class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
   $$TasksTableFilterComposer({
@@ -11077,6 +11504,227 @@ typedef $$PendingTaskOperationsTableProcessedTableManager =
       PendingTaskOperationData,
       PrefetchHooks Function()
     >;
+typedef $$NoteTasksTableCreateCompanionBuilder = NoteTasksCompanion Function({
+  required String noteId,
+  required String blockId,
+  required int position,
+  required String title,
+  required String metadataJson,
+  Value<String?> invalidReason,
+  Value<int> rowid,
+});
+typedef $$NoteTasksTableUpdateCompanionBuilder = NoteTasksCompanion Function({
+  Value<String> noteId,
+  Value<String> blockId,
+  Value<int> position,
+  Value<String> title,
+  Value<String> metadataJson,
+  Value<String?> invalidReason,
+  Value<int> rowid,
+});
+
+class $$NoteTasksTableFilterComposer
+    extends Composer<_$AppDatabase, $NoteTasksTable> {
+  $$NoteTasksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get blockId => $composableBuilder(
+    column: $table.blockId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metadataJson => $composableBuilder(
+    column: $table.metadataJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get invalidReason => $composableBuilder(
+    column: $table.invalidReason,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$NoteTasksTableOrderingComposer
+    extends Composer<_$AppDatabase, $NoteTasksTable> {
+  $$NoteTasksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get blockId => $composableBuilder(
+    column: $table.blockId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metadataJson => $composableBuilder(
+    column: $table.metadataJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get invalidReason => $composableBuilder(
+    column: $table.invalidReason,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NoteTasksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NoteTasksTable> {
+  $$NoteTasksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<String> get blockId =>
+      $composableBuilder(column: $table.blockId, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get metadataJson => $composableBuilder(
+    column: $table.metadataJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get invalidReason => $composableBuilder(
+    column: $table.invalidReason,
+    builder: (column) => column,
+  );
+}
+
+class $$NoteTasksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NoteTasksTable,
+          NoteTaskRow,
+          $$NoteTasksTableFilterComposer,
+          $$NoteTasksTableOrderingComposer,
+          $$NoteTasksTableAnnotationComposer,
+          $$NoteTasksTableCreateCompanionBuilder,
+          $$NoteTasksTableUpdateCompanionBuilder,
+          (
+            NoteTaskRow,
+            BaseReferences<_$AppDatabase, $NoteTasksTable, NoteTaskRow>,
+          ),
+          NoteTaskRow,
+          PrefetchHooks Function()
+        > {
+  $$NoteTasksTableTableManager(_$AppDatabase db, $NoteTasksTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NoteTasksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NoteTasksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NoteTasksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> noteId = const Value.absent(),
+                Value<String> blockId = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> metadataJson = const Value.absent(),
+                Value<String?> invalidReason = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteTasksCompanion(
+                noteId: noteId,
+                blockId: blockId,
+                position: position,
+                title: title,
+                metadataJson: metadataJson,
+                invalidReason: invalidReason,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String noteId,
+                required String blockId,
+                required int position,
+                required String title,
+                required String metadataJson,
+                Value<String?> invalidReason = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NoteTasksCompanion.insert(
+                noteId: noteId,
+                blockId: blockId,
+                position: position,
+                title: title,
+                metadataJson: metadataJson,
+                invalidReason: invalidReason,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$NoteTasksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NoteTasksTable,
+      NoteTaskRow,
+      $$NoteTasksTableFilterComposer,
+      $$NoteTasksTableOrderingComposer,
+      $$NoteTasksTableAnnotationComposer,
+      $$NoteTasksTableCreateCompanionBuilder,
+      $$NoteTasksTableUpdateCompanionBuilder,
+      (
+        NoteTaskRow,
+        BaseReferences<_$AppDatabase, $NoteTasksTable, NoteTaskRow>,
+      ),
+      NoteTaskRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11105,4 +11753,6 @@ class $AppDatabaseManager {
       $$TasksTableTableManager(_db, _db.tasks);
   $$PendingTaskOperationsTableTableManager get pendingTaskOperations =>
       $$PendingTaskOperationsTableTableManager(_db, _db.pendingTaskOperations);
+  $$NoteTasksTableTableManager get noteTasks =>
+      $$NoteTasksTableTableManager(_db, _db.noteTasks);
 }

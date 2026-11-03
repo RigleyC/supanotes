@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,8 +20,6 @@ import (
 )
 
 const (
-	defaultCacheCapacity    = 256
-	defaultCacheTTL         = 15 * time.Minute
 	defaultConnectTimeout   = 3 * time.Second
 	defaultHeaderTimeout    = 3 * time.Second
 	defaultRequestTimeout   = 6 * time.Second
@@ -49,14 +46,11 @@ type Service interface {
 }
 
 type Metrics struct {
-	CacheEntries   int
-	CacheCapacity  int
 	BlockedFetches int64
 }
 
 type service struct {
 	client         *http.Client
-	cache          *previewCache
 	group          singleflight.Group
 	maxBodyBytes   int64
 	normalizeURL   func(string) (*url.URL, string, error)
@@ -65,11 +59,8 @@ type service struct {
 
 type serviceOptions struct {
 	client       *http.Client
-	cacheTTL     time.Duration
-	cacheCap     int
 	maxBodyBytes int64
 	normalizeURL func(string) (*url.URL, string, error)
-	now          func() time.Time
 }
 
 func NewService() Service {
@@ -77,14 +68,6 @@ func NewService() Service {
 }
 
 func newService(opts serviceOptions) *service {
-	cacheTTL := opts.cacheTTL
-	if cacheTTL == 0 {
-		cacheTTL = defaultCacheTTL
-	}
-	cacheCap := opts.cacheCap
-	if cacheCap == 0 {
-		cacheCap = defaultCacheCapacity
-	}
 	maxBodyBytes := opts.maxBodyBytes
 	if maxBodyBytes == 0 {
 		maxBodyBytes = defaultResponseByteSize
@@ -97,14 +80,8 @@ func newService(opts serviceOptions) *service {
 	if client == nil {
 		client = newSafeHTTPClient()
 	}
-	now := opts.now
-	if now == nil {
-		now = time.Now
-	}
-
 	return &service{
 		client:       client,
-		cache:        newPreviewCache(cacheCap, cacheTTL, now),
 		maxBodyBytes: maxBodyBytes,
 		normalizeURL: normalizeURLFn,
 	}
@@ -160,26 +137,21 @@ var (
 	)
 )
 
+// Fetch scrapes the Open Graph preview of rawURL.
+//
+// Previews are not kept in memory: share intake persists the fetched preview
+// inside the note document, so each URL is normally fetched once, when it is
+// shared. Concurrent requests for the same normalized URL still share a
+// single outbound fetch.
 func (s *service) Fetch(ctx context.Context, rawURL string) (*Preview, error) {
-	parsedURL, cacheKey, err := s.normalizeURL(rawURL)
+	parsedURL, normalizedURL, err := s.normalizeURL(rawURL)
 	if err != nil {
 		s.blockedFetches.Add(1)
 		return nil, err
 	}
-	if preview, ok := s.cache.get(cacheKey); ok {
-		return preview, nil
-	}
 
-	value, err, _ := s.group.Do(cacheKey, func() (any, error) {
-		if preview, ok := s.cache.get(cacheKey); ok {
-			return preview, nil
-		}
-		preview, fetchErr := s.fetch(ctx, parsedURL, cacheKey)
-		if fetchErr != nil {
-			return nil, fetchErr
-		}
-		s.cache.set(cacheKey, preview)
-		return preview, nil
+	value, err, _ := s.group.Do(normalizedURL, func() (any, error) {
+		return s.fetch(ctx, parsedURL, normalizedURL)
 	})
 	if err != nil {
 		return nil, err
@@ -188,10 +160,7 @@ func (s *service) Fetch(ctx context.Context, rawURL string) (*Preview, error) {
 }
 
 func (s *service) Metrics() Metrics {
-	cacheEntries, cacheCapacity := s.cache.stats()
 	return Metrics{
-		CacheEntries:   cacheEntries,
-		CacheCapacity:  cacheCapacity,
 		BlockedFetches: s.blockedFetches.Load(),
 	}
 }
@@ -375,78 +344,4 @@ func mustParsePrefixes(rawPrefixes ...string) []netip.Prefix {
 func isHTMLResponse(contentType string) bool {
 	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
 	return mediaType == "text/html" || mediaType == "application/xhtml+xml"
-}
-
-type cacheEntry struct {
-	preview   *Preview
-	expiresAt time.Time
-}
-
-type previewCache struct {
-	mu       sync.Mutex
-	items    map[string]cacheEntry
-	order    []string
-	capacity int
-	ttl      time.Duration
-	now      func() time.Time
-}
-
-func newPreviewCache(capacity int, ttl time.Duration, now func() time.Time) *previewCache {
-	return &previewCache{
-		items:    make(map[string]cacheEntry),
-		capacity: capacity,
-		ttl:      ttl,
-		now:      now,
-	}
-}
-
-func (c *previewCache) get(key string) (*Preview, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	entry, ok := c.items[key]
-	if !ok {
-		return nil, false
-	}
-	if c.now().After(entry.expiresAt) {
-		delete(c.items, key)
-		c.removeOrderKey(key)
-		return nil, false
-	}
-	return entry.preview, true
-}
-
-func (c *previewCache) set(key string, preview *Preview) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, exists := c.items[key]; !exists {
-		c.order = append(c.order, key)
-	}
-	c.items[key] = cacheEntry{
-		preview:   preview,
-		expiresAt: c.now().Add(c.ttl),
-	}
-
-	for len(c.items) > c.capacity && len(c.order) > 0 {
-		oldest := c.order[0]
-		c.order = c.order[1:]
-		delete(c.items, oldest)
-	}
-}
-
-func (c *previewCache) removeOrderKey(key string) {
-	for i, candidate := range c.order {
-		if candidate == key {
-			c.order = append(c.order[:i], c.order[i+1:]...)
-			return
-		}
-	}
-}
-
-func (c *previewCache) stats() (entries int, capacity int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return len(c.items), c.capacity
 }

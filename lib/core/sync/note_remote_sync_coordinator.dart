@@ -9,6 +9,7 @@ import 'package:supanotes/core/sync/sync_inbox_worker.dart';
 final class NoteRemoteSyncNoteApplier {
   const NoteRemoteSyncNoteApplier({
     required this.isActive,
+    required this.reconcileActive,
     required this.syncPending,
     required this.confirmedRevision,
     required this.pollAndReconcile,
@@ -17,6 +18,10 @@ final class NoteRemoteSyncNoteApplier {
   });
 
   final bool Function(String noteId) isActive;
+
+  /// Pulls remote changes into the open editor session of [noteId]; returns
+  /// `false` when no session is open.
+  final Future<bool> Function(String noteId) reconcileActive;
   final Future<void> Function(String noteId) syncPending;
   final Future<int?> Function(String noteId) confirmedRevision;
   final Future<void> Function(String noteId) pollAndReconcile;
@@ -33,6 +38,12 @@ final class NoteRemoteSyncNoteApplier {
 
     switch (change.type) {
       case 'note_changed':
+        // The open editor owns its document: let its session pull the change
+        // so the editor reconciles in place.
+        if (isActive(noteId) && await reconcileActive(noteId)) {
+          await hydrateRemote(noteId);
+          return;
+        }
         await syncPending(noteId);
         final currentRevision = await confirmedRevision(noteId);
         final remoteRevision = change.revision;
@@ -134,7 +145,11 @@ final class NoteRemoteSyncCoordinator {
       userId: userId,
       store: store,
       fetchChanges: fetchChanges,
-      isNoteActive: noteApplier.isActive,
+      // Content changes of an open note are delivered to its session; only
+      // structural changes (deletion, revoked access) wait until it closes.
+      deferChange: (change) =>
+          change.type != 'note_changed' &&
+          noteApplier.isActive(change.noteId ?? ''),
       applyChange: (change) => _applyChange(change, noteApplier),
       scope: taskApplier.enabled ? SyncFeedScope.all : SyncFeedScope.notes,
     );
@@ -150,14 +165,15 @@ final class NoteRemoteSyncCoordinator {
   Future<void> _tail = Future<void>.value();
   bool _disposed = false;
 
-  Future<void> syncOnce() {
-    if (_disposed) return Future<void>.value();
+  /// Runs one feed pass; completes with whether any change was applied.
+  Future<bool> syncOnce() {
+    if (_disposed) return Future<bool>.value(false);
     final run = _tail.then((_) => _syncOnce());
     _tail = run.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return run;
   }
 
-  Future<void> _syncOnce() async {
+  Future<bool> _syncOnce() async {
     final bootstrapVersion = await _store.getBootstrapVersion(userId);
     if (_taskApplier.enabled && bootstrapVersion < 2) {
       await _bootstrap();
@@ -167,7 +183,7 @@ final class NoteRemoteSyncCoordinator {
     _worker.scope = _taskApplier.enabled
         ? SyncFeedScope.all
         : SyncFeedScope.notes;
-    await _worker.syncOnce();
+    return await _worker.syncOnce() > 0;
   }
 
   Future<void> _bootstrap() async {

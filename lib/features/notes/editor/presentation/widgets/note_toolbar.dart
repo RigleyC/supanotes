@@ -1,120 +1,168 @@
-// Compact contextual toolbar for the note editor.
+// The note editor toolbar: one row above the keyboard.
 //
-// The toolbar derives its content from the editor selection and active nodes
-// (see NoteToolbarState). A paragraph-level interaction shows block-format
-// controls; selecting text or placing the caret in a list/task shows inline and
-// block conversion controls. The toolbar shell keeps a single position and
-// height - only its action content animates between the two modes.
+// With a caret it offers what is used while writing (format panel, task,
+// bullets, photo, file, hide keyboard). With selected text it switches to
+// what applies to that text (bold, italic, strikethrough, task, note link and
+// the format panel). Everything else lives in the "Formatar" panel, which
+// takes the keyboard's place (see NoteFormatPanel). The bar keeps its
+// position and height; only its row animates between the two modes.
 import 'dart:async';
 
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:motor/motor.dart';
-import 'package:supanotes/features/notes/editor/document/note_editor_commands.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_interaction.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_state.dart';
-import 'package:supanotes/shared/theme/app_spacing.dart';
 import 'package:supanotes/shared/widgets/glass/glass_surface.dart';
-import 'package:super_editor/super_editor.dart';
 
 export 'note_editor_interaction.dart' show noteEditorToolbarTapRegionGroup;
 
 /// Corner radius of the floating toolbar shell.
-const _shellRadius = 30.0;
+const _shellRadius = 26.0;
 
-class NoteToolbar extends StatefulWidget {
-  const NoteToolbar({
-    required this.editor,
-    required this.composer,
+/// Which row of the note toolbar is shown.
+enum NoteToolbarMode { writing, selection }
+
+/// The selection row while text is selected, the writing row otherwise.
+NoteToolbarMode noteToolbarModeFor(NoteFormatState state) =>
+    state.hasTextSelection
+    ? NoteToolbarMode.selection
+    : NoteToolbarMode.writing;
+
+/// Rebuilds [builder] with the formatting state of [editorState]'s selection,
+/// only when that state changes.
+class NoteFormatStateBuilder extends StatefulWidget {
+  const NoteFormatStateBuilder({
+    required this.editorState,
+    required this.builder,
     super.key,
-    this.onAttachFile,
-    this.onAttachImage,
   });
 
-  final Editor editor;
-  final MutableDocumentComposer composer;
-  final VoidCallback? onAttachFile;
-  final VoidCallback? onAttachImage;
+  final EditorState editorState;
+  final Widget Function(BuildContext context, NoteFormatState state) builder;
 
   @override
-  State<NoteToolbar> createState() => _NoteToolbarState();
+  State<NoteFormatStateBuilder> createState() => _NoteFormatStateBuilderState();
 }
 
-class _NoteToolbarState extends State<NoteToolbar> {
-  late NoteToolbarState _state;
+class _NoteFormatStateBuilderState extends State<NoteFormatStateBuilder> {
+  late NoteFormatState _state;
+  StreamSubscription<Object?>? _transactions;
 
   @override
   void initState() {
     super.initState();
-    _state = _readState();
-    widget.composer.selectionNotifier.addListener(_onStateChange);
-    widget.editor.context.document.addListener(_onStateChange);
+    _listen(widget.editorState);
   }
 
   @override
-  void didUpdateWidget(NoteToolbar oldWidget) {
+  void didUpdateWidget(NoteFormatStateBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.composer != widget.composer) {
-      oldWidget.composer.selectionNotifier.removeListener(_onStateChange);
-      widget.composer.selectionNotifier.addListener(_onStateChange);
+    if (oldWidget.editorState != widget.editorState) {
+      _unlisten(oldWidget.editorState);
+      _listen(widget.editorState);
     }
-    if (oldWidget.editor != widget.editor) {
-      oldWidget.editor.context.document.removeListener(_onStateChange);
-      widget.editor.context.document.addListener(_onStateChange);
-    }
-    _onStateChange();
   }
 
   @override
   void dispose() {
-    widget.composer.selectionNotifier.removeListener(_onStateChange);
-    widget.editor.context.document.removeListener(_onStateChange);
+    _unlisten(widget.editorState);
     super.dispose();
   }
 
-  NoteToolbarState _readState() => NoteToolbarState.from(
-    widget.editor.context.document,
-    widget.composer.selection,
-  );
+  void _listen(EditorState editorState) {
+    _state = NoteFormatState.of(editorState);
+    editorState.selectionNotifier.addListener(_onStateChange);
+    editorState.toggledStyleNotifier.addListener(_onStateChange);
+    // Formatting changes the selection's attributes without moving it.
+    _transactions = editorState.transactionStream.listen((event) {
+      if (event.$1 == TransactionTime.after) _onStateChange();
+    });
+  }
 
-  void _onStateChange([DocumentChangeLog? _]) {
+  void _unlisten(EditorState editorState) {
+    editorState.selectionNotifier.removeListener(_onStateChange);
+    editorState.toggledStyleNotifier.removeListener(_onStateChange);
+    unawaited(_transactions?.cancel());
+    _transactions = null;
+  }
+
+  void _onStateChange() {
     if (!mounted) return;
-    final next = _readState();
+    final next = NoteFormatState.of(widget.editorState);
     if (next == _state) return;
     setState(() => _state = next);
   }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _state);
+}
+
+class NoteToolbar extends StatelessWidget {
+  const NoteToolbar({
+    required this.editorState,
+    super.key,
+    this.panelOpen = false,
+    this.onTogglePanel,
+    this.onAttachFile,
+    this.onAttachImage,
+    this.onHideKeyboard,
+    this.onLinkNote,
+  });
+
+  final EditorState editorState;
+
+  /// Whether the "Formatar" panel is showing in the keyboard's place.
+  final bool panelOpen;
+  final VoidCallback? onTogglePanel;
+  final VoidCallback? onAttachFile;
+  final VoidCallback? onAttachImage;
+  final VoidCallback? onHideKeyboard;
+
+  /// Asks which note the selected text should link to.
+  final VoidCallback? onLinkNote;
 
   @override
   Widget build(BuildContext context) {
     return TapRegion(
       groupId: noteEditorToolbarTapRegionGroup,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
         child: GlassSurface(
           key: const ValueKey('note-toolbar-shell'),
           radius: _shellRadius,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: 8,
-            ),
-            child: _ContextualToolbarContent(
-              mode: _state.mode,
-              normalActions: _NormalActions(
-                state: _state,
-                onSetBlockType: _setBlockType,
-                onConvertToTask: _convertToTask,
-                onInsertDivider: _insertDivider,
-                onAttachImage: widget.onAttachImage,
-                onAttachFile: widget.onAttachFile,
-              ),
-              contextualActions: _ContextualActions(
-                state: _state,
-                onToggleInline: _toggleInline,
-                onConvertToList: _convertToList,
-                onConvertToTask: _convertToTask,
-                onUnindent: _unindentSelectedBlocks,
-                onIndent: _indentSelectedBlocks,
+            padding: const EdgeInsets.all(4),
+            child: NoteFormatStateBuilder(
+              editorState: editorState,
+              builder: (context, state) => _ToolbarRows(
+                mode: noteToolbarModeFor(state),
+                writing: _WritingRow(
+                  state: state,
+                  panelOpen: panelOpen,
+                  onTogglePanel: onTogglePanel,
+                  onToggleTask: () => unawaited(
+                    editorState.toggleNoteBlockStyle(NoteBlockStyle.task),
+                  ),
+                  onToggleBullets: () => unawaited(
+                    editorState.toggleNoteBlockStyle(NoteBlockStyle.bulletList),
+                  ),
+                  onAttachImage: onAttachImage,
+                  onAttachFile: onAttachFile,
+                  onHideKeyboard: onHideKeyboard,
+                ),
+                selection: _SelectionRow(
+                  state: state,
+                  panelOpen: panelOpen,
+                  onToggleInline: (key) =>
+                      unawaited(editorState.toggleNoteInlineStyle(key)),
+                  onToggleTask: () => unawaited(
+                    editorState.toggleNoteBlockStyle(NoteBlockStyle.task),
+                  ),
+                  onLinkNote: onLinkNote,
+                  onTogglePanel: onTogglePanel,
+                ),
               ),
             ),
           ),
@@ -122,240 +170,198 @@ class _NoteToolbarState extends State<NoteToolbar> {
       ),
     );
   }
-
-  void _setBlockType(Attribution attribution) {
-    NoteEditorCommands.setBlockType(
-      widget.editor,
-      widget.composer,
-      attribution,
-    );
-  }
-
-  void _toggleInline(Attribution attribution) {
-    NoteEditorCommands.toggleInlineAttribution(
-      widget.editor,
-      widget.composer,
-      attribution,
-    );
-  }
-
-  void _convertToList(ListItemType type) {
-    NoteEditorCommands.convertToListItem(widget.editor, widget.composer, type);
-  }
-
-  void _convertToTask() {
-    NoteEditorCommands.convertToTask(widget.editor, widget.composer);
-  }
-
-  void _indentSelectedBlocks() {
-    NoteEditorCommands.indentSelectedBlocks(widget.editor, widget.composer);
-  }
-
-  void _unindentSelectedBlocks() {
-    NoteEditorCommands.unindentSelectedBlocks(widget.editor, widget.composer);
-  }
-
-  void _insertDivider() {
-    NoteEditorCommands.insertDividerAtSelection(
-      widget.editor,
-      widget.composer,
-    );
-  }
 }
 
-class _NormalActions extends StatelessWidget {
-  const _NormalActions({
+class _WritingRow extends StatelessWidget {
+  const _WritingRow({
     required this.state,
-    required this.onSetBlockType,
-    required this.onConvertToTask,
-    required this.onInsertDivider,
+    required this.panelOpen,
+    required this.onTogglePanel,
+    required this.onToggleTask,
+    required this.onToggleBullets,
     required this.onAttachImage,
     required this.onAttachFile,
+    required this.onHideKeyboard,
   });
 
-  final NoteToolbarState state;
-  final ValueChanged<Attribution> onSetBlockType;
-  final VoidCallback onConvertToTask;
-  final VoidCallback onInsertDivider;
+  final NoteFormatState state;
+  final bool panelOpen;
+  final VoidCallback? onTogglePanel;
+  final VoidCallback onToggleTask;
+  final VoidCallback onToggleBullets;
   final VoidCallback? onAttachImage;
   final VoidCallback? onAttachFile;
+  final VoidCallback? onHideKeyboard;
 
   @override
   Widget build(BuildContext context) {
-    final blockType = state.blockType;
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         ToolbarButton(
-          svgAsset: 'assets/icons/h1_icon.svg',
-          isActive: blockType == header1Attribution,
+          label: 'Aa',
+          isActive: panelOpen,
+          activeStyle: ToolbarActiveStyle.filled,
+          spacious: true,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onSetBlockType(header1Attribution),
-          semanticLabel: 'Título 1',
-        ),
-        ToolbarButton(
-          svgAsset: 'assets/icons/h2_icon.svg',
-          isActive: blockType == header2Attribution,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onSetBlockType(header2Attribution),
-          semanticLabel: 'Título 2',
-        ),
-        ToolbarButton(
-          svgAsset: 'assets/icons/h3_icon.svg',
-          isActive: blockType == header3Attribution,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onSetBlockType(header3Attribution),
-          semanticLabel: 'Título 3',
-        ),
-        ToolbarButton(
-          icon: Icons.format_quote,
-          isActive: blockType == blockquoteAttribution,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onSetBlockType(blockquoteAttribution),
-          semanticLabel: 'Citação',
+          onPressed: onTogglePanel,
+          semanticLabel: 'Formatar',
         ),
         ToolbarButton(
           svgAsset: 'assets/icons/checkbox.svg',
           isActive: state.allTasks,
+          spacious: true,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: onConvertToTask,
-          semanticLabel: 'Task',
+          onPressed: onToggleTask,
+          semanticLabel: 'Inserir tarefa',
         ),
-        const ToolbarDivider(),
         ToolbarButton(
-          icon: Icons.horizontal_rule,
-          isActive: false,
+          icon: Icons.format_list_bulleted,
+          isActive: state.blockStyle == NoteBlockStyle.bulletList,
+          spacious: true,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: onInsertDivider,
-          semanticLabel: 'Inserir divisor',
+          onPressed: onToggleBullets,
+          semanticLabel: 'Lista com marcadores',
         ),
-        const ToolbarDivider(),
         ToolbarButton(
-          icon: Icons.image,
+          icon: Icons.photo_outlined,
           isActive: false,
+          spacious: true,
           haptic: ToolbarHaptic.controlTap,
           onPressed: onAttachImage,
-          semanticLabel: 'Inserir imagem',
+          semanticLabel: 'Anexar foto',
         ),
         ToolbarButton(
           icon: Icons.attach_file,
           isActive: false,
+          spacious: true,
           haptic: ToolbarHaptic.controlTap,
           onPressed: onAttachFile,
           semanticLabel: 'Anexar arquivo',
         ),
+        ToolbarButton(
+          icon: Icons.keyboard_hide_outlined,
+          isActive: false,
+          spacious: true,
+          haptic: ToolbarHaptic.controlTap,
+          onPressed: onHideKeyboard,
+          semanticLabel: 'Esconder teclado',
+        ),
       ],
     );
   }
 }
 
-class _ContextualActions extends StatelessWidget {
-  const _ContextualActions({
+class _SelectionRow extends StatelessWidget {
+  const _SelectionRow({
     required this.state,
+    required this.panelOpen,
     required this.onToggleInline,
-    required this.onConvertToList,
-    required this.onConvertToTask,
-    required this.onUnindent,
-    required this.onIndent,
+    required this.onToggleTask,
+    required this.onLinkNote,
+    required this.onTogglePanel,
   });
 
-  final NoteToolbarState state;
-  final ValueChanged<Attribution> onToggleInline;
-  final ValueChanged<ListItemType> onConvertToList;
-  final VoidCallback onConvertToTask;
-  final VoidCallback onUnindent;
-  final VoidCallback onIndent;
+  final NoteFormatState state;
+  final bool panelOpen;
+  final ValueChanged<String> onToggleInline;
+  final VoidCallback onToggleTask;
+  final VoidCallback? onLinkNote;
+  final VoidCallback? onTogglePanel;
 
   @override
   Widget build(BuildContext context) {
-    final hasText = state.hasTextSelection;
-    final hasListOrTask = state.hasListOrTask;
-    final activeAttributions = state.activeAttributions;
+    final inline = state.inlineStyles;
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        ToolbarButton(
-          icon: Icons.format_bold,
-          isActive: activeAttributions.contains(boldAttribution),
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: hasText ? () => onToggleInline(boldAttribution) : null,
-          semanticLabel: 'Negrito',
-        ),
-        ToolbarButton(
-          icon: Icons.format_italic,
-          isActive: activeAttributions.contains(italicsAttribution),
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: hasText ? () => onToggleInline(italicsAttribution) : null,
-          semanticLabel: 'Itálico',
-        ),
-        ToolbarButton(
-          icon: Icons.format_strikethrough,
-          isActive: activeAttributions.contains(strikethroughAttribution),
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: hasText
-              ? () => onToggleInline(strikethroughAttribution)
-              : null,
-          semanticLabel: 'Tachado',
-        ),
+        for (final style in noteInlineStyleButtons)
+          ToolbarButton(
+            label: style.glyph,
+            labelStyle: style.glyphStyle,
+            isActive: inline.contains(style.key),
+            spacious: true,
+            haptic: ToolbarHaptic.selectionChange,
+            onPressed: () => onToggleInline(style.key),
+            semanticLabel: style.label,
+          ),
         const ToolbarDivider(),
-        ToolbarButton(
-          icon: Icons.format_list_bulleted,
-          isActive: state.listType == ListItemType.unordered,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onConvertToList(ListItemType.unordered),
-          semanticLabel: 'Lista com marcadores',
-        ),
-        ToolbarButton(
-          icon: Icons.format_list_numbered,
-          isActive: state.listType == ListItemType.ordered,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: () => onConvertToList(ListItemType.ordered),
-          semanticLabel: 'Lista numerada',
-        ),
         ToolbarButton(
           svgAsset: 'assets/icons/checkbox.svg',
           isActive: state.allTasks,
+          spacious: true,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: onConvertToTask,
-          semanticLabel: 'Task',
-        ),
-        const ToolbarDivider(),
-        ToolbarButton(
-          icon: Icons.format_indent_decrease,
-          isActive: false,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: hasListOrTask ? onUnindent : null,
-          semanticLabel: 'Diminuir recuo',
+          onPressed: onToggleTask,
+          semanticLabel: 'Transformar em tarefa',
         ),
         ToolbarButton(
-          icon: Icons.format_indent_increase,
+          icon: Icons.link,
           isActive: false,
+          spacious: true,
+          haptic: ToolbarHaptic.controlTap,
+          onPressed: onLinkNote,
+          semanticLabel: 'Criar link para outra nota',
+        ),
+        ToolbarButton(
+          label: 'Aa',
+          isActive: panelOpen,
+          activeStyle: ToolbarActiveStyle.filled,
+          spacious: true,
           haptic: ToolbarHaptic.selectionChange,
-          onPressed: hasListOrTask ? onIndent : null,
-          semanticLabel: 'Aumentar recuo',
+          onPressed: onTogglePanel,
+          semanticLabel: 'Mais formatação',
         ),
       ],
     );
   }
 }
 
-class _ContextualToolbarContent extends StatefulWidget {
-  const _ContextualToolbarContent({
+/// Bold, italic and strikethrough, drawn as styled letters.
+const noteInlineStyleButtons = [
+  (
+    key: NoteInlineStyle.bold,
+    glyph: 'B',
+    label: 'Negrito',
+    glyphStyle: TextStyle(fontWeight: FontWeight.w800),
+  ),
+  (
+    key: NoteInlineStyle.italic,
+    glyph: 'I',
+    label: 'Itálico',
+    glyphStyle: TextStyle(
+      fontStyle: FontStyle.italic,
+      fontWeight: FontWeight.w500,
+    ),
+  ),
+  (
+    key: NoteInlineStyle.strikethrough,
+    glyph: 'S',
+    label: 'Tachado',
+    glyphStyle: TextStyle(
+      decoration: TextDecoration.lineThrough,
+      fontWeight: FontWeight.w500,
+    ),
+  ),
+];
+
+/// Shows the row for [mode] across the bar's full width, sliding between
+/// rows when the mode changes.
+class _ToolbarRows extends StatefulWidget {
+  const _ToolbarRows({
     required this.mode,
-    required this.normalActions,
-    required this.contextualActions,
+    required this.writing,
+    required this.selection,
   });
 
   final NoteToolbarMode mode;
-  final Widget normalActions;
-  final Widget contextualActions;
+  final Widget writing;
+  final Widget selection;
 
   @override
-  State<_ContextualToolbarContent> createState() =>
-      _ContextualToolbarContentState();
+  State<_ToolbarRows> createState() => _ToolbarRowsState();
 }
 
-class _ContextualToolbarContentState extends State<_ContextualToolbarContent>
+class _ToolbarRowsState extends State<_ToolbarRows>
     with TickerProviderStateMixin {
   late final SingleMotionController _motion;
 
@@ -385,11 +391,9 @@ class _ContextualToolbarContentState extends State<_ContextualToolbarContent>
   }
 
   @override
-  void didUpdateWidget(_ContextualToolbarContent oldWidget) {
+  void didUpdateWidget(_ToolbarRows oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.mode != widget.mode) {
-      _applyMotion();
-    }
+    if (oldWidget.mode != widget.mode) _applyMotion();
   }
 
   void _applyMotion() {
@@ -409,59 +413,42 @@ class _ContextualToolbarContentState extends State<_ContextualToolbarContent>
 
   @override
   Widget build(BuildContext context) {
-    final showingNormal = widget.mode == NoteToolbarMode.normal;
-    final incoming = showingNormal
-        ? widget.normalActions
-        : widget.contextualActions;
-    final outgoing = showingNormal
-        ? widget.contextualActions
-        : widget.normalActions;
+    final writing = widget.mode == NoteToolbarMode.writing;
+    final incoming = writing ? widget.writing : widget.selection;
+    final outgoing = writing ? widget.selection : widget.writing;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: AnimatedBuilder(
-        animation: _motion,
-        builder: (_, _) {
-          final progress = _motion.value.clamp(0.0, 1.0);
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // The leaving row is removed from the tree once its fade ends.
-              if (progress < 1)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  child: ExcludeSemantics(
-                    child: IgnorePointer(
-                      child: FadeTransition(
-                        opacity: _outgoingOpacity,
-                        child: Transform.translate(
-                          offset: Offset(-(1 - progress) * 8, 0),
-                          child: Transform.scale(
-                            scale: 0.96 + 0.04 * progress,
-                            alignment: Alignment.centerLeft,
-                            child: outgoing,
-                          ),
-                        ),
+    return AnimatedBuilder(
+      animation: _motion,
+      builder: (_, _) {
+        final progress = _motion.value.clamp(0.0, 1.0);
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // The leaving row is removed from the tree once its fade ends.
+            if (progress < 1)
+              Positioned.fill(
+                child: ExcludeSemantics(
+                  child: IgnorePointer(
+                    child: FadeTransition(
+                      opacity: _outgoingOpacity,
+                      child: Transform.translate(
+                        offset: Offset(-(1 - progress) * 8, 0),
+                        child: outgoing,
                       ),
                     ),
                   ),
                 ),
-              Opacity(
-                opacity: 0.35 + 0.65 * progress,
-                child: Transform.translate(
-                  offset: Offset((1 - progress) * 8, 0),
-                  child: Transform.scale(
-                    scale: 0.96 + 0.04 * progress,
-                    alignment: Alignment.centerLeft,
-                    child: incoming,
-                  ),
-                ),
               ),
-            ],
-          );
-        },
-      ),
+            Opacity(
+              opacity: 0.35 + 0.65 * progress,
+              child: Transform.translate(
+                offset: Offset((1 - progress) * 8, 0),
+                child: incoming,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

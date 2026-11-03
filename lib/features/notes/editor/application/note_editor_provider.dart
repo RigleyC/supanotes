@@ -6,6 +6,7 @@ import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/catalog/data/notes_repository.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
+import 'package:supanotes/features/notes/editor/appflowy/appflowy_note_adapter.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_session.dart';
@@ -67,12 +68,19 @@ Future<NoteEditorSession> _openNoteEditorSession(Ref ref, String noteId) async {
 
     final syncService = ref.read(noteOperationsSyncServiceProvider);
 
+    final captureLocalOperations = _canCaptureLocalOperations(note);
+    final adapter = AppFlowyNoteAdapter(
+      editorState: controller.editorState,
+      syncService: syncService,
+      noteId: noteId,
+      captureLocalOperations: captureLocalOperations,
+    );
+    controller.attachVisibility(adapter);
     final syncSession = NoteSyncSession(
       noteId: noteId,
       syncService: syncService,
-      document: controller.document,
-      editor: controller.editor,
-      captureLocalOperations: _canCaptureLocalOperations(note),
+      adapter: adapter,
+      captureLocalOperations: captureLocalOperations,
       appLifecycleStates: appLifecycleStates,
     );
 

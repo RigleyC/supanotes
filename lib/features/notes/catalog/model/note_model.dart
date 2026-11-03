@@ -1,17 +1,25 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show immutable;
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/note_lifecycle_policy.dart';
 
 import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 
+@immutable
 class NoteModel {
   const NoteModel({
     required this.id,
     required this.userId,
     required this.content,
     required this.title,
-    required this.favorite, required this.archived, required this.createdAt, required this.updatedAt, required this.hasRemoteCopy, required this.isEmptyDraft, this.excerpt,
+    required this.favorite,
+    required this.archived,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.hasRemoteCopy,
+    required this.isEmptyDraft,
+    this.excerpt,
     this.hideCompleted = false,
     this.collapseImages = false,
     this.permission,
@@ -76,6 +84,51 @@ class NoteModel {
   bool get isOwner => permission == null;
   bool get isReadOnly => permission == 'view';
   bool get isShared => sharedByEmail != null;
+
+  /// Value equality lets catalog streams drop emissions that do not change
+  /// anything the UI shows (dirty flags, lifecycle bookkeeping, sync markers).
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NoteModel &&
+          other.id == id &&
+          other.userId == userId &&
+          other.content == content &&
+          other.title == title &&
+          other.excerpt == excerpt &&
+          other.favorite == favorite &&
+          other.archived == archived &&
+          other.createdAt == createdAt &&
+          other.updatedAt == updatedAt &&
+          other.hideCompleted == hideCompleted &&
+          other.collapseImages == collapseImages &&
+          other.permission == permission &&
+          other.sharedByEmail == sharedByEmail &&
+          other.sharedByName == sharedByName &&
+          other.noteIcon == noteIcon &&
+          other.hasRemoteCopy == hasRemoteCopy &&
+          other.isEmptyDraft == isEmptyDraft;
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    userId,
+    content,
+    title,
+    excerpt,
+    favorite,
+    archived,
+    createdAt,
+    updatedAt,
+    hideCompleted,
+    collapseImages,
+    permission,
+    sharedByEmail,
+    sharedByName,
+    noteIcon,
+    hasRemoteCopy,
+    isEmptyDraft,
+  );
 
   NoteModel copyWith({
     String? id,

@@ -48,20 +48,3 @@ class TaskNotificationId {
     return id & 0x7fffffff;
   }
 }
-
-/// Backwards-compatible name for callers that only need a source-aware task
-/// ID. New code should use [TaskNotificationId.forTask] directly.
-int notificationIdForTask(
-  String userId,
-  String taskId, {
-  DateTime? scheduledAt,
-}) {
-  if (scheduledAt == null) {
-    return TaskNotificationId.legacyForTask(userId, taskId);
-  }
-  return TaskNotificationId.forTask(
-    userId: userId,
-    taskId: taskId,
-    scheduledAt: scheduledAt,
-  );
-}

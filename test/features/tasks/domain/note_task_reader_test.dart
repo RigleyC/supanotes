@@ -24,7 +24,10 @@ void main() {
       ],
     });
 
-    final entries = const NoteTaskReader().read(document, noteId: 'note-1');
+    final entries = const NoteTaskReader().read(
+      parseNoteTaskBlocks(document),
+      noteId: 'note-1',
+    );
 
     expect(entries, hasLength(1));
     expect(entries.single.id, 'task-1');
@@ -55,7 +58,10 @@ void main() {
     });
 
     expect(
-      const NoteTaskReader().read(document, noteId: 'note-1'),
+      const NoteTaskReader().read(
+        parseNoteTaskBlocks(document),
+        noteId: 'note-1',
+      ),
       hasLength(1),
     );
   });
@@ -80,7 +86,10 @@ void main() {
       ],
     });
 
-    final entries = const NoteTaskReader().read(document, noteId: 'note-1');
+    final entries = const NoteTaskReader().read(
+      parseNoteTaskBlocks(document),
+      noteId: 'note-1',
+    );
 
     expect(entries, hasLength(1));
     expect(entries.single.title, 'Persisted task');
@@ -111,7 +120,10 @@ void main() {
     });
 
     expect(
-      const NoteTaskReader().read(document, noteId: 'note-1'),
+      const NoteTaskReader().read(
+        parseNoteTaskBlocks(document),
+        noteId: 'note-1',
+      ),
       hasLength(1),
     );
   });
@@ -138,7 +150,7 @@ void main() {
 
     final entries = NoteTaskReader(
       clock: () => DateTime(2026, 8, 10, 10),
-    ).read(document, noteId: 'note-1');
+    ).read(parseNoteTaskBlocks(document), noteId: 'note-1');
 
     expect(entries.single.dueDate, DateTime(2026, 8, 12, 9));
   });
@@ -165,7 +177,7 @@ void main() {
 
     final entries = NoteTaskReader(
       clock: () => DateTime(2026, 8, 12, 8),
-    ).read(document, noteId: 'note-1');
+    ).read(parseNoteTaskBlocks(document), noteId: 'note-1');
 
     expect(entries.single.dueDate, DateTime(2026, 8, 12));
   });
@@ -195,7 +207,7 @@ void main() {
 
     final entries = NoteTaskReader(
       clock: () => DateTime(2026, 8, 10, 10),
-    ).read(document, noteId: 'note-1');
+    ).read(parseNoteTaskBlocks(document), noteId: 'note-1');
 
     expect(entries.single.dueDate, DateTime(2026, 8, 19));
   });
@@ -226,7 +238,7 @@ void main() {
 
     final entries = NoteTaskReader(
       clock: () => DateTime(2026, 8, 10, 16),
-    ).read(document, noteId: 'note-1');
+    ).read(parseNoteTaskBlocks(document), noteId: 'note-1');
 
     expect(entries.single.dueDate, DateTime(2026, 8, 26, 9));
   });

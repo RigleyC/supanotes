@@ -48,7 +48,7 @@ class TaskOccurrenceTransition {
 /// Resolves the current occurrence and recurring completion transitions.
 ///
 /// Date arithmetic remains in [nextDueDate] and
-/// [advanceRecurringDueDate]. This module owns the meaning of the current
+/// [latestOccurrenceOnOrBefore]. This module owns the meaning of the current
 /// occurrence so editor actions and read projections use the same policy.
 class TaskOccurrencePolicy {
   const TaskOccurrencePolicy({this.clock});
@@ -237,58 +237,25 @@ class TaskOccurrencePolicy {
     required DateTime now,
     required Map<DateTime, DateTime> completedAtByScheduledAt,
   }) {
-    var scheduledAt = anchor;
-    DateTime? latestStarted;
-
-    for (var i = 0; i < 10000; i++) {
-      final hasStarted = _hasDateStarted(scheduledAt, now);
-
-      if (!hasStarted) {
-        final current = latestStarted ?? scheduledAt;
-        final currentCompletion = _findCompletion(
-          current,
-          hasTime: hasTime,
-          completedAtByScheduledAt: completedAtByScheduledAt,
-        );
-        return TaskOccurrence(
-          taskId: '',
-          scheduledAt: current,
-          status: currentCompletion != null
-              ? OccurrenceStatus.completed
-              : latestStarted == null
-              ? OccurrenceStatus.pending
-              : _isOverdue(current, now, hasTime)
-              ? OccurrenceStatus.overdue
-              : OccurrenceStatus.pending,
-          completedAt: currentCompletion,
-        );
-      }
-
-      // Keep the latest occurrence date visible, including after completion.
-      // A new timed occurrence replaces it at local midnight on its date.
-      latestStarted = scheduledAt;
-
-      final next = nextDueDate(
-        from: scheduledAt,
-        recurrence: recurrence,
-        anchorDay: anchor.day,
-      );
-      if (next == null || next.isAtSameMomentAs(scheduledAt)) break;
-      scheduledAt = next;
-    }
-
-    final result = latestStarted ?? scheduledAt;
+    // The current occurrence is the latest one whose date has started; before
+    // the anchor's date the anchor itself is upcoming.
+    final latestStarted = latestOccurrenceOnOrBefore(
+      anchor: anchor,
+      recurrence: recurrence,
+      today: now.toLocal(),
+    );
+    final current = latestStarted ?? anchor;
     final completedAt = _findCompletion(
-      result,
+      current,
       hasTime: hasTime,
       completedAtByScheduledAt: completedAtByScheduledAt,
     );
     return TaskOccurrence(
       taskId: '',
-      scheduledAt: result,
+      scheduledAt: current,
       status: completedAt != null
           ? OccurrenceStatus.completed
-          : _isOverdue(result, now, hasTime)
+          : latestStarted != null && _isOverdue(current, now, hasTime)
           ? OccurrenceStatus.overdue
           : OccurrenceStatus.pending,
       completedAt: completedAt,
@@ -304,52 +271,6 @@ class TaskOccurrencePolicy {
     final current = canonicalScheduledAt(now.toLocal(), hasTime: hasTime);
     return !scheduled.isAfter(current);
   }
-
-  bool _hasDateStarted(DateTime scheduledAt, DateTime now) {
-    final scheduledDate = DateTime(
-      scheduledAt.year,
-      scheduledAt.month,
-      scheduledAt.day,
-    );
-    final current = now.toLocal();
-    final currentDate = DateTime(current.year, current.month, current.day);
-    return !scheduledDate.isAfter(currentDate);
-  }
-}
-
-List<TaskOccurrence> buildOccurrences({
-  required String taskId,
-  required DateTime? anchor,
-  required TaskRecurrence? recurrence,
-  required bool hasTime,
-  required DateTime now,
-  required Set<DateTime> completedScheduledAts,
-  int maxCount = 365,
-}) {
-  if (maxCount <= 0) return [];
-
-  final occurrence = TaskOccurrencePolicy(clock: () => now).resolveCurrent(
-    taskId: taskId,
-    anchor: anchor,
-    recurrence: recurrence,
-    hasTime: hasTime,
-    completedAtByScheduledAt: {
-      for (final scheduledAt in completedScheduledAts) scheduledAt: scheduledAt,
-    },
-  );
-  return occurrence == null ? [] : [occurrence];
-}
-
-DateTime nextOccurrenceDate({
-  required DateTime from,
-  required TaskRecurrence recurrence,
-  DateTime? anchor,
-}) {
-  return nextDueDate(
-    from: from,
-    recurrence: recurrence,
-    anchorDay: anchor?.day ?? from.day,
-  )!;
 }
 
 DateTime? _findCompletion(

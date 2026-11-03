@@ -16,24 +16,31 @@ typedef NoteQueryResult = ({
   bool collapseImages,
 });
 
+final _headingMarker = RegExp(r'^#+\s*');
+final _taskMarker = RegExp(r'^[-*]\s*\[[ xX]\]\s*');
+final _bulletMarker = RegExp(r'^[-*]\s*');
+final _orderedMarker = RegExp(r'^\d+\.\s*');
+
 /// Derives a display title from note content by extracting the first non-empty
 /// line and stripping markdown heading, task and list markers.
+///
+/// Lines are scanned lazily so long notes are not split in full just to read
+/// their first line, and the marker patterns are compiled once.
 String deriveNoteTitle(String content) {
-  final lines = content.split('\n');
-  for (final line in lines) {
-    var trimmed = line.trim();
+  var start = 0;
+  while (start <= content.length) {
+    var end = content.indexOf('\n', start);
+    if (end < 0) end = content.length;
+    var trimmed = content.substring(start, end).trim();
+    start = end + 1;
     if (trimmed.isEmpty) continue;
 
-    // Strip heading markers (# ## ###)
-    trimmed = trimmed.replaceFirst(RegExp(r'^#+\s*'), '');
-    // Strip task checkboxes (- [ ] - [x] * [ ] * [x])
-    trimmed = trimmed.replaceFirst(RegExp(r'^[-*]\s*\[[ xX]\]\s*'), '');
-    // Strip bullet list markers (- item * item)
-    trimmed = trimmed.replaceFirst(RegExp(r'^[-*]\s*'), '');
-    // Strip ordered list markers (1. item)
-    trimmed = trimmed.replaceFirst(RegExp(r'^\d+\.\s*'), '');
-
-    trimmed = trimmed.trim();
+    trimmed = trimmed
+        .replaceFirst(_headingMarker, '')
+        .replaceFirst(_taskMarker, '')
+        .replaceFirst(_bulletMarker, '')
+        .replaceFirst(_orderedMarker, '')
+        .trim();
     if (trimmed.isEmpty) continue;
     return trimmed;
   }
@@ -45,8 +52,25 @@ const _noteSelectColumns =
     'COALESCE(unp.favorite, 0) AS favorite, '
     'COALESCE(unp.archived, 0) AS archived, '
     'COALESCE(unp.hide_completed, 0) AS hide_completed, '
-    'COALESCE(unp.collapse_images, 0) AS collapse_images, '
-    'n.content AS title';
+    'COALESCE(unp.collapse_images, 0) AS collapse_images';
+
+/// Number of leading content characters loaded by catalog list queries.
+///
+/// List rows only need the title (first non-empty line) and the stored
+/// excerpt. Loading every note's full plain text re-ran on each autosave while
+/// typing, so list queries read a bounded prefix instead.
+const catalogContentPrefixLength = 1024;
+
+const _catalogSelectColumns =
+    'SELECT n.id, n.user_id, '
+    'substr(n.content, 1, $catalogContentPrefixLength) AS content, '
+    'n.excerpt, n.created_at, n.updated_at, n.deleted_at, n.is_dirty, '
+    'n.has_remote_copy, n.note_icon_dirty, n.lifecycle_state, n.permission, '
+    'n.shared_by_email, n.shared_by_name, n.note_icon_json, '
+    'COALESCE(unp.favorite, 0) AS favorite, '
+    'COALESCE(unp.archived, 0) AS archived, '
+    'COALESCE(unp.hide_completed, 0) AS hide_completed, '
+    'COALESCE(unp.collapse_images, 0) AS collapse_images';
 
 @DriftAccessor(tables: [Notes, UserNotePreferences])
 class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
@@ -55,7 +79,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Streams all active notes with the user's preferences.
   Stream<List<NoteQueryResult>> watchAllActiveNotes(String userId) {
     return _watchWithPref(
-      '$_noteSelectColumns '
+      '$_catalogSelectColumns '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
@@ -74,6 +98,36 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
       userId,
       extraVariables: [Variable.withString(userId)],
     );
+  }
+
+  /// Returns the ids of active notes whose full plain-text content contains
+  /// [normalizedQuery] (already lower-cased by the caller).
+  ///
+  /// Catalog rows only carry a content prefix, so search reads full content on
+  /// demand instead. Matching happens in Dart because SQLite's `lower()` and
+  /// `LIKE` only case-fold ASCII, which would miss accented Portuguese text.
+  Future<Set<String>> searchActiveNoteIds(
+    String userId,
+    String normalizedQuery,
+  ) async {
+    if (normalizedQuery.isEmpty) return const {};
+    final rows = await customSelect(
+      'SELECT n.id, n.content '
+      'FROM notes n '
+      'LEFT JOIN user_note_preferences unp '
+      'ON unp.note_id = n.id AND unp.user_id = ? '
+      'WHERE COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
+      "AND n.lifecycle_state <> '$emptyDraftLifecycleState' "
+      'AND (n.user_id = ? OR '
+      "(n.permission IN ('view', 'edit') AND unp.note_id IS NOT NULL))",
+      variables: [Variable.withString(userId), Variable.withString(userId)],
+      readsFrom: {notes, userNotePreferences},
+    ).get();
+    return {
+      for (final row in rows)
+        if (row.read<String>('content').toLowerCase().contains(normalizedQuery))
+          row.read<String>('id'),
+    };
   }
 
   /// Returns a [NoteData] row without preference info. Prefer
@@ -118,7 +172,7 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
   /// Streams every favorite note with the user's preferences.
   Stream<List<NoteQueryResult>> watchFavorites(String userId) {
     return _watchWithPref(
-      '$_noteSelectColumns '
+      '$_catalogSelectColumns '
       'FROM notes n '
       'LEFT JOIN user_note_preferences unp ON unp.note_id = n.id AND unp.user_id = ? '
       'WHERE COALESCE(unp.favorite, 0) = 1 AND COALESCE(unp.archived, 0) = 0 AND n.deleted_at IS NULL '
@@ -316,17 +370,6 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
     );
   }
 
-  /// Returns every note that has unsynced local changes and is eligible for
-  /// sync (has a remote copy, is inbox, or has non-empty content).
-  /// Locally-created-then-deleted notes without a remote copy are excluded
-  /// to avoid wasted API calls.
-  Future<List<NoteData>> getDirtyNotes() {
-    return (select(notes)
-          ..where((t) => t.isDirty.equals(true))
-          ..where((t) => t.hasRemoteCopy.equals(true) | t.deletedAt.isNull()))
-        .get();
-  }
-
   /// Returns dirty tombstones for notes that are known to exist remotely.
   Future<List<NoteData>> getDirtyDeletedNotes() {
     return (select(notes)..where(
@@ -443,7 +486,12 @@ class NotesDao extends DatabaseAccessor<AppDatabase> with _$NotesDaoMixin {
 
   /// Permanently removes a note from the local database.
   Future<void> hardDeleteNote(String id) async {
-    await (delete(notes)..where((t) => t.id.equals(id))).go();
+    await transaction(() async {
+      await (delete(notes)..where((t) => t.id.equals(id))).go();
+      await (delete(
+        attachedDatabase.noteTasks,
+      )..where((task) => task.noteId.equals(id))).go();
+    });
   }
 
   /// Stores a note that came back from the backend. Uses

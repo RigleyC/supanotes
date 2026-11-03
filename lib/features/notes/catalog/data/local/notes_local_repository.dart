@@ -5,18 +5,19 @@ import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/database.dart';
 import 'package:uuid/uuid.dart';
 
-final Provider<NotesLocalRepository> notesLocalRepositoryProvider = Provider.autoDispose<NotesLocalRepository>(
-  (ref) {
-    final db = ref.watch(appDatabaseProvider);
-    final userId = ref.watch(currentUserIdProvider);
-    if (userId == null) {
-      throw StateError(
-        'Cannot create NotesLocalRepository: user not authenticated',
-      );
-    }
-    return NotesLocalRepository(db.notesDao, userId);
-  },
-);
+final Provider<NotesLocalRepository> notesLocalRepositoryProvider =
+    Provider.autoDispose<NotesLocalRepository>(
+      (ref) {
+        final db = ref.watch(appDatabaseProvider);
+        final userId = ref.watch(currentUserIdProvider);
+        if (userId == null) {
+          throw StateError(
+            'Cannot create NotesLocalRepository: user not authenticated',
+          );
+        }
+        return NotesLocalRepository(db.notesDao, userId);
+      },
+    );
 
 class NotesLocalRepository {
   NotesLocalRepository(this._dao, this._userId);
@@ -32,6 +33,12 @@ class NotesLocalRepository {
 
   Stream<List<NoteQueryResult>> watchActiveNotes() {
     return _dao.watchAllActiveNotes(_userId);
+  }
+
+  /// Ids of this account's active notes whose full content contains
+  /// [normalizedQuery].
+  Future<Set<String>> searchNoteIds(String normalizedQuery) {
+    return _dao.searchActiveNoteIds(_userId, normalizedQuery);
   }
 
   Stream<List<NoteQueryResult>> watchFavorites() {

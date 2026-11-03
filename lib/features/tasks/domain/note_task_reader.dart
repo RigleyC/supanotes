@@ -40,12 +40,25 @@ class ParsedNoteTask {
   final List<TaskCompletionRecord> completionHistory;
 }
 
-/// Decodes task blocks from an effective document snapshot.
+/// A task block as stored in a note document: identity, text and the raw
+/// metadata object.
+typedef NoteTaskBlock = ({
+  String blockId,
+  String title,
+  Map<String, dynamic> metadata,
+});
+
+/// Extracts the task blocks of an effective document snapshot.
+///
+/// This runs once per saved note, when its document is persisted, to fill the
+/// local `note_tasks` projection. Readers then query that projection instead
+/// of decoding every note document on every change.
 ///
 /// [NoteDocumentCodec] remains the authority for document and metadata
-/// validation. Invalid snapshots are allowed to throw so callers can expose
-/// the error instead of silently hiding one note from a task list.
-List<ParsedNoteTask> parseNoteTaskBlocks(String documentJson) {
+/// validation. Invalid snapshots throw so the projection can record the note
+/// as invalid and readers can expose the error instead of silently hiding one
+/// note from a task list.
+List<NoteTaskBlock> extractNoteTaskBlocks(String documentJson) {
   final json = jsonDecode(documentJson) as Map<String, dynamic>;
   final snapshot = const NoteDocumentCodec().parseSnapshot(
     json,
@@ -55,11 +68,18 @@ List<ParsedNoteTask> parseNoteTaskBlocks(String documentJson) {
   return [
     for (final block in snapshot.blocks)
       if (block.type == 'task')
-        _parseNoteTaskBlock(block.id, block.text, block.metadata),
+        (blockId: block.id, title: block.text, metadata: block.metadata),
   ];
 }
 
-ParsedNoteTask _parseNoteTaskBlock(
+/// Decodes the task blocks of an effective document snapshot.
+List<ParsedNoteTask> parseNoteTaskBlocks(String documentJson) => [
+  for (final block in extractNoteTaskBlocks(documentJson))
+    parseNoteTaskBlock(block.blockId, block.title, block.metadata),
+];
+
+/// Interprets one task block's metadata.
+ParsedNoteTask parseNoteTaskBlock(
   String blockId,
   String title,
   Map<String, dynamic> metadata,
@@ -112,12 +132,12 @@ class NoteTaskReader {
   final DateTime Function()? clock;
 
   List<TaskNotificationEntry> read(
-    String documentJson, {
+    Iterable<ParsedNoteTask> tasks, {
     required String noteId,
   }) {
     final policy = TaskOccurrencePolicy(clock: clock);
     final entries = <TaskNotificationEntry>[];
-    for (final task in parseNoteTaskBlocks(documentJson)) {
+    for (final task in tasks) {
       final occurrence = policy.resolveNotificationOccurrence(
         taskId: task.blockId,
         anchor: task.dueDate,

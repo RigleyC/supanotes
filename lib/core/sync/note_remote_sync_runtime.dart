@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/core/database/database.dart';
@@ -10,17 +11,15 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/sync/note_remote_sync_coordinator.dart';
 import 'package:supanotes/core/sync/sync_feed_client.dart';
 import 'package:supanotes/core/sync/sync_inbox_store.dart';
-import 'package:supanotes/core/sync/sync_retry_policy.dart';
-import 'package:supanotes/core/sync/task_outbox_worker.dart';
+import 'package:supanotes/core/sync/remote_sync_pacer.dart';
 import 'package:supanotes/features/notes/catalog/data/note_catalog_sync.dart';
 import 'package:supanotes/features/notes/catalog/data/remote_note_change_applier.dart';
 import 'package:supanotes/features/notes/catalog/model/remote_note_metadata.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
 
-typedef RemoteNoteMetadataLoader =
-    Future<RemoteNoteMetadata> Function(
-      String noteId,
-    );
+typedef RemoteNoteMetadataLoader = Future<RemoteNoteMetadata> Function(
+  String noteId,
+);
 
 final syncInboxStoreProvider = Provider.autoDispose<SyncInboxStore>((ref) {
   return SyncInboxStore(ref.watch(appDatabaseProvider));
@@ -122,6 +121,9 @@ final noteRemoteSyncCoordinatorProvider =
         },
         noteApplier: NoteRemoteSyncNoteApplier(
           isActive: activityTracker.isActive,
+          // Read lazily: only consulted when a note is open in the editor.
+          reconcileActive: (noteId) =>
+              ref.read(noteSessionCoordinatorProvider).reconcileRemote(noteId),
           syncPending: syncPending,
           confirmedRevision: (noteId) async =>
               (await ref
@@ -157,15 +159,24 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
   if (coordinator == null) return;
   final taskWorker = ref.watch(taskOutboxWorkerProvider);
 
+  final activityTracker = ref.watch(noteSessionActivityTrackerProvider);
+  final pacer = RemoteSyncPacer();
   final connectivitySubscription = ref
       .watch(noteOutboxConnectivityChangesProvider)
       .listen((results) {
         if (results.any((result) => result != ConnectivityResult.none)) {
-          unawaited(_wakeCoordinatorAfterTasks(taskWorker, coordinator));
+          pacer.wake();
         }
       });
+  final lifecycleSubscription = ref
+      .watch(appLifecycleStateStreamProvider)
+      .listen(
+        (state) => pacer.setForeground(state == AppLifecycleState.resumed),
+      );
   ref.onDispose(() {
+    pacer.dispose();
     unawaited(connectivitySubscription.cancel());
+    unawaited(lifecycleSubscription.cancel());
   });
 
   var failureAttempt = 0;
@@ -176,9 +187,13 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
       await taskWorker?.drain();
       await catalog.pushDeletedNotes();
       await catalog.pushDirtyPreferences();
-      await coordinator.syncOnce();
+      final changed = await coordinator.syncOnce();
       await catalog.pushDirtyNoteIcons();
       failureAttempt = 0;
+      pacer.recordSuccess(
+        changed: changed,
+        editing: activityTracker.activeCount > 0,
+      );
       yield null;
     } catch (error, stackTrace) {
       if (_isUnauthenticated(error)) {
@@ -191,32 +206,12 @@ final noteRemoteSyncRuntimeProvider = StreamProvider.autoDispose<void>((
         stackTrace: stackTrace,
       );
       failureAttempt++;
+      pacer.recordFailure(failureAttempt);
     }
-    await Future<void>.delayed(_remoteSyncDelay(failureAttempt));
+    await pacer.waitForNextRun();
+    if (!ref.mounted) break;
   }
 });
-
-Future<void> _wakeCoordinatorAfterTasks(
-  TaskOutboxWorker? taskWorker,
-  NoteRemoteSyncCoordinator coordinator,
-) async {
-  taskWorker?.wake();
-  try {
-    await taskWorker?.drain();
-  } on Object catch (error, stackTrace) {
-    dev.log(
-      '[RemoteSync] Task outbox wake failed; continuing with notes',
-      error: error,
-      stackTrace: stackTrace,
-    );
-  }
-  coordinator.wake();
-}
-
-Duration _remoteSyncDelay(int failureAttempt) {
-  if (failureAttempt == 0) return const Duration(seconds: 2);
-  return syncRetryDelayForAttempt(failureAttempt);
-}
 
 bool _isUnauthenticated(Object error) {
   if (error is NoteOperationsException) return error.statusCode == 401;
