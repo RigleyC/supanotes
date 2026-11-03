@@ -86,9 +86,7 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
   void didUpdateWidget(NoteEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session) {
-      oldWidget.session.controller.editorState.selectionNotifier.removeListener(
-        _onSelection,
-      );
+      oldWidget.session.controller.editing.removeListener(_onSelection);
       _scrollController.dispose();
       _panelOpen = false;
       _attach();
@@ -97,7 +95,7 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
   }
 
   void _attach() {
-    _controller.editorState.selectionNotifier.addListener(_onSelection);
+    _controller.editing.addListener(_onSelection);
     _controller.hideCompleted = widget.hideCompleted;
     _scrollController = EditorScrollController(
       editorState: _controller.editorState,
@@ -107,14 +105,14 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller.editorState.selectionNotifier.removeListener(_onSelection);
+    _controller.editing.removeListener(_onSelection);
     _scrollController.dispose();
     super.dispose();
   }
 
-  /// Editing ended (no caret): the panel goes away with the toolbar.
+  /// Editing ended: the panel goes away with the toolbar.
   void _onSelection() {
-    if (_panelOpen && _controller.editorState.selection == null) {
+    if (_panelOpen && !_controller.editing.value) {
       setState(() => _panelOpen = false);
     }
   }
@@ -142,7 +140,7 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
     if (selection == null || selection.isCollapsed) return;
     final note = await pickNoteToLink(context, currentNoteId: widget.noteId);
     if (note == null || !mounted) return;
-    editorState.selection = selection;
+    _controller.editAt(selection);
     await editorState.linkSelectionToNote(note.id);
   }
 
@@ -176,11 +174,12 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
     if (last == null || last.delta == null) {
       final path = [editorState.document.root.children.length];
       unawaited(
-        editorState.apply(
-          editorState.transaction
-            ..insertNode(path, paragraphNode())
-            ..afterSelection = Selection.collapsed(Position(path: path)),
-        ),
+        editorState
+            .apply(editorState.transaction..insertNode(path, paragraphNode()))
+            .then(
+              (_) =>
+                  _controller.editAt(Selection.collapsed(Position(path: path))),
+            ),
       );
       return;
     }
@@ -188,8 +187,10 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
     while (node.children.isNotEmpty) {
       node = node.children.last;
     }
-    editorState.selection = Selection.collapsed(
-      Position(path: node.path, offset: node.delta?.length ?? 0),
+    _controller.editAt(
+      Selection.collapsed(
+        Position(path: node.path, offset: node.delta?.length ?? 0),
+      ),
     );
   }
 
@@ -251,11 +252,11 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
           ),
           // Rebuilds only when editing starts or stops, not on every caret
           // move: the toolbar listens to the selection itself.
-          ValueListenableBuilder<Selection?>(
-            valueListenable: editorState.selectionNotifier,
-            // The format panel replaces the bar while it is open; it has its
-            // own close button.
-            builder: (context, selection, _) => selection == null || _panelOpen
+          // Shown only while editing, and replaced by the format panel while
+          // that is open (the panel has its own close button).
+          ValueListenableBuilder<bool>(
+            valueListenable: _controller.editing,
+            builder: (context, editing, _) => !editing || _panelOpen
                 ? const SizedBox.shrink()
                 : NoteToolbar(
                     editorState: editorState,

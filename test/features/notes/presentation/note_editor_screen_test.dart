@@ -253,4 +253,19 @@ void main() {
       'attributes': {'href': 'note://note-2'},
     });
   });
+
+  testWidgets('a caret placed by code alone shows no toolbar', (tester) async {
+    await pumpScreen(tester, blockId: 'task-1');
+
+    // The deep link highlights the task without starting to edit.
+    expect(controller.editorState.selection, isNotNull);
+    expect(controller.editing.value, isFalse);
+    expect(find.byType(NoteToolbar), findsNothing);
+    expect(find.byTooltip('Remover foco'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await tester.pumpAndSettle();
+    expect(controller.editing.value, isTrue);
+    expect(find.byType(NoteToolbar), findsOneWidget);
+  });
 }
