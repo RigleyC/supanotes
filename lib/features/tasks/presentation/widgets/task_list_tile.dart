@@ -88,9 +88,9 @@ class _TaskListTileState extends State<TaskListTile> {
       isComplete: isChecked,
       onAnimationComplete: null,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          vertical: widget._detailed ? AppSpacing.xs : 0,
-        ),
+        // Compact rows get air too, so a list of tasks does not read as one
+        // block (56 px rows).
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
         child: Row(
           spacing: widget._detailed ? AppSpacing.md : 0,
           children: [
