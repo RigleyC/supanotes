@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:supanotes/core/api/api_client.dart';
 
 class NoteDocumentResponse {
-
   NoteDocumentResponse({
     required this.noteId,
     required this.revision,
@@ -25,12 +24,12 @@ class NoteDocumentResponse {
 }
 
 class OperationRequest {
-
   OperationRequest({
     required this.operationId,
     required this.baseRevision,
     required this.kind,
-    required this.payload, this.blockId,
+    required this.payload,
+    this.blockId,
   });
   final String operationId;
   final int baseRevision;
@@ -48,7 +47,6 @@ class OperationRequest {
 }
 
 class SyncRequest {
-
   SyncRequest({
     required this.knownRevision,
     required this.operations,
@@ -66,7 +64,6 @@ class SyncRequest {
 }
 
 class AcceptedOperation {
-
   AcceptedOperation({
     required this.operationId,
     required this.revision,
@@ -89,7 +86,6 @@ class AcceptedOperation {
 }
 
 class Operation {
-
   Operation({
     required this.operationId,
     required this.noteId,
@@ -97,7 +93,9 @@ class Operation {
     required this.baseRevision,
     required this.actorId,
     required this.kind,
-    required this.payload, required this.createdAt, this.blockId,
+    required this.payload,
+    required this.createdAt,
+    this.blockId,
   });
 
   factory Operation.fromJson(Map<String, dynamic> json) {
@@ -125,12 +123,12 @@ class Operation {
 }
 
 class SyncResponse {
-
   SyncResponse({
     required this.accepted,
     required this.finalRevision,
     required this.remoteOperations,
-    required this.serverTime, this.canonicalDocument,
+    required this.serverTime,
+    this.canonicalDocument,
   });
 
   factory SyncResponse.fromJson(Map<String, dynamic> json) {
@@ -160,7 +158,6 @@ class SyncResponse {
 }
 
 class OperationsListResponse {
-
   OperationsListResponse({
     required this.operations,
     this.document,
@@ -184,7 +181,6 @@ class OperationsListResponse {
 }
 
 class NoteOperationsException implements Exception {
-
   NoteOperationsException({
     required this.errorCode,
     required this.message,
@@ -225,7 +221,6 @@ class NotePreferencesResponse {
 }
 
 class NoteSyncClient {
-
   NoteSyncClient({required ApiClient client}) : _client = client;
   final ApiClient _client;
 
@@ -297,7 +292,6 @@ class NoteSyncClient {
       throw _mapError(e);
     }
   }
-
 
   Future<OperationsListResponse> getOperationsSince(
     String noteId,

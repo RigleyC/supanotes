@@ -66,7 +66,6 @@ class _ShareNotePickerSheetState extends State<ShareNotePickerSheet> {
       ],
     );
   }
-
 }
 
 class _PickerResults extends StatelessWidget {

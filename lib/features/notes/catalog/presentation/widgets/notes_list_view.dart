@@ -17,7 +17,12 @@ import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 /// [Column]) and provides scroll constraints via [Expanded].
 class NotesListView extends StatelessWidget {
   const NotesListView({
-    required this.notes, required this.onTap, required this.onDelete, required this.onToggleFavorite, required this.onEditIcon, super.key,
+    required this.notes,
+    required this.onTap,
+    required this.onDelete,
+    required this.onToggleFavorite,
+    required this.onEditIcon,
+    super.key,
   });
 
   final List<NoteModel> notes;
@@ -43,9 +48,9 @@ class NotesListView extends StatelessWidget {
         final note = notes[notes.length - 1 - index];
         final canLongPressToEditIcon =
             NoteIconInteractionPolicy.canUseLongPress(
-          note: note,
-          onEditIcon: () => onEditIcon(note),
-        );
+              note: note,
+              onEditIcon: () => onEditIcon(note),
+            );
 
         final Widget? leading = note.noteIcon != null
             ? NoteIconView(icon: note.noteIcon!)
@@ -67,8 +72,8 @@ class NotesListView extends StatelessWidget {
                       child: Text(
                         '${NoteStrings.sharedFromPrefix} ${note.sharedByEmail}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                          color: scheme.onSurfaceVariant,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

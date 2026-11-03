@@ -9,60 +9,12 @@ import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.
 import 'package:supanotes/features/notes/attachments/model/attachment_model.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/attachment_renderers.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 typedef _OpenAttachmentCallback = Future<void> Function(
   String? url, {
   AttachmentReference? attachment,
 });
-
-class DocumentAttachmentWidget extends StatelessWidget {
-  const DocumentAttachmentWidget({
-    required this.componentKey,
-    required this.nodeId,
-    required this.attachmentId,
-    required this.collapseImages,
-    required this.selectionColor,
-    super.key,
-    this.onDelete,
-    this.fallbackAttachment,
-    this.deliveryPreference = AttachmentDeliveryPreference.localFirst,
-    this.attachmentDelivery,
-    this.selection,
-  });
-
-  final GlobalKey componentKey;
-  final String nodeId;
-  final String attachmentId;
-  final VoidCallback? onDelete;
-  final bool collapseImages;
-  final AttachmentReference? fallbackAttachment;
-  final AttachmentDeliveryPreference deliveryPreference;
-  final AttachmentDelivery? attachmentDelivery;
-  final UpstreamDownstreamNodeSelection? selection;
-  final Color selectionColor;
-
-  @override
-  Widget build(BuildContext context) => SelectableBox(
-    selection: selection,
-    selectionColor: selectionColor,
-    child: BoxComponent(
-      key: componentKey,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: DocumentAttachmentContent(
-          attachmentId: attachmentId,
-          onDelete: onDelete,
-          collapseImages: collapseImages,
-          fallbackAttachment: fallbackAttachment,
-          deliveryPreference: deliveryPreference,
-          attachmentDelivery: attachmentDelivery,
-        ),
-      ),
-    ),
-  );
-}
 
 /// The attachment itself (image, file pill, upload state), independent of
 /// the editor that hosts it.

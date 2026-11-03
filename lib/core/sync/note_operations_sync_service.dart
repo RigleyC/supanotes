@@ -10,7 +10,6 @@ import 'package:supanotes/core/sync/note_sync_persistence.dart';
 import 'package:supanotes/core/sync/note_sync_reconciler.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_rebaser.dart';
 import 'package:supanotes/features/notes/editor/sync/note_sync_client.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:uuid/uuid.dart';
 
 class SyncResult {
@@ -551,7 +550,6 @@ class NoteOperationsSyncService {
   }
 
   static dynamic _toJsonValue(dynamic value) {
-    if (value is Attribution) return value.id;
     if (value is DateTime) return value.toUtc().toIso8601String();
     if (value is Map) {
       return value.map(

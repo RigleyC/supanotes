@@ -1,9 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:supanotes/features/notes/editor/document/attachment_nodes.dart';
 import 'package:supanotes/shared/widgets/app_icon_button.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AttachmentUploadingCapsule extends StatelessWidget {
@@ -287,44 +285,6 @@ class _AttachmentNetworkImage extends StatelessWidget {
       ),
     );
   }
-}
-
-class AttachmentRichLinkCard extends StatelessWidget {
-  const AttachmentRichLinkCard({
-    required this.componentKey,
-    required this.node,
-    required this.selectionColor,
-    super.key,
-    this.selection,
-    this.allowInternalNoteLinks = true,
-  });
-
-  final GlobalKey componentKey;
-  final RichLinkNode node;
-  final UpstreamDownstreamNodeSelection? selection;
-  final Color selectionColor;
-  final bool allowInternalNoteLinks;
-
-  @override
-  Widget build(BuildContext context) => SelectableBox(
-    selection: selection,
-    selectionColor: selectionColor,
-    child: BoxComponent(
-      key: componentKey,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: RichLinkCard(
-          url: node.url,
-          title: node.title,
-          description: node.description,
-          imageUrl: node.imageUrl,
-          domain: node.domain,
-          siteName: node.siteName,
-          allowInternalNoteLinks: allowInternalNoteLinks,
-        ),
-      ),
-    ),
-  );
 }
 
 /// A link preview card (image, title, description, site).

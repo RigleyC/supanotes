@@ -31,7 +31,6 @@ class UserSettings {
 
 /// The one-time MCP credential returned when a new token is issued.
 class McpTokenResponse {
-
   const McpTokenResponse({required this.token});
 
   factory McpTokenResponse.fromJson(Map<String, dynamic> json) {

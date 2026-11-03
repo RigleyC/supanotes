@@ -7,9 +7,10 @@ import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/notes/sharing/model/share_model.dart';
 import 'package:supanotes/features/notes/sharing/model/share_permission.dart';
 
-final Provider<SharesRepository> sharesRepositoryProvider = Provider.autoDispose<SharesRepository>(
-  (ref) => SharesRepository(ref.watch(apiClientProvider)),
-);
+final Provider<SharesRepository> sharesRepositoryProvider =
+    Provider.autoDispose<SharesRepository>(
+      (ref) => SharesRepository(ref.watch(apiClientProvider)),
+    );
 
 /// Repository for managing note shares on the backend.
 ///
