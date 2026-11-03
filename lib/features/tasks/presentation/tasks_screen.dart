@@ -9,6 +9,7 @@ import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/tasks/application/note_task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
+import 'package:supanotes/features/tasks/application/task_source_preference.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/domain/task_schedule_identity.dart';
 import 'package:supanotes/features/tasks/presentation/task_editor_screen.dart';
@@ -26,13 +27,12 @@ class TasksScreen extends ConsumerStatefulWidget {
 }
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
-  bool _includeNoteTasks = true;
   final Set<String> _dismissedTaskKeys = {};
 
   @override
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(
-      taskListProvider(includeNoteTasks: _includeNoteTasks),
+      taskListProvider(includeNoteTasks: ref.watch(includeNoteTasksProvider)),
     );
 
     return Scaffold(
@@ -45,8 +45,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         actions: [
           TaskSourceFilterMenu(
             key: const ValueKey('task-source-filter-menu'),
-            includeNoteTasks: _includeNoteTasks,
-            onChanged: (value) => setState(() => _includeNoteTasks = value),
+            includeNoteTasks: ref.watch(includeNoteTasksProvider),
+            onChanged: (value) =>
+                ref.read(includeNoteTasksProvider.notifier).set(value),
           ),
           const SizedBox(width: 12),
         ],
@@ -57,7 +58,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           title: 'Erro ao carregar tasks',
           subtitle: error.toString(),
           onRetry: () => ref.invalidate(
-            taskListProvider(includeNoteTasks: _includeNoteTasks),
+            taskListProvider(
+              includeNoteTasks: ref.read(includeNoteTasksProvider),
+            ),
           ),
         ),
         data: (tasks) {

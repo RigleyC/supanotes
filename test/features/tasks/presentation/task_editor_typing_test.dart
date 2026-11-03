@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supanotes/core/auth/current_user.dart';
+import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
@@ -57,6 +59,7 @@ void main() {
   setUpAll(() async {
     await initializeDateFormatting('pt_BR');
     registerFallbackValue(_task());
+    SharedPreferences.setMockInitialValues({});
   });
 
   testWidgets(
@@ -73,6 +76,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            sharedPreferencesProvider.overrideWithValue(
+              await SharedPreferences.getInstance(),
+            ),
             currentUserIdProvider.overrideWithValue('user-1'),
             taskListProvider(includeNoteTasks: true).overrideWith(
               (ref) => Stream.value([TaskListItem.task(_task())]),
