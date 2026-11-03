@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -73,9 +74,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  /// Lays the rows out top to bottom (sections, then the completed link) and
-  /// renders them in a reverse list, so they sit just above the bottom bar
-  /// when they fit and scroll lazily when they do not.
+  /// Lays the rows out top to bottom (sections, then the completed link).
+  /// When they fit they sit just above the bottom bar; when they do not, the
+  /// list opens at its top so overdue tasks are seen first.
   Widget _buildList(BuildContext context, List<TaskListItem> openTasks) {
     final now = DateTime.now();
     final entries = <_Entry>[];
@@ -99,54 +100,54 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     entries.add(const _CompletedLinkEntry());
 
     final overdueColor = Theme.of(context).colorScheme.error;
-    final last = entries.length - 1;
-    return ListView.builder(
-      key: const ValueKey('tasks-list'),
-      reverse: true,
-      padding: EdgeInsets.only(
-        top: 8,
-        bottom: AppNavigationBar.contentBottomPadding(context),
-      ),
-      itemCount: entries.length,
-      findChildIndexCallback: (key) {
-        if (key is! ValueKey<String>) return null;
-        final index = entries.indexWhere(
-          (entry) => entry is _TaskEntry && entry.item.uiKey == key.value,
-        );
-        return index < 0 ? null : last - index;
-      },
-      itemBuilder: (context, index) {
-        final entry = entries[last - index];
-        switch (entry) {
-          case _HeaderEntry(:final section):
-            return _SectionHeader(section: section);
-          case _TaskEntry(:final item, :final section):
-            return KeyedSubtree(
-              key: ValueKey(item.uiKey),
-              child: Padding(
-                padding: const EdgeInsets.only(
-                  left: AppNavigationBar.contentInset - 14,
-                  right: AppNavigationBar.contentInset,
-                ),
-                child: TaskListTile(
-                  item: item,
-                  checked: item.isCompleted,
-                  trailingLabel: _scheduleLabel(item, now),
-                  trailingColor: section == _TaskSection.overdue
-                      ? overdueColor
-                      : null,
-                  onTap: () => unawaited(_openTask(context, item)),
-                  onToggle: () => _toggleTask(item),
-                  onDelete: () => _deleteTask(item),
-                ),
+    Widget buildEntry(_Entry entry) {
+      switch (entry) {
+        case _HeaderEntry(:final section):
+          return _SectionHeader(section: section);
+        case _TaskEntry(:final item, :final section):
+          return KeyedSubtree(
+            key: ValueKey(item.uiKey),
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: AppNavigationBar.contentInset - 14,
+                right: AppNavigationBar.contentInset,
               ),
-            );
-          case _EmptyEntry():
-            return const _TasksEmptyMessage();
-          case _CompletedLinkEntry():
-            return const _CompletedTasksLink();
-        }
-      },
+              child: TaskListTile(
+                item: item,
+                checked: item.isCompleted,
+                trailingLabel: _scheduleLabel(item, now),
+                trailingColor: section == _TaskSection.overdue
+                    ? overdueColor
+                    : null,
+                onTap: () => unawaited(_openTask(context, item)),
+                onToggle: () => _toggleTask(item),
+                onDelete: () => _deleteTask(item),
+              ),
+            ),
+          );
+        case _EmptyEntry():
+          return const _TasksEmptyMessage();
+        case _CompletedLinkEntry():
+          return const _CompletedTasksLink();
+      }
+    }
+
+    final bottomPadding = AppNavigationBar.contentBottomPadding(context);
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        key: const ValueKey('tasks-list'),
+        padding: EdgeInsets.only(top: 8, bottom: bottomPadding),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: math.max(0, constraints.maxHeight - 8 - bottomPadding),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [for (final entry in entries) buildEntry(entry)],
+          ),
+        ),
+      ),
     );
   }
 

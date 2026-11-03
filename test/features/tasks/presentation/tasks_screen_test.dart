@@ -309,4 +309,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('/notes/note-1?blockId=block-1'), findsOneWidget);
   });
+
+  testWidgets('a short list sits just above the bottom bar', (tester) async {
+    final router = _router();
+    await tester.pumpWidget(_wrap(router));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final screenHeight = tester.getSize(find.byType(TasksScreen)).height;
+    // The rows end near the bar, not at the top of the screen.
+    expect(
+      tester.getTopLeft(find.text('standalone')).dy,
+      greaterThan(screenHeight / 2),
+    );
+  });
+
+  testWidgets('a long list opens at its top, overdue tasks first', (
+    tester,
+  ) async {
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final router = _router();
+    await tester.pumpWidget(
+      _wrap(
+        router,
+        standaloneItems: [
+          TaskListItem.task(_task('atrasada', dueDate: yesterday)),
+          for (var i = 0; i < 30; i++) TaskListItem.task(_task('tarefa $i')),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
+
+    expect(find.text('atrasada'), findsOneWidget);
+    final top = tester.getTopLeft(find.text('atrasada')).dy;
+    expect(top, lessThan(200));
+    // The end of the list is below the fold.
+    final screenHeight = tester.getSize(find.byType(TasksScreen)).height;
+    expect(
+      tester.getTopLeft(find.text('Concluídas')).dy,
+      greaterThan(screenHeight),
+    );
+  });
 }
