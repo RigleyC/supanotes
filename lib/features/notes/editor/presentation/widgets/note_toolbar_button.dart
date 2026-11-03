@@ -7,23 +7,36 @@ import 'package:supanotes/shared/widgets/app_press_scale.dart';
 
 enum ToolbarHaptic { none, controlTap, selectionChange }
 
+/// How an active button looks: a light tint, or filled with the accent.
+enum ToolbarActiveStyle { tint, filled }
+
 class ToolbarButton extends StatefulWidget {
   const ToolbarButton({
     required this.isActive,
     super.key,
     this.icon,
     this.svgAsset,
+    this.label,
+    this.labelStyle,
     this.semanticLabel,
     this.spacious = false,
+    this.activeStyle = ToolbarActiveStyle.tint,
     this.haptic = ToolbarHaptic.none,
     this.onPressed,
   }) : assert(
-         icon != null || svgAsset != null,
-         'Provide either an icon or an svgAsset.',
+         icon != null || svgAsset != null || label != null,
+         'Provide an icon, an svgAsset or a label.',
        );
 
   final IconData? icon;
   final String? svgAsset;
+
+  /// A short text glyph shown instead of an icon ("Aa", "B").
+  final String? label;
+
+  /// Weight, style or decoration of [label]; its color follows the state.
+  final TextStyle? labelStyle;
+  final ToolbarActiveStyle activeStyle;
   final String? semanticLabel;
   final bool spacious;
   final ToolbarHaptic haptic;
@@ -110,6 +123,9 @@ class _ToolbarButtonState extends State<ToolbarButton>
         builder: (_, _) => _ToolbarButtonVisual(
           icon: widget.icon,
           svgAsset: widget.svgAsset,
+          label: widget.label,
+          labelStyle: widget.labelStyle,
+          activeStyle: widget.activeStyle,
           semanticLabel: widget.semanticLabel,
           spacious: widget.spacious,
           onPressed: onPressed,
@@ -141,6 +157,9 @@ class _ToolbarButtonVisual extends StatelessWidget {
   const _ToolbarButtonVisual({
     required this.icon,
     required this.svgAsset,
+    required this.label,
+    required this.labelStyle,
+    required this.activeStyle,
     required this.semanticLabel,
     required this.spacious,
     required this.onPressed,
@@ -151,6 +170,9 @@ class _ToolbarButtonVisual extends StatelessWidget {
 
   final IconData? icon;
   final String? svgAsset;
+  final String? label;
+  final TextStyle? labelStyle;
+  final ToolbarActiveStyle activeStyle;
   final String? semanticLabel;
   final bool spacious;
   final VoidCallback? onPressed;
@@ -164,15 +186,24 @@ class _ToolbarButtonVisual extends StatelessWidget {
     final inactiveColor = onPressed == null
         ? colorScheme.onSurface.withValues(alpha: 0.38)
         : colorScheme.onSurface;
+    final filled = activeStyle == ToolbarActiveStyle.filled;
     final foreground = Color.lerp(
       inactiveColor,
-      colorScheme.primary,
+      filled ? colorScheme.onPrimary : colorScheme.primary,
       activeProgress,
     )!;
     final background = colorScheme.primary.withValues(
-      alpha: 0.12 * activeProgress,
+      alpha: (filled ? 1 : 0.12) * activeProgress,
     );
-    final buttonIcon = icon != null
+    final buttonIcon = label != null
+        ? Text(
+            label!,
+            textScaler: TextScaler.noScaling,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)
+                .merge(labelStyle)
+                .copyWith(color: foreground, decorationColor: foreground),
+          )
+        : icon != null
         ? Icon(icon, size: spacious ? 28 : 26, color: foreground)
         : SvgPicture.asset(
             svgAsset!,
@@ -199,7 +230,9 @@ class _ToolbarButtonVisual extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.xs),
             decoration: BoxDecoration(
               color: background,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              borderRadius: BorderRadius.circular(
+                spacious ? 22 : AppSpacing.radiusSm,
+              ),
             ),
             child: Transform.scale(
               scale: 0.96 + (0.04 * activeProgress),
@@ -207,7 +240,11 @@ class _ToolbarButtonVisual extends StatelessWidget {
                 opacity: 0.7 + (0.3 * iconProgress),
                 child: Transform.scale(
                   scale: 0.9 + (0.1 * iconProgress),
-                  child: buttonIcon,
+                  // The button's label names it; the glyph is decoration.
+                  child: ExcludeSemantics(
+                    excluding: semanticLabel != null,
+                    child: buttonIcon,
+                  ),
                 ),
               ),
             ),

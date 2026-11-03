@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
@@ -12,6 +13,9 @@ import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_style.dar
 import 'package:supanotes/features/notes/editor/application/note_editor_controller.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_delegate.dart';
 import 'package:supanotes/features/notes/editor/application/note_editor_session.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_format_panel.dart';
+import 'package:supanotes/features/notes/editor/presentation/widgets/note_link_picker_sheet.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_suggestion_overlay.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/shared/widgets/app_snackbar.dart';
@@ -48,28 +52,52 @@ class NoteEditor extends StatefulWidget {
   State<NoteEditor> createState() => _NoteEditorState();
 }
 
-class _NoteEditorState extends State<NoteEditor> {
+class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
   late EditorScrollController _scrollController;
+
+  /// The "Formatar" panel is showing in the keyboard's place.
+  bool _panelOpen = false;
+
+  /// Last height of the on-screen keyboard; the panel takes the same space so
+  /// the note does not move when they swap.
+  double _keyboardHeight = 291;
 
   NoteEditorController get _controller => widget.session.controller;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _attach();
+  }
+
+  @override
+  void didChangeMetrics() {
+    final view = View.of(context);
+    final inset = view.viewInsets.bottom / view.devicePixelRatio;
+    if (inset < 100) return;
+    _keyboardHeight = inset;
+    // The keyboard came back (the user tapped the text): it replaces the
+    // panel.
+    if (_panelOpen) setState(() => _panelOpen = false);
   }
 
   @override
   void didUpdateWidget(NoteEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session) {
+      oldWidget.session.controller.editorState.selectionNotifier.removeListener(
+        _onSelection,
+      );
       _scrollController.dispose();
+      _panelOpen = false;
       _attach();
     }
     _controller.hideCompleted = widget.hideCompleted;
   }
 
   void _attach() {
+    _controller.editorState.selectionNotifier.addListener(_onSelection);
     _controller.hideCompleted = widget.hideCompleted;
     _scrollController = EditorScrollController(
       editorState: _controller.editorState,
@@ -78,8 +106,44 @@ class _NoteEditorState extends State<NoteEditor> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.editorState.selectionNotifier.removeListener(_onSelection);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Editing ended (no caret): the panel goes away with the toolbar.
+  void _onSelection() {
+    if (_panelOpen && _controller.editorState.selection == null) {
+      setState(() => _panelOpen = false);
+    }
+  }
+
+  void _togglePanel() {
+    final open = !_panelOpen;
+    setState(() => _panelOpen = open);
+    unawaited(
+      SystemChannels.textInput.invokeMethod<void>(
+        open ? 'TextInput.hide' : 'TextInput.show',
+      ),
+    );
+  }
+
+  void _hideKeyboard() {
+    setState(() => _panelOpen = false);
+    _controller.editorState.selection = null;
+    _controller.focusNode.unfocus();
+    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
+  }
+
+  Future<void> _linkNote() async {
+    final editorState = _controller.editorState;
+    final selection = editorState.selection;
+    if (selection == null || selection.isCollapsed) return;
+    final note = await pickNoteToLink(context, currentNoteId: widget.noteId);
+    if (note == null || !mounted) return;
+    editorState.selection = selection;
+    await editorState.linkSelectionToNote(note.id);
   }
 
   Future<void> _attachFile({bool imageOnly = false}) async {
@@ -189,14 +253,24 @@ class _NoteEditorState extends State<NoteEditor> {
           // move: the toolbar listens to the selection itself.
           ValueListenableBuilder<Selection?>(
             valueListenable: editorState.selectionNotifier,
-            builder: (context, selection, toolbar) =>
-                selection == null ? const SizedBox.shrink() : toolbar!,
-            child: NoteToolbar(
-              editorState: editorState,
-              onAttachFile: () => _attachFile(),
-              onAttachImage: () => _attachFile(imageOnly: true),
-            ),
+            builder: (context, selection, _) => selection == null
+                ? const SizedBox.shrink()
+                : NoteToolbar(
+                    editorState: editorState,
+                    panelOpen: _panelOpen,
+                    onTogglePanel: _togglePanel,
+                    onAttachFile: () => _attachFile(),
+                    onAttachImage: () => _attachFile(imageOnly: true),
+                    onHideKeyboard: _hideKeyboard,
+                    onLinkNote: () => unawaited(_linkNote()),
+                  ),
           ),
+          if (_panelOpen)
+            NoteFormatPanel(
+              editorState: editorState,
+              height: _keyboardHeight,
+              onClose: _togglePanel,
+            ),
         ],
       ),
     );
