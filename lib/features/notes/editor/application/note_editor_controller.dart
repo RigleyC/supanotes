@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
@@ -6,11 +7,12 @@ import 'package:flutter/widgets.dart';
 import 'package:mime/mime.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_upload.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
-import 'package:supanotes/features/notes/editor/appflowy/note_editor_state.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_block_visibility.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_task_commands.dart';
 import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:supanotes/features/notes/editor/document/note_document_constants.dart';
+import 'package:supanotes/features/notes/editor/document/note_task_editor_commands.dart';
 import 'package:supanotes/features/tasks/domain/task_completion_command.dart';
 import 'package:supanotes/features/tasks/presentation/controllers/task_metadata_draft.dart';
 import 'package:uuid/uuid.dart';
@@ -23,7 +25,7 @@ class NoteEditorController {
     required String noteId,
     List<NoteBlock>? blocks,
   }) : _noteId = noteId,
-       editorState = NoteEditorState(
+       editorState = EditorState(
          document: const NoteAppFlowyCodec().toDocument(
            blocks == null || blocks.isEmpty
                ? [NoteBlock(id: initialNoteBlockId, type: 'paragraph')]
@@ -35,7 +37,7 @@ class NoteEditorController {
   }
 
   final String userId;
-  final NoteEditorState editorState;
+  final EditorState editorState;
   final FocusNode focusNode = FocusNode(debugLabel: 'note editor');
 
   /// The user is editing: the editor has focus and shows a caret or a
@@ -66,23 +68,52 @@ class NoteEditorController {
     _assertCanMutate = assertCanMutate;
   }
 
-  /// Whether completed tasks are hidden (and therefore not editable).
-  set hideCompleted(bool value) => editorState.hideCompleted = value;
+  NoteBlockVisibility? _visibility;
+  bool _hideCompleted = false;
+
+  /// Connects the session that knows the whole note, including the blocks
+  /// the editor leaves out.
+  void attachVisibility(NoteBlockVisibility visibility) {
+    _visibility = visibility;
+    if (_hideCompleted) unawaited(visibility.hideBlocks(isCompletedTaskBlock));
+  }
+
+  /// Leaves completed tasks out of the editor (they stay in the note).
+  set hideCompleted(bool value) {
+    if (_hideCompleted == value) return;
+    _hideCompleted = value;
+    unawaited(_visibility?.hideBlocks(value ? isCompletedTaskBlock : null));
+  }
+
+  /// Hides tasks completed since the last check, once their exit animation
+  /// has played.
+  Future<void> refreshHidden() async => _visibility?.refreshHidden();
+
+  NoteBlock? _hiddenTask(String blockId) {
+    final block = _visibility?.hiddenBlock(blockId);
+    return block?.type == 'task' ? block : null;
+  }
 
   /// The task block [blockId], as the metadata sheet edits it.
   TaskMetadataDraft? taskMetadata(String blockId) {
     final node = editorState.nodeForBlock(blockId);
-    if (node?.type != TodoListBlockKeys.type) return null;
-    return TaskMetadataDraft.fromMetadata(
-      Map<String, dynamic>.from(
-        node!.attributes[NoteNodeKeys.metadata] as Map? ?? const {},
-      ),
-    );
+    if (node?.type == TodoListBlockKeys.type) {
+      return TaskMetadataDraft.fromMetadata(
+        Map<String, dynamic>.from(
+          node!.attributes[NoteNodeKeys.metadata] as Map? ?? const {},
+        ),
+      );
+    }
+    final hidden = _hiddenTask(blockId);
+    return hidden == null
+        ? null
+        : TaskMetadataDraft.fromMetadata(taskStateOfBlock(hidden).metadata);
   }
 
-  /// Whether the note has a task block [blockId].
+  /// Whether the note has a task block [blockId] (shown or hidden).
   bool hasTask(String blockId) =>
-      editorState.nodeForBlock(blockId)?.type == TodoListBlockKeys.type;
+      editorState.nodeForBlock(blockId)?.type == TodoListBlockKeys.type ||
+      _hiddenTask(blockId) != null;
 
   /// Shows the caret at the start of block [blockId] without starting to
   /// edit (no focus, no keyboard), e.g. when a task is opened from a link.
@@ -104,6 +135,17 @@ class NoteEditorController {
     DateTime? scheduledAt,
   }) {
     _assertCanMutate?.call();
+    final hidden = _hiddenTask(blockId);
+    if (hidden != null) {
+      final (state, result) = const NoteTaskEditorCommands().completeState(
+        taskStateOfBlock(hidden),
+        now: now,
+        scheduledAt: scheduledAt,
+      );
+      return _visibility!
+          .replaceHiddenBlock(blockId, withTaskState(hidden, state))
+          .then((_) => result);
+    }
     return editorState.completeNoteTask(
       blockId,
       now: now,
@@ -117,6 +159,18 @@ class NoteEditorController {
     DateTime? scheduledAt,
   }) {
     _assertCanMutate?.call();
+    final hidden = _hiddenTask(blockId);
+    if (hidden != null) {
+      final state = const NoteTaskEditorCommands().reopenState(
+        taskStateOfBlock(hidden),
+        previousDue: previousDue,
+        scheduledAt: scheduledAt,
+      );
+      return _visibility!.replaceHiddenBlock(
+        blockId,
+        withTaskState(hidden, state),
+      );
+    }
     return editorState.reopenNoteTask(
       blockId,
       previousDue: previousDue,
@@ -127,6 +181,9 @@ class NoteEditorController {
   /// Deletes a task block, keeping one editable block in the note.
   Future<void> deleteTaskInEditor(String blockId) {
     _assertCanMutate?.call();
+    if (_hiddenTask(blockId) != null) {
+      return _visibility!.replaceHiddenBlock(blockId, null);
+    }
     final node = editorState.nodeForBlock(blockId);
     if (node == null || node.type != TodoListBlockKeys.type) {
       return Future.value();
@@ -154,6 +211,24 @@ class NoteEditorController {
     bool clearReminder = false,
   }) {
     _assertCanMutate?.call();
+    final hidden = _hiddenTask(blockId);
+    if (hidden != null) {
+      final state = const NoteTaskEditorCommands().updateMetadataState(
+        taskStateOfBlock(hidden),
+        dueDate: dueDate,
+        recurrence: recurrence,
+        clearDueDate: clearDueDate,
+        clearRecurrence: clearRecurrence,
+        hasTime: hasTime,
+        reminder: reminder,
+        clearReminder: clearReminder,
+      );
+      if (state == null) return Future.value();
+      return _visibility!.replaceHiddenBlock(
+        blockId,
+        withTaskState(hidden, state),
+      );
+    }
     return editorState.updateNoteTaskMetadata(
       blockId,
       dueDate: dueDate,

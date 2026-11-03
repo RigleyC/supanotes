@@ -23,6 +23,7 @@ final class NoteTaskActions {
     this.onComplete,
     this.onReopen,
     this.onOpenDetails,
+    this.onHidden,
   });
 
   /// Completes the current occurrence of task [blockId].
@@ -33,6 +34,9 @@ final class NoteTaskActions {
 
   /// Opens the task's date, recurrence and reminder sheet.
   final void Function(String blockId)? onOpenDetails;
+
+  /// A completed task finished its exit animation and can leave the editor.
+  final void Function(String blockId)? onHidden;
 }
 
 /// Whether a task block currently counts as done: for a recurring task, its
@@ -381,9 +385,11 @@ class _NoteTaskBlockState extends State<NoteTaskBlockComponent>
     return TaskExitAnimator(
       hideCompleted: widget.hideCompleted,
       isComplete: _isComplete,
-      onAnimationComplete: _animatingOut
-          ? () => setState(() => _animatingOut = false)
-          : null,
+      // The animation completes only when the task is being hidden.
+      onAnimationComplete: () {
+        if (_animatingOut) setState(() => _animatingOut = false);
+        widget.actions.onHidden?.call(_blockId);
+      },
       child: ExcludeSemantics(
         excluding: hidden,
         child: IgnorePointer(ignoring: hidden, child: child),

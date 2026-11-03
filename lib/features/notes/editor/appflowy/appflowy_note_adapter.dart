@@ -7,6 +7,7 @@ import 'package:dart_quill_delta/dart_quill_delta.dart' as quill;
 import 'package:supanotes/core/database/database.dart';
 import 'package:supanotes/core/sync/note_operations_sync_service.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
+import 'package:supanotes/features/notes/editor/appflowy/note_block_visibility.dart';
 import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
 import 'package:supanotes/features/notes/editor/sync/note_document_adapter.dart';
 import 'package:supanotes/features/notes/editor/sync/note_operation_contract.dart';
@@ -21,7 +22,13 @@ import 'package:uuid/uuid.dart';
 /// the mirror into REST/OT operations and persists them to the outbox.
 /// Server results are applied back as remote transactions, which AppFlowy
 /// neither records in undo history nor reports as local edits.
-final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
+///
+/// Completed tasks the user hid are not in the editor at all: the mirror is
+/// the whole note, the editor shows its visible blocks, and every local edit
+/// is merged back with the hidden blocks in their places. Nothing the user
+/// does in the editor can reach a block they cannot see.
+final class AppFlowyNoteAdapter
+    implements NoteDocumentAdapter, NoteBlockVisibility {
   AppFlowyNoteAdapter({
     required this.editorState,
     required NoteOperationsSyncService syncService,
@@ -50,7 +57,19 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
   @override
   void Function(List<OperationRequest> ops)? onLocalOperations;
 
+  /// The whole note, hidden blocks included.
   List<NoteBlock> _mirror = const [];
+
+  /// Decides which blocks the editor leaves out; null shows everything.
+  bool Function(NoteBlock block)? _hides;
+
+  /// Blocks of [_mirror] the editor does not show.
+  Set<String> _hiddenIds = const {};
+
+  /// For blocks shown less indented than they are (their parent is hidden),
+  /// how many levels the editor dropped.
+  Map<String, int> _indentOffsets = const {};
+  bool _started = false;
   final List<OperationRequest> _pendingOps = [];
   StreamSubscription<EditorTransactionValue>? _transactions;
   Timer? _flushTimer;
@@ -81,11 +100,16 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
       final snapshot = confirmed == null
           ? const <String, dynamic>{'blocks': <dynamic>[]}
           : jsonDecode(confirmed.documentJson) as Map<String, dynamic>;
-      await _replaceDocument(
-        projectNoteBlocks(snapshot: snapshot, pendingOps: pending),
+      final projected = projectNoteBlocks(
+        snapshot: snapshot,
+        pendingOps: pending,
       );
+      await _replaceDocument(projected);
+      _mirror = _readWhole(source: projected);
+    } else {
+      _mirror = _readWhole(source: const []);
     }
-    _mirror = _readDocument();
+    _started = true;
     if (_disposed) return;
     await _syncService.storeMaterializedDocument(
       noteId: _noteId,
@@ -100,7 +124,7 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
     _captureLocalOperations = captureLocalOperations;
     // Read-only sessions still receive remote changes; keep the mirror in
     // step with whatever the editor shows when capture resumes.
-    if (captureLocalOperations) _mirror = _readDocument();
+    if (captureLocalOperations) _mirror = _readWhole(source: _mirror);
   }
 
   void _onTransaction(EditorTransactionValue value) {
@@ -114,7 +138,10 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
     final operations = diffNoteBlocks(before, after);
     if (operations.isEmpty) return;
     _stampAssignedIds();
+    _record(operations);
+  }
 
+  void _record(List<NoteBlockOperation> operations) {
     final requests = <OperationRequest>[];
     for (final operation in operations) {
       final error = NoteOperationContract.validate(
@@ -147,10 +174,10 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
     final touched = <Node>{};
     for (final operation in transaction.operations) {
       if (operation is InsertOperation || operation is DeleteOperation) {
-        return _readDocument();
+        return _readWhole(source: before);
       }
       final node = editorState.getNodeAtPath(operation.path);
-      if (node == null) return _readDocument();
+      if (node == null) return _readWhole(source: before);
       touched.add(node);
     }
     if (touched.isEmpty) return before;
@@ -162,20 +189,56 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
     for (final node in touched) {
       final id = node.attributes[NoteNodeKeys.blockId] as String?;
       final index = id == null ? null : indexById[id];
-      if (index == null) return _readDocument();
-      updated[index] = _codec.toBlock(
-        node,
-        id: id!,
-        depth: node.path.length - 1,
-      );
+      if (index == null) return _readWhole(source: before);
+      updated[index] = _fromNode(node, id!);
     }
     return updated;
   }
 
-  List<NoteBlock> _readDocument() => _codec.toBlocks(
+  /// The blocks exactly as the editor shows them.
+  List<NoteBlock> _readShown() => _codec.toBlocks(
     editorState.document,
     idFor: (node) => _assignedIds[node] ??= _uuid.v4(),
   );
+
+  /// The editor's blocks with their real indentation, plus the hidden blocks
+  /// of [source] put back where they were.
+  List<NoteBlock> _readWhole({required List<NoteBlock> source}) =>
+      _withHidden(_readShown().map(_withRealIndent).toList(), source);
+
+  NoteBlock _fromNode(Node node, String id) => _withRealIndent(
+    _codec.toBlock(node, id: id, depth: node.path.length - 1),
+  );
+
+  NoteBlock _withRealIndent(NoteBlock block) {
+    final offset = _indentOffsets[block.id];
+    if (offset == null) return block;
+    return block.copyWith(
+      metadata: {...block.metadata, 'indent': block.indent + offset},
+    );
+  }
+
+  /// Puts each hidden block of [source] after the visible block it followed
+  /// (or the nearest earlier one that still exists).
+  List<NoteBlock> _withHidden(List<NoteBlock> visible, List<NoteBlock> source) {
+    if (_hiddenIds.isEmpty) return visible;
+    final visibleIds = {for (final block in visible) block.id};
+    final following = <String?, List<NoteBlock>>{};
+    String? anchor;
+    for (final block in source) {
+      if (_hiddenIds.contains(block.id)) {
+        if (!visibleIds.contains(block.id)) {
+          (following[anchor] ??= []).add(block);
+        }
+      } else if (visibleIds.contains(block.id)) {
+        anchor = block.id;
+      }
+    }
+    return [
+      ...?following[null],
+      for (final block in visible) ...[block, ...?following[block.id]],
+    ];
+  }
 
   /// Writes ids assigned during capture into their nodes, outside the
   /// transaction being observed and without recording undo history.
@@ -319,7 +382,7 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
       pendingOps: pendingOps,
     );
     await _replaceDocument(target);
-    _mirror = _readDocument();
+    _mirror = _readWhole(source: target);
     await _syncService.storeMaterializedDocument(
       noteId: _noteId,
       documentJson: _encode(_mirror),
@@ -329,8 +392,27 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
   /// Makes the editor show [target]. When only block contents changed, the
   /// affected nodes are updated in place so the caret, focus and widgets of
   /// untouched blocks survive; any change in shape rebuilds the tree once.
-  Future<void> _replaceDocument(List<NoteBlock> target) async {
-    final current = _readDocument();
+  Future<void> _replaceDocument(List<NoteBlock> whole) async {
+    final hides = _hides;
+    final visible = hides == null
+        ? whole
+        : whole.where((block) => !hides(block)).toList();
+    _hiddenIds = {
+      for (final block in whole)
+        if (hides != null && hides(block)) block.id,
+    };
+    // AppFlowy cannot show a block more indented than the one above it; when
+    // a parent is hidden its children move up, and the difference is kept so
+    // reading them back does not change their real indentation.
+    final next = _codec.toDocument(visible);
+    final target = _codec.toBlocks(next);
+    _indentOffsets = {
+      for (var i = 0; i < target.length; i++)
+        if (visible[i].indent != target[i].indent)
+          target[i].id: visible[i].indent - target[i].indent,
+    };
+
+    final current = _readShown();
     if (_sameShape(current, target)) {
       final transaction = editorState.transaction;
       Selection? selection = editorState.selection;
@@ -368,7 +450,6 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
                   ?.attributes[NoteNodeKeys.blockId]
               as String?;
     final caretOffset = selection?.end.offset ?? 0;
-    final next = _codec.toDocument(target);
     final nodes = next.root.children.map((node) => node.deepCopy()).toList();
     // Insert before deleting: a transaction rebases later operations on
     // earlier ones, so deleting first would shift the insert path to -1 and
@@ -381,6 +462,11 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
       isRemote: true,
       skipEditableCheck: true,
     );
+    // Undo steps address blocks by position; after the blocks were replaced
+    // they would apply to the wrong ones.
+    editorState.undoManager
+      ..undoStack.clear()
+      ..redoStack.clear();
     final node = caretBlock == null ? null : _nodeForBlock(caretBlock);
     _restoreSelection(
       node == null
@@ -471,6 +557,44 @@ final class AppFlowyNoteAdapter implements NoteDocumentAdapter {
           status: '',
         ),
     ];
+  }
+
+  @override
+  Future<void> hideBlocks(bool Function(NoteBlock block)? hides) async {
+    _hides = hides;
+    await refreshHidden();
+  }
+
+  @override
+  Future<void> refreshHidden() async {
+    if (_disposed || !_started) return;
+    // Pending edits are already in the mirror; it is the whole note.
+    await _replaceDocument(_mirror);
+    _mirror = _readWhole(source: _mirror);
+  }
+
+  @override
+  NoteBlock? hiddenBlock(String blockId) {
+    if (!_hiddenIds.contains(blockId)) return null;
+    for (final block in _mirror) {
+      if (block.id == blockId) return block;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> replaceHiddenBlock(String blockId, NoteBlock? block) async {
+    if (_disposed || !_hiddenIds.contains(blockId)) return;
+    final before = _mirror;
+    final after = [
+      for (final current in before)
+        if (current.id != blockId) current else if (block != null) block,
+    ];
+    _mirror = after;
+    final operations = diffNoteBlocks(before, after);
+    if (operations.isNotEmpty && _captureLocalOperations) _record(operations);
+    // A reopened task becomes visible again.
+    await refreshHidden();
   }
 
   String _encode(List<NoteBlock> blocks) =>
