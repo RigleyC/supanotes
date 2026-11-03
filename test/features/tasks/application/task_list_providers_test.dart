@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/core/auth/current_user.dart';
@@ -631,7 +632,7 @@ void main() {
   );
 
   test(
-    'surfaces malformed effective note documents as a provider error',
+    'leaves out a note with an unreadable document and lists the rest',
     () async {
       final database = AppDatabase.test();
       final createdAt = DateTime.utc(2026, 9, 15);
@@ -654,6 +655,21 @@ void main() {
           materializedDocumentJson: const Value('{malformed'),
         ),
       );
+      await database
+          .into(database.tasks)
+          .insert(
+            TasksCompanion.insert(
+              id: 'still-listed',
+              ownerUserId: 'user-1',
+              title: 'Ainda aparece',
+              createdAt: createdAt,
+              updatedAt: createdAt,
+            ),
+          );
+      final reported = <FlutterErrorDetails>[];
+      final previousOnError = FlutterError.onError;
+      FlutterError.onError = reported.add;
+      addTearDown(() => FlutterError.onError = previousOnError);
       final container = ProviderContainer(
         overrides: [
           appDatabaseProvider.overrideWithValue(database),
@@ -661,10 +677,11 @@ void main() {
         ],
       );
       final provider = taskListProvider(includeNoteTasks: true);
-      final providerError = Completer<Object>();
+      final firstData = Completer<List<TaskListItem>>();
       final subscription = container.listen(provider, (_, next) {
-        if (next.hasError && !providerError.isCompleted) {
-          providerError.complete(next.error!);
+        if (next.hasError) fail('one bad note must not fail the list');
+        if (next.hasValue && !firstData.isCompleted) {
+          firstData.complete(next.requireValue);
         }
       });
       addTearDown(() {
@@ -673,10 +690,9 @@ void main() {
       });
       addTearDown(database.close);
 
-      final error = await providerError.future.timeout(
-        const Duration(seconds: 1),
-      );
-      expect(error, isA<FormatException>());
+      final items = await firstData.future.timeout(const Duration(seconds: 1));
+      expect(items.map((item) => item.task?.title), ['Ainda aparece']);
+      expect(reported.single.exception, isA<FormatException>());
     },
   );
 }

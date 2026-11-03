@@ -155,7 +155,8 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final accent = Theme.of(context).colorScheme.primary;
+    // Same ink as the home screens: near-black, inverted in dark mode.
+    final accent = Theme.of(context).colorScheme.onSurface;
     return AppBar(
       automaticallyImplyLeading: false,
       backgroundColor: Colors.transparent,
@@ -341,6 +342,8 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
             message: 'Remover foco',
             child: FilledButton(
               style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.onSurface,
+                foregroundColor: Theme.of(context).colorScheme.surface,
                 minimumSize: const Size(56, 34),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 shape: const StadiumBorder(),

@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart';
 import 'package:supanotes/core/database/daos/note_operations_dao.dart';
 import 'package:supanotes/core/database/daos/notes_dao.dart';
 import 'package:supanotes/core/database/database.dart';
@@ -40,8 +40,8 @@ Stream<List<VisibleNoteTasks>> watchVisibleNoteTasks(
 
 /// Groups projected rows by note and interprets each task's metadata.
 ///
-/// Throws [FormatException] when a visible note's document could not be read,
-/// so the failure reaches the UI instead of silently hiding that note.
+/// A note whose document could not be read is left out (and reported once),
+/// so one damaged note never hides every other task or stops reminders.
 List<VisibleNoteTasks> groupVisibleNoteTasks(List<VisibleNoteTaskRow> rows) {
   final result = <VisibleNoteTasks>[];
   String? currentNoteId;
@@ -49,9 +49,8 @@ List<VisibleNoteTasks> groupVisibleNoteTasks(List<VisibleNoteTaskRow> rows) {
   for (final row in rows) {
     final invalidReason = row.invalidReason;
     if (invalidReason != null) {
-      throw FormatException(
-        'Note ${row.noteId} has an unreadable document: $invalidReason',
-      );
+      _reportUnreadable(row.noteId, invalidReason);
+      continue;
     }
     if (row.noteId != currentNoteId) {
       currentNoteId = row.noteId;
@@ -74,4 +73,20 @@ List<VisibleNoteTasks> groupVisibleNoteTasks(List<VisibleNoteTaskRow> rows) {
     );
   }
   return result;
+}
+
+final _reportedUnreadable = <String>{};
+
+void _reportUnreadable(String noteId, String reason) {
+  if (!_reportedUnreadable.add('$noteId:$reason')) return;
+  FlutterError.reportError(
+    FlutterErrorDetails(
+      exception: FormatException(
+        'Note $noteId has an unreadable document: $reason',
+      ),
+      library: 'supanotes tasks',
+      context: ErrorDescription('while listing the tasks of every note'),
+      silent: true,
+    ),
+  );
 }
