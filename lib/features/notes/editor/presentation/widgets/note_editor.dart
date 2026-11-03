@@ -34,6 +34,7 @@ class NoteEditor extends StatefulWidget {
     this.attachmentDelivery,
     this.requestInitialFocus = false,
     this.isReadOnly = false,
+    this.header,
   });
 
   final String noteId;
@@ -48,6 +49,9 @@ class NoteEditor extends StatefulWidget {
   /// Write access is owned by the screen, which already watches the session
   /// capability stream. The editor only renders the resulting mode.
   final bool isReadOnly;
+
+  /// Shown above the first block, scrolling with the note.
+  final Widget? header;
 
   @override
   State<NoteEditor> createState() => _NoteEditorState();
@@ -178,6 +182,7 @@ class _NoteEditorState extends State<NoteEditor> with WidgetsBindingObserver {
       collapseImages: widget.collapseImages,
       attachmentDelivery: widget.attachmentDelivery,
       scrollController: _scrollController,
+      header: widget.header,
       focusNode: _controller.focusNode,
       autoFocus: widget.requestInitialFocus && !widget.isReadOnly,
       padding: const EdgeInsets.symmetric(

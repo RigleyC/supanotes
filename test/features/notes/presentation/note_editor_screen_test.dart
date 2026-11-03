@@ -2,6 +2,7 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supanotes/core/auth/current_user.dart';
 import 'package:supanotes/features/notes/catalog/application/notes_providers.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
@@ -45,6 +46,8 @@ class _ReadySyncHandle implements NoteEditorSyncHandle {
 }
 
 void main() {
+  setUpAll(() => initializeDateFormatting('pt_BR'));
+
   late NoteEditorController controller;
   late NoteEditorSession session;
 
@@ -169,6 +172,16 @@ void main() {
     await _tapBelowText(tester);
     await tester.pumpAndSettle();
     expect(controller.editorState.selection, isNotNull);
+  });
+
+  testWidgets('shows when the note was last edited above it', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    // updatedAt is 2026-01-01T00:00Z, shown in local time (São Paulo).
+    expect(find.text('31 de dezembro de 2025 às 21:00'), findsOneWidget);
+    expect(find.text('Notas'), findsOneWidget);
   });
 
   testWidgets('selects an existing task block from the route state', (
