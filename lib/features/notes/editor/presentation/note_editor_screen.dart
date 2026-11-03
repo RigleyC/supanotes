@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:supanotes/core/router/app_routes.dart';
 import 'package:supanotes/features/notes/attachments/data/attachments_repository.dart';
 import 'package:supanotes/features/notes/attachments/domain/attachment_delivery.dart';
@@ -25,7 +26,6 @@ import 'package:supanotes/shared/widgets/app_bottom_sheet.dart';
 import 'package:supanotes/shared/widgets/app_button.dart';
 import 'package:supanotes/shared/widgets/app_error_view.dart';
 import 'package:supanotes/shared/theme/app_spacing.dart';
-import 'package:supanotes/shared/widgets/app_platform_icon_button.dart';
 import 'package:supanotes/shared/widgets/app_popup_menu.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -155,13 +155,25 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final accent = Theme.of(context).colorScheme.primary;
     return AppBar(
       automaticallyImplyLeading: false,
       backgroundColor: Colors.transparent,
       elevation: 0,
-      actionsPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
+      actionsPadding: const EdgeInsets.only(right: AppSpacing.sm),
+      leadingWidth: 112,
+      leading: TextButton.icon(
+        style: TextButton.styleFrom(
+          foregroundColor: accent,
+          padding: const EdgeInsets.only(left: 4, right: 8),
+          minimumSize: const Size(44, 44),
+          textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+            fontSize: 17,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        icon: const Icon(Icons.chevron_left, size: 30),
+        label: const Text('Notas'),
         onPressed: () {
           if (context.canPop()) {
             context.pop();
@@ -181,10 +193,20 @@ class _NoteEditorAppBar extends ConsumerWidget implements PreferredSizeWidget {
         data: (chrome) => chrome == null || isReadOnly
             ? const <Widget>[]
             : [
-                _NoteEditorMenuButton(noteId: noteId, chrome: chrome),
-                const SizedBox(width: AppSpacing.xs),
                 _NoteEditorPreferenceStatus(noteId: noteId),
-                const SizedBox(width: AppSpacing.xs),
+                if (chrome.isOwner)
+                  IconButton(
+                    tooltip: NoteStrings.shareLabel,
+                    color: accent,
+                    icon: const Icon(Icons.ios_share),
+                    onPressed: () => unawaited(
+                      showAppBottomSheet<void>(
+                        context: context,
+                        builder: (_) => ShareNoteSheet(noteId: noteId),
+                      ),
+                    ),
+                  ),
+                _NoteEditorMenuButton(noteId: noteId, chrome: chrome),
                 _NoteEditorKeyboardButton(sessionAsync: sessionAsync),
               ],
         loading: () => const <Widget>[],
@@ -221,11 +243,6 @@ class _NoteEditorMenuButton extends ConsumerWidget {
       notePreferenceMutationControllerProvider(noteId).notifier,
     );
     switch (value) {
-      case 'share':
-        await showAppBottomSheet<void>(
-          context: context,
-          builder: (_) => ShareNoteSheet(noteId: noteId),
-        );
       case 'hide_completed':
         await mutationController.setHideCompleted(
           current: note,
@@ -242,13 +259,6 @@ class _NoteEditorMenuButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = [
-      if (chrome.isOwner)
-        (
-          value: 'share',
-          label: NoteStrings.shareLabel,
-          symbol: 'square.and.arrow.up',
-          icon: Icons.share_outlined,
-        ),
       (
         value: 'hide_completed',
         label: chrome.hideCompleted
@@ -270,7 +280,7 @@ class _NoteEditorMenuButton extends ConsumerWidget {
         ),
     ];
     return AppPopupMenu<String>(
-      icon: Icons.more_vert,
+      icon: Icons.more_horiz,
       onSelected: (value) => unawaited(_handleSelection(context, ref, value)),
       items: [
         for (final entry in entries)
@@ -325,18 +335,30 @@ class _NoteEditorKeyboardButton extends StatelessWidget {
         valueListenable: session.controller.editing,
         builder: (context, editing, button) =>
             editing ? button! : const SizedBox.shrink(),
-        child: Tooltip(
-          message: 'Remover foco',
-          child: AppPlatformIconButton(
-            icon: Icons.check,
-            size: 44,
-            onPressed: () {
-              session.controller.editorState.selection = null;
-              session.controller.focusNode.unfocus();
-              unawaited(
-                SystemChannels.textInput.invokeMethod<void>('TextInput.hide'),
-              );
-            },
+        child: Padding(
+          padding: const EdgeInsets.only(left: AppSpacing.xs),
+          child: Tooltip(
+            message: 'Remover foco',
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(56, 34),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: const StadiumBorder(),
+                textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                tapTargetSize: MaterialTapTargetSize.padded,
+              ),
+              onPressed: () {
+                session.controller.editorState.selection = null;
+                session.controller.focusNode.unfocus();
+                unawaited(
+                  SystemChannels.textInput.invokeMethod<void>('TextInput.hide'),
+                );
+              },
+              child: const Text('OK'),
+            ),
           ),
         ),
       ),
@@ -436,6 +458,7 @@ class _NoteEditorWithSessionState extends State<_NoteEditorWithSession> {
       attachmentDelivery: widget.attachmentDelivery,
       attachmentUploader: widget.attachmentUploader,
       delegate: taskDelegate.create(),
+      header: _NoteDateHeader(noteId: widget.noteId),
     );
     if (!_targetMissing) return editor;
 
@@ -538,5 +561,35 @@ class _NoteEditorTaskDelegate {
   Future<void> _onTaskReopen(String taskId, DateTime? scheduledAt) async {
     final controller = readSession().value?.controller;
     await controller?.reopenTaskInEditor(taskId, scheduledAt: scheduledAt);
+  }
+}
+
+/// "2 de novembro de 2026 às 15:42" above the note, as in the prototype.
+///
+/// Watches only the note's edit time, so saving the note rebuilds this line
+/// and not the editor.
+class _NoteDateHeader extends ConsumerWidget {
+  const _NoteDateHeader({required this.noteId});
+
+  final String noteId;
+
+  static final _format = DateFormat("d 'de' MMMM 'de' y 'às' HH:mm", 'pt_BR');
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final updatedAt = ref.watch(
+      noteProvider(noteId).select((note) => note.value?.updatedAt),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 14),
+      child: Text(
+        updatedAt == null ? '' : _format.format(updatedAt.toLocal()),
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontSize: 12,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 }

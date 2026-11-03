@@ -15,7 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 /// look the same after the switch.
 abstract final class NoteEditorMetrics {
   static const bodySize = 17.0;
-  static const h1Size = 32.0;
+  static const h1Size = 30.0;
   static const h2Size = 26.0;
   static const h3Size = 22.0;
   static const quoteSize = 20.0;
@@ -177,14 +177,15 @@ Map<String, BlockComponentBuilder> noteBlockBuilders(
   TextStyle heading(double size) => body.copyWith(
     fontSize: size,
     fontWeight: FontWeight.bold,
-    height: 1.25,
+    height: size >= NoteEditorMetrics.h1Size ? 1.15 : 1.25,
+    letterSpacing: size >= NoteEditorMetrics.h1Size ? -0.2 : null,
   );
 
   return {
     PageBlockKeys.type: PageBlockComponentBuilder(),
     ParagraphBlockKeys.type: ParagraphBlockComponentBuilder(
       configuration: config(
-        padding: (node) => EdgeInsets.only(top: isFirst(node) ? 0 : 16),
+        padding: (node) => EdgeInsets.only(top: isFirst(node) ? 0 : 10),
         // Hint only on an empty note, like the previous editor.
         placeholderText: (node) =>
             node.path.first == 0 && node.next == null ? placeholder : ' ',
@@ -234,11 +235,11 @@ Map<String, BlockComponentBuilder> noteBlockBuilders(
       configuration: config(padding: listPadding),
       iconBuilder: (context, node) => _ListMarker(
         child: Container(
-          width: 4,
-          height: 4,
+          width: 6,
+          height: 6,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: scheme.onSurface,
+            color: scheme.primary,
           ),
         ),
       ),
@@ -254,7 +255,7 @@ Map<String, BlockComponentBuilder> noteBlockBuilders(
       actions: taskActions,
       readOnly: readOnly,
       hideCompleted: hideCompleted,
-      configuration: config(padding: (_) => const EdgeInsets.only(top: 14)),
+      configuration: config(padding: (_) => const EdgeInsets.only(top: 6)),
     ),
     DividerBlockKeys.type: noteDividerBlockBuilder()
       ..configuration = BlockComponentConfiguration(
@@ -296,7 +297,7 @@ class _ListMarker extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     constraints: const BoxConstraints(minWidth: 18),
     height: NoteEditorMetrics.bodySize * NoteEditorMetrics.lineHeight,
-    margin: const EdgeInsetsDirectional.only(end: NoteEditorMetrics.markerGap),
+    margin: const EdgeInsetsDirectional.only(end: 12),
     alignment: alignment,
     child: child,
   );
