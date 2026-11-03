@@ -91,6 +91,12 @@ void main() {
         overrides: [
           currentUserIdProvider.overrideWithValue('user-1'),
           noteProvider('note-1').overrideWith((ref) => Stream.value(note)),
+          activeNotesProvider.overrideWith(
+            (ref) => Stream.value([
+              note,
+              note.copyWith(id: 'note-2', title: 'Mercado'),
+            ]),
+          ),
           noteEditorSessionProvider(
             'note-1',
           ).overrideWith((ref) async => session),
@@ -187,4 +193,62 @@ void main() {
       expect(find.byType(AppFlowyEditor), findsOneWidget);
     },
   );
+
+  testWidgets('Aa swaps the keyboard for the format panel and back', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Formatar'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('note-format-panel')), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Título'));
+    await tester.pumpAndSettle();
+    expect(
+      controller.editorState.getNodeAtPath([0])!.type,
+      HeadingBlockKeys.type,
+    );
+
+    await tester.tap(find.bySemanticsLabel('Fechar formatação'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('note-format-panel')), findsNothing);
+    // Still editing: the caret stays.
+    expect(controller.editorState.selection, isNotNull);
+  });
+
+  testWidgets('hiding the keyboard ends editing', (tester) async {
+    await pumpScreen(tester);
+    await tester.tap(find.byKey(const ValueKey('note-editor-end')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Esconder teclado'));
+    await tester.pumpAndSettle();
+
+    expect(controller.editorState.selection, isNull);
+    expect(find.byType(NoteToolbar), findsNothing);
+  });
+
+  testWidgets('selected text links to a picked note', (tester) async {
+    await pumpScreen(tester);
+    controller.editorState.selection = Selection.single(
+      path: [0],
+      startOffset: 0,
+      endOffset: 6,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Criar link para outra nota'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mercado'));
+    await tester.pumpAndSettle();
+
+    final delta = controller.editorState.getNodeAtPath([0])!.delta!.toJson();
+    expect(delta.first, {
+      'insert': 'Target',
+      'attributes': {'href': 'note://note-2'},
+    });
+  });
 }

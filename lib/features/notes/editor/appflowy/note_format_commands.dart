@@ -158,12 +158,21 @@ extension NoteFormatCommands on EditorState {
   /// Applies [style] to the selected text blocks, or turns them back into
   /// paragraphs when they all have it already.
   Future<void> toggleNoteBlockStyle(NoteBlockStyle style) =>
+      _applyBlockStyle(style, toggle: true);
+
+  /// Applies [style] to the selected text blocks (a choice among styles: the
+  /// current one stays).
+  Future<void> setNoteBlockStyle(NoteBlockStyle style) =>
+      _applyBlockStyle(style, toggle: false);
+
+  Future<void> _applyBlockStyle(NoteBlockStyle style, {required bool toggle}) =>
       _rewriteSelection((blocks, selected) {
         final targets = blocks
             .where((block) => selected.contains(block.id) && _isText(block))
             .toList();
         if (targets.isEmpty) return null;
         final clear =
+            toggle &&
             style != NoteBlockStyle.paragraph &&
             targets.every((block) => block.type == style.type);
         final type = clear ? 'paragraph' : style.type;
@@ -177,6 +186,13 @@ extension NoteFormatCommands on EditorState {
           caretBlockId: null,
         );
       });
+
+  /// Links the selected text to note [noteId].
+  Future<void> linkSelectionToNote(String noteId) async {
+    final current = selection;
+    if (current == null || current.isCollapsed) return;
+    await formatDelta(current, {AppFlowyRichTextKeys.href: 'note://$noteId'});
+  }
 
   /// Indents the selected list items and tasks one level, when the block
   /// above can hold them.
