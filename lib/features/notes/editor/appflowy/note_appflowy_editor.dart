@@ -86,6 +86,7 @@ class NoteAppFlowyEditor extends StatelessWidget {
     this.header,
     this.footer,
     this.padding,
+    this.autoScrollEdgeOffset = appFlowyEditorAutoScrollEdgeOffset,
   });
 
   /// The document being edited.
@@ -130,6 +131,10 @@ class NoteAppFlowyEditor extends StatelessWidget {
   /// Space around the document.
   final EdgeInsets? padding;
 
+  /// How close the caret may get to the viewport's edges before the note
+  /// scrolls; larger when something floats over the bottom of the editor.
+  final double autoScrollEdgeOffset;
+
   @override
   Widget build(BuildContext context) {
     configureNoteAppFlowy();
@@ -140,6 +145,7 @@ class NoteAppFlowyEditor extends StatelessWidget {
       autoFocus: autoFocus,
       focusNode: focusNode,
       shrinkWrap: shrinkWrap,
+      autoScrollEdgeOffset: autoScrollEdgeOffset,
       editorScrollController: scrollController,
       header: header,
       footer: footer,

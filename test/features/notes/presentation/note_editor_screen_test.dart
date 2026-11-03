@@ -234,6 +234,47 @@ void main() {
     expect(controller.editorState.selection, isNotNull);
   });
 
+  testWidgets('the note scrolls behind the floating toolbar', (tester) async {
+    await pumpScreen(tester);
+    await _tapBelowText(tester);
+    await tester.pumpAndSettle();
+
+    final toolbarTop = tester.getTopLeft(find.byType(NoteToolbar)).dy;
+    final editorBottom = tester.getBottomLeft(find.byType(AppFlowyEditor)).dy;
+    expect(editorBottom, greaterThan(toolbarTop));
+  });
+
+  testWidgets('the keyboard going down does not close the format panel', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    final dpr = tester.view.devicePixelRatio;
+    await pumpScreen(tester);
+    await _tapBelowText(tester);
+    tester.view.viewInsets = FakeViewPadding(bottom: 320 * dpr);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Formatar'));
+    await tester.pump();
+    // The keyboard slides away one frame at a time.
+    for (final inset in [280.0, 200.0, 120.0, 0.0]) {
+      tester.view.viewInsets = FakeViewPadding(bottom: inset * dpr);
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(const ValueKey('note-format-panel'));
+    expect(panel, findsOneWidget);
+    // It takes the keyboard's full height, not a frame of its way down.
+    expect(tester.getSize(panel).height, 320);
+
+    // The keyboard coming back up replaces it.
+    tester.view.viewInsets = FakeViewPadding(bottom: 150 * dpr);
+    await tester.pump();
+    expect(panel, findsNothing);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('hiding the keyboard ends editing', (tester) async {
     await pumpScreen(tester);
     await _tapBelowText(tester);
