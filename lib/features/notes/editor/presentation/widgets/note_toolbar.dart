@@ -1,16 +1,12 @@
-// The note editor toolbar: one row above the keyboard.
+// The note editor toolbar: one row above the keyboard with every format.
 //
-// With a caret it offers what is used while writing (format panel, task,
-// bullets, photo, file, hide keyboard). With selected text it switches to
-// what applies to that text (bold, italic, strikethrough, task, note link and
-// the format panel). Everything else lives in the "Formatar" panel, which
-// takes the keyboard's place (see NoteFormatPanel). The bar keeps its
-// position and height; only its row animates between the two modes.
+// The row scrolls sideways; the button that hides the keyboard stays pinned
+// at its end. Buttons are grouped (lists, inline styles, paragraph styles,
+// indentation, insertions, attachments) with dividers between groups.
 import 'dart:async';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
-import 'package:motor/motor.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_format_commands.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_editor_interaction.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
@@ -21,14 +17,11 @@ export 'note_editor_interaction.dart' show noteEditorToolbarTapRegionGroup;
 /// Corner radius of the floating toolbar shell.
 const _shellRadius = 26.0;
 
-/// Which row of the note toolbar is shown.
-enum NoteToolbarMode { writing, selection }
+/// Height of a toolbar button.
+const _buttonSize = 44.0;
 
-/// The selection row while text is selected, the writing row otherwise.
-NoteToolbarMode noteToolbarModeFor(NoteFormatState state) =>
-    state.hasTextSelection
-    ? NoteToolbarMode.selection
-    : NoteToolbarMode.writing;
+/// Space between two buttons of the same group.
+const _buttonGap = 2.0;
 
 /// Rebuilds [builder] with the formatting state of [editorState]'s selection,
 /// only when that state changes.
@@ -103,8 +96,6 @@ class NoteToolbar extends StatelessWidget {
   const NoteToolbar({
     required this.editorState,
     super.key,
-    this.panelOpen = false,
-    this.onTogglePanel,
     this.onAttachFile,
     this.onAttachImage,
     this.onHideKeyboard,
@@ -112,10 +103,6 @@ class NoteToolbar extends StatelessWidget {
   });
 
   final EditorState editorState;
-
-  /// Whether the "Formatar" panel is showing in the keyboard's place.
-  final bool panelOpen;
-  final VoidCallback? onTogglePanel;
   final VoidCallback? onAttachFile;
   final VoidCallback? onAttachImage;
   final VoidCallback? onHideKeyboard;
@@ -134,36 +121,42 @@ class NoteToolbar extends StatelessWidget {
           radius: _shellRadius,
           child: Padding(
             padding: const EdgeInsets.all(4),
-            child: NoteFormatStateBuilder(
-              editorState: editorState,
-              builder: (context, state) => _ToolbarRows(
-                mode: noteToolbarModeFor(state),
-                writing: _WritingRow(
-                  state: state,
-                  panelOpen: panelOpen,
-                  onTogglePanel: onTogglePanel,
-                  onToggleTask: () => unawaited(
-                    editorState.toggleNoteBlockStyle(NoteBlockStyle.task),
+            child: Row(
+              children: [
+                Expanded(
+                  // A sideways scroll view would otherwise take all the
+                  // height it is offered.
+                  child: SizedBox(
+                    height: _buttonSize,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(_shellRadius - 4),
+                      child: SingleChildScrollView(
+                        key: const ValueKey('note-toolbar-scroll'),
+                        scrollDirection: Axis.horizontal,
+                        child: NoteFormatStateBuilder(
+                          editorState: editorState,
+                          builder: (context, state) => _FormatButtons(
+                            editorState: editorState,
+                            state: state,
+                            onLinkNote: onLinkNote,
+                            onAttachImage: onAttachImage,
+                            onAttachFile: onAttachFile,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  onToggleBullets: () => unawaited(
-                    editorState.toggleNoteBlockStyle(NoteBlockStyle.bulletList),
-                  ),
-                  onAttachImage: onAttachImage,
-                  onAttachFile: onAttachFile,
-                  onHideKeyboard: onHideKeyboard,
                 ),
-                selection: _SelectionRow(
-                  state: state,
-                  panelOpen: panelOpen,
-                  onToggleInline: (key) =>
-                      unawaited(editorState.toggleNoteInlineStyle(key)),
-                  onToggleTask: () => unawaited(
-                    editorState.toggleNoteBlockStyle(NoteBlockStyle.task),
-                  ),
-                  onLinkNote: onLinkNote,
-                  onTogglePanel: onTogglePanel,
+                const ToolbarDivider(),
+                ToolbarButton(
+                  icon: Icons.keyboard_hide_outlined,
+                  isActive: false,
+                  spacious: true,
+                  haptic: ToolbarHaptic.controlTap,
+                  onPressed: onHideKeyboard,
+                  semanticLabel: 'Esconder teclado',
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -172,145 +165,158 @@ class NoteToolbar extends StatelessWidget {
   }
 }
 
-class _WritingRow extends StatelessWidget {
-  const _WritingRow({
+/// Paragraph styles, drawn as short labels.
+const _paragraphButtons = [
+  (style: NoteBlockStyle.header1, glyph: 'H1', label: 'Título'),
+  (style: NoteBlockStyle.header2, glyph: 'H2', label: 'Cabeçalho'),
+  (style: NoteBlockStyle.header3, glyph: 'H3', label: 'Subcabeçalho'),
+];
+
+class _FormatButtons extends StatelessWidget {
+  const _FormatButtons({
+    required this.editorState,
     required this.state,
-    required this.panelOpen,
-    required this.onTogglePanel,
-    required this.onToggleTask,
-    required this.onToggleBullets,
+    required this.onLinkNote,
     required this.onAttachImage,
     required this.onAttachFile,
-    required this.onHideKeyboard,
   });
 
+  final EditorState editorState;
   final NoteFormatState state;
-  final bool panelOpen;
-  final VoidCallback? onTogglePanel;
-  final VoidCallback onToggleTask;
-  final VoidCallback onToggleBullets;
+  final VoidCallback? onLinkNote;
   final VoidCallback? onAttachImage;
   final VoidCallback? onAttachFile;
-  final VoidCallback? onHideKeyboard;
+
+  void _toggleBlock(NoteBlockStyle style) =>
+      unawaited(editorState.toggleNoteBlockStyle(style));
+
+  ToolbarButton _block(
+    NoteBlockStyle style, {
+    required String semanticLabel,
+    IconData? icon,
+    String? svgAsset,
+    String? label,
+    bool? active,
+  }) => ToolbarButton(
+    icon: icon,
+    svgAsset: svgAsset,
+    label: label,
+    labelStyle: label == null ? null : _paragraphGlyph,
+    isActive: active ?? state.blockStyle == style,
+    spacious: true,
+    haptic: ToolbarHaptic.selectionChange,
+    onPressed: () => _toggleBlock(style),
+    semanticLabel: semanticLabel,
+  );
+
+  static const _paragraphGlyph = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+  );
+
+  ToolbarButton _action(
+    IconData icon,
+    String semanticLabel,
+    VoidCallback? onPressed,
+  ) => ToolbarButton(
+    icon: icon,
+    isActive: false,
+    spacious: true,
+    haptic: ToolbarHaptic.controlTap,
+    onPressed: onPressed,
+    semanticLabel: semanticLabel,
+  );
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        ToolbarButton(
-          label: 'Aa',
-          isActive: panelOpen,
-          activeStyle: ToolbarActiveStyle.filled,
-          spacious: true,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: onTogglePanel,
-          semanticLabel: 'Formatar',
-        ),
-        ToolbarButton(
+    final groups = <List<Widget>>[
+      [
+        _block(
+          NoteBlockStyle.task,
           svgAsset: 'assets/icons/checkbox.svg',
-          isActive: state.allTasks,
-          spacious: true,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: onToggleTask,
-          semanticLabel: 'Inserir tarefa',
+          active: state.allTasks,
+          semanticLabel: 'Tarefa',
         ),
-        ToolbarButton(
+        _block(
+          NoteBlockStyle.bulletList,
           icon: Icons.format_list_bulleted,
-          isActive: state.blockStyle == NoteBlockStyle.bulletList,
-          spacious: true,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: onToggleBullets,
           semanticLabel: 'Lista com marcadores',
         ),
-        ToolbarButton(
-          icon: Icons.photo_outlined,
-          isActive: false,
-          spacious: true,
-          haptic: ToolbarHaptic.controlTap,
-          onPressed: onAttachImage,
-          semanticLabel: 'Anexar foto',
-        ),
-        ToolbarButton(
-          icon: Icons.attach_file,
-          isActive: false,
-          spacious: true,
-          haptic: ToolbarHaptic.controlTap,
-          onPressed: onAttachFile,
-          semanticLabel: 'Anexar arquivo',
-        ),
-        ToolbarButton(
-          icon: Icons.keyboard_hide_outlined,
-          isActive: false,
-          spacious: true,
-          haptic: ToolbarHaptic.controlTap,
-          onPressed: onHideKeyboard,
-          semanticLabel: 'Esconder teclado',
+        _block(
+          NoteBlockStyle.orderedList,
+          icon: Icons.format_list_numbered,
+          semanticLabel: 'Lista numerada',
         ),
       ],
-    );
-  }
-}
-
-class _SelectionRow extends StatelessWidget {
-  const _SelectionRow({
-    required this.state,
-    required this.panelOpen,
-    required this.onToggleInline,
-    required this.onToggleTask,
-    required this.onLinkNote,
-    required this.onTogglePanel,
-  });
-
-  final NoteFormatState state;
-  final bool panelOpen;
-  final ValueChanged<String> onToggleInline;
-  final VoidCallback onToggleTask;
-  final VoidCallback? onLinkNote;
-  final VoidCallback? onTogglePanel;
-
-  @override
-  Widget build(BuildContext context) {
-    final inline = state.inlineStyles;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
+      [
         for (final style in noteInlineStyleButtons)
           ToolbarButton(
             label: style.glyph,
             labelStyle: style.glyphStyle,
-            isActive: inline.contains(style.key),
+            isActive: state.inlineStyles.contains(style.key),
             spacious: true,
             haptic: ToolbarHaptic.selectionChange,
-            onPressed: () => onToggleInline(style.key),
+            onPressed: () =>
+                unawaited(editorState.toggleNoteInlineStyle(style.key)),
             semanticLabel: style.label,
           ),
-        const ToolbarDivider(),
-        ToolbarButton(
-          svgAsset: 'assets/icons/checkbox.svg',
-          isActive: state.allTasks,
-          spacious: true,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: onToggleTask,
-          semanticLabel: 'Transformar em tarefa',
+      ],
+      [
+        for (final paragraph in _paragraphButtons)
+          _block(
+            paragraph.style,
+            label: paragraph.glyph,
+            semanticLabel: paragraph.label,
+          ),
+        _block(
+          NoteBlockStyle.quote,
+          icon: Icons.format_quote_rounded,
+          semanticLabel: 'Citação',
         ),
-        ToolbarButton(
-          icon: Icons.link,
-          isActive: false,
-          spacious: true,
-          haptic: ToolbarHaptic.controlTap,
-          onPressed: onLinkNote,
-          semanticLabel: 'Criar link para outra nota',
+      ],
+      [
+        _action(
+          Icons.format_indent_decrease,
+          'Diminuir recuo',
+          state.hasListOrTask
+              ? () => unawaited(editorState.outdentNoteBlocks())
+              : null,
         ),
-        ToolbarButton(
-          label: 'Aa',
-          isActive: panelOpen,
-          activeStyle: ToolbarActiveStyle.filled,
-          spacious: true,
-          haptic: ToolbarHaptic.selectionChange,
-          onPressed: onTogglePanel,
-          semanticLabel: 'Mais formatação',
+        _action(
+          Icons.format_indent_increase,
+          'Aumentar recuo',
+          state.hasListOrTask
+              ? () => unawaited(editorState.indentNoteBlocks())
+              : null,
         ),
+      ],
+      [
+        _action(
+          Icons.link,
+          'Criar link para outra nota',
+          state.hasTextSelection ? onLinkNote : null,
+        ),
+        _action(
+          Icons.horizontal_rule,
+          'Inserir divisória',
+          () => unawaited(editorState.insertNoteDivider()),
+        ),
+      ],
+      [
+        _action(Icons.photo_outlined, 'Anexar foto', onAttachImage),
+        _action(Icons.attach_file, 'Anexar arquivo', onAttachFile),
+      ],
+    ];
+
+    return Row(
+      children: [
+        for (final (index, group) in groups.indexed) ...[
+          if (index > 0) const ToolbarDivider(),
+          for (final (i, button) in group.indexed) ...[
+            if (i > 0) const SizedBox(width: _buttonGap),
+            button,
+          ],
+        ],
       ],
     );
   }
@@ -343,112 +349,3 @@ const noteInlineStyleButtons = [
     ),
   ),
 ];
-
-/// Shows the row for [mode] across the bar's full width, sliding between
-/// rows when the mode changes.
-class _ToolbarRows extends StatefulWidget {
-  const _ToolbarRows({
-    required this.mode,
-    required this.writing,
-    required this.selection,
-  });
-
-  final NoteToolbarMode mode;
-  final Widget writing;
-  final Widget selection;
-
-  @override
-  State<_ToolbarRows> createState() => _ToolbarRowsState();
-}
-
-class _ToolbarRowsState extends State<_ToolbarRows>
-    with TickerProviderStateMixin {
-  late final SingleMotionController _motion;
-
-  /// Fades the leaving row out as the motion runs from 0 to 1.
-  late final Animation<double> _outgoingOpacity;
-  bool _animationsDisabled = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _motion = SingleMotionController(
-      motion: const MaterialSpringMotion.standardEffectsFast(),
-      vsync: this,
-      initialValue: 1,
-    );
-    _outgoingOpacity = ReverseAnimation(_motion);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final disabled = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    if (disabled != _animationsDisabled) {
-      _animationsDisabled = disabled;
-      _applyMotion();
-    }
-  }
-
-  @override
-  void didUpdateWidget(_ToolbarRows oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.mode != widget.mode) _applyMotion();
-  }
-
-  void _applyMotion() {
-    if (_animationsDisabled) {
-      _motion.value = 1;
-      return;
-    }
-    _motion.value = 0;
-    unawaited(_motion.animateTo(1).orCancel.catchError((_) {}));
-  }
-
-  @override
-  void dispose() {
-    _motion.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final writing = widget.mode == NoteToolbarMode.writing;
-    final incoming = writing ? widget.writing : widget.selection;
-    final outgoing = writing ? widget.selection : widget.writing;
-
-    return AnimatedBuilder(
-      animation: _motion,
-      builder: (_, _) {
-        final progress = _motion.value.clamp(0.0, 1.0);
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // The leaving row is removed from the tree once its fade ends.
-            if (progress < 1)
-              Positioned.fill(
-                child: ExcludeSemantics(
-                  child: IgnorePointer(
-                    child: FadeTransition(
-                      opacity: _outgoingOpacity,
-                      child: Transform.translate(
-                        offset: Offset(-(1 - progress) * 8, 0),
-                        child: outgoing,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            Opacity(
-              opacity: 0.35 + 0.65 * progress,
-              child: Transform.translate(
-                offset: Offset((1 - progress) * 8, 0),
-                child: incoming,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}

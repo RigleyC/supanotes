@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supanotes/features/notes/editor/appflowy/note_appflowy_codec.dart';
 import 'package:supanotes/features/notes/editor/document/note_blocks.dart';
-import 'package:supanotes/features/notes/editor/presentation/widgets/note_format_panel.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar.dart';
 import 'package:supanotes/features/notes/editor/presentation/widgets/note_toolbar_button.dart';
 
@@ -43,6 +42,9 @@ ToolbarButton _button(WidgetTester tester, String label) =>
     );
 
 Future<void> _tap(WidgetTester tester, String label) async {
+  // The row scrolls sideways: bring the button into view first.
+  await tester.ensureVisible(_labelled(label));
+  await tester.pumpAndSettle();
   await tester.tap(_labelled(label));
   await tester.pumpAndSettle();
 }
@@ -51,188 +53,134 @@ String _types(EditorState editorState) =>
     _codec.toBlocks(editorState.document).map((block) => block.type).join(' ');
 
 void main() {
-  group('toolbar', () {
-    testWidgets('a caret shows the writing row', (tester) async {
-      await _pump(
-        tester,
-        NoteToolbar(editorState: _editor([_b('p', 'paragraph', 'Olá')])),
-      );
-
-      for (final label in [
-        'Formatar',
-        'Inserir tarefa',
-        'Lista com marcadores',
-        'Anexar foto',
-        'Anexar arquivo',
-        'Esconder teclado',
-      ]) {
-        expect(_labelled(label), findsOneWidget, reason: label);
-      }
-      expect(_labelled('Negrito'), findsNothing);
-    });
-
-    testWidgets('task and bullet buttons convert the current line', (
+  testWidgets('every format is in the one row, keyboard button pinned', (
+    tester,
+  ) async {
+    await _pump(
       tester,
-    ) async {
-      final editorState = _editor([_b('p', 'paragraph', 'Leite')]);
-      await _pump(tester, NoteToolbar(editorState: editorState));
+      NoteToolbar(editorState: _editor([_b('p', 'paragraph', 'Olá')])),
+    );
 
-      await _tap(tester, 'Inserir tarefa');
-      expect(_types(editorState), 'task');
-      expect(_button(tester, 'Inserir tarefa').isActive, isTrue);
+    for (final label in [
+      'Tarefa',
+      'Lista com marcadores',
+      'Lista numerada',
+      'Negrito',
+      'Itálico',
+      'Tachado',
+      'Título',
+      'Cabeçalho',
+      'Subcabeçalho',
+      'Citação',
+      'Diminuir recuo',
+      'Aumentar recuo',
+      'Criar link para outra nota',
+      'Inserir divisória',
+      'Anexar foto',
+      'Anexar arquivo',
+      'Esconder teclado',
+    ]) {
+      expect(_labelled(label), findsOneWidget, reason: label);
+    }
+    expect(find.text('Formatar'), findsNothing);
 
-      await _tap(tester, 'Lista com marcadores');
-      expect(_types(editorState), 'bulletList');
-    });
-
-    testWidgets('selected text shows the selection row and formats it', (
-      tester,
-    ) async {
-      var linked = false;
-      final editorState = _editor(
-        [_b('p', 'paragraph', 'negrito')],
-        selection: Selection.single(path: [0], startOffset: 0, endOffset: 7),
-      );
-      await _pump(
-        tester,
-        NoteToolbar(editorState: editorState, onLinkNote: () => linked = true),
-      );
-
-      expect(_labelled('Formatar'), findsNothing);
-      await _tap(tester, 'Negrito');
-      await _tap(tester, 'Itálico');
-      expect(_codec.toBlocks(editorState.document).single.delta.single, {
-        'insert': 'negrito',
-        'attributes': {'bold': true, 'italics': true},
-      });
-      expect(_button(tester, 'Negrito').isActive, isTrue);
-
-      await _tap(tester, 'Criar link para outra nota');
-      expect(linked, isTrue);
-
-      await _tap(tester, 'Transformar em tarefa');
-      expect(_types(editorState), 'task');
-    });
-
-    testWidgets('Aa toggles the panel and shows when it is open', (
-      tester,
-    ) async {
-      var toggles = 0;
-      final editorState = _editor([_b('p', 'paragraph', 'a')]);
-      await _pump(
-        tester,
-        NoteToolbar(editorState: editorState, onTogglePanel: () => toggles++),
-      );
-      await _tap(tester, 'Formatar');
-      expect(toggles, 1);
-      expect(_button(tester, 'Formatar').isActive, isFalse);
-
-      await _pump(
-        tester,
-        NoteToolbar(editorState: editorState, panelOpen: true),
-      );
-      expect(_button(tester, 'Formatar').isActive, isTrue);
-    });
-
-    testWidgets('the bar stays put while the rows switch', (tester) async {
-      final editorState = _editor([_b('p', 'paragraph', 'Hello')]);
-      await _pump(tester, NoteToolbar(editorState: editorState));
-      final shell = find.byKey(const ValueKey('note-toolbar-shell'));
-      final before = tester.getRect(shell);
-
-      editorState.selection = Selection.single(
-        path: [0],
-        startOffset: 0,
-        endOffset: 5,
-      );
-      await tester.pumpAndSettle();
-
-      expect(tester.getRect(shell), before);
-      expect(_labelled('Negrito'), findsOneWidget);
-    });
+    // Scrolling the row leaves the keyboard button where it is.
+    final hide = tester.getRect(_labelled('Esconder teclado'));
+    await tester.drag(
+      find.byKey(const ValueKey('note-toolbar-scroll')),
+      const Offset(-400, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getRect(_labelled('Esconder teclado')), hide);
   });
 
-  group('format panel', () {
-    Future<EditorState> pumpPanel(
-      WidgetTester tester,
-      List<NoteBlock> blocks, {
-      VoidCallback? onClose,
-    }) async {
-      final editorState = _editor(blocks);
-      await _pump(
-        tester,
-        NoteFormatPanel(
-          editorState: editorState,
-          height: 320,
-          onClose: onClose ?? () {},
-        ),
-      );
-      return editorState;
-    }
+  testWidgets('list and task buttons convert the current line', (
+    tester,
+  ) async {
+    final editorState = _editor([_b('p', 'paragraph', 'Leite')]);
+    await _pump(tester, NoteToolbar(editorState: editorState));
 
-    testWidgets('paragraph style chips choose a style', (tester) async {
-      final editorState = await pumpPanel(tester, [
-        _b('p', 'paragraph', 'Oi'),
-      ]);
+    await _tap(tester, 'Tarefa');
+    expect(_types(editorState), 'task');
+    expect(_button(tester, 'Tarefa').isActive, isTrue);
 
-      await _tap(tester, 'Título');
-      expect(_types(editorState), 'header1');
-      // Choosing the current style keeps it (unlike the toggle buttons).
-      await _tap(tester, 'Título');
-      expect(_types(editorState), 'header1');
+    await _tap(tester, 'Lista com marcadores');
+    expect(_types(editorState), 'bulletList');
+    await _tap(tester, 'Lista numerada');
+    expect(_types(editorState), 'orderedList');
+  });
 
-      await _tap(tester, 'Citação');
-      expect(_types(editorState), 'quote');
-      await _tap(tester, 'Corpo');
-      expect(_types(editorState), 'paragraph');
-    });
+  testWidgets('paragraph styles toggle back to body text', (tester) async {
+    final editorState = _editor([_b('p', 'paragraph', 'Oi')]);
+    await _pump(tester, NoteToolbar(editorState: editorState));
 
-    testWidgets('lists, tasks and dividers', (tester) async {
-      final editorState = await pumpPanel(tester, [
-        _b('a', 'bulletList', 'um'),
-        _b('b', 'paragraph', 'dois'),
-      ]);
-      editorState.selection = Selection.collapsed(
-        Position(path: [1], offset: 4),
-      );
-      await tester.pumpAndSettle();
+    await _tap(tester, 'Título');
+    expect(_types(editorState), 'header1');
+    expect(_button(tester, 'Título').isActive, isTrue);
+    await _tap(tester, 'Título');
+    expect(_types(editorState), 'paragraph');
 
-      await _tap(tester, 'Lista numerada');
-      expect(_types(editorState), 'bulletList orderedList');
-      await _tap(tester, 'Lista com marcadores');
-      await _tap(tester, 'Aumentar recuo');
-      expect(_codec.toBlocks(editorState.document).last.indent, 1);
-      await _tap(tester, 'Diminuir recuo');
-      expect(_codec.toBlocks(editorState.document).last.indent, 0);
+    await _tap(tester, 'Citação');
+    expect(_types(editorState), 'quote');
+  });
 
-      await _tap(tester, 'Lista de tarefas');
-      expect(_types(editorState), 'bulletList task');
-
-      await _tap(tester, 'Inserir divisória');
-      expect(_types(editorState), 'bulletList task divider paragraph');
-    });
-
-    testWidgets('indentation does nothing outside lists and tasks', (
+  testWidgets('selected text gets inline styles and a note link', (
+    tester,
+  ) async {
+    var linked = false;
+    final editorState = _editor(
+      [_b('p', 'paragraph', 'negrito')],
+      selection: Selection.single(path: [0], startOffset: 0, endOffset: 7),
+    );
+    await _pump(
       tester,
-    ) async {
-      final editorState = await pumpPanel(tester, [
-        _b('p', 'paragraph', 'Oi'),
-      ]);
+      NoteToolbar(editorState: editorState, onLinkNote: () => linked = true),
+    );
 
-      await _tap(tester, 'Aumentar recuo');
-
-      expect(_types(editorState), 'paragraph');
-      expect(_codec.toBlocks(editorState.document).single.indent, 0);
+    await _tap(tester, 'Negrito');
+    await _tap(tester, 'Itálico');
+    expect(_codec.toBlocks(editorState.document).single.delta.single, {
+      'insert': 'negrito',
+      'attributes': {'bold': true, 'italics': true},
     });
+    expect(_button(tester, 'Negrito').isActive, isTrue);
 
-    testWidgets('the close button closes it', (tester) async {
-      var closed = false;
-      await pumpPanel(tester, [
-        _b('p', 'paragraph', 'Oi'),
-      ], onClose: () => closed = true);
+    await _tap(tester, 'Criar link para outra nota');
+    expect(linked, isTrue);
+  });
 
-      await _tap(tester, 'Fechar formatação');
-      expect(closed, isTrue);
-    });
+  testWidgets('a note link needs selected text', (tester) async {
+    await _pump(
+      tester,
+      NoteToolbar(
+        editorState: _editor([_b('p', 'paragraph', 'Oi')]),
+        onLinkNote: () {},
+      ),
+    );
+    expect(_button(tester, 'Criar link para outra nota').onPressed, isNull);
+  });
+
+  testWidgets('indentation and dividers', (tester) async {
+    final editorState = _editor([
+      _b('a', 'bulletList', 'um'),
+      _b('b', 'bulletList', 'dois'),
+    ], selection: Selection.collapsed(Position(path: [1], offset: 4)));
+    await _pump(tester, NoteToolbar(editorState: editorState));
+
+    await _tap(tester, 'Aumentar recuo');
+    expect(_codec.toBlocks(editorState.document).last.indent, 1);
+    await _tap(tester, 'Diminuir recuo');
+    expect(_codec.toBlocks(editorState.document).last.indent, 0);
+
+    await _tap(tester, 'Inserir divisória');
+    expect(_types(editorState), 'bulletList bulletList divider paragraph');
+  });
+
+  testWidgets('indentation is off outside lists and tasks', (tester) async {
+    await _pump(
+      tester,
+      NoteToolbar(editorState: _editor([_b('p', 'paragraph', 'Oi')])),
+    );
+    expect(_button(tester, 'Aumentar recuo').onPressed, isNull);
   });
 }
