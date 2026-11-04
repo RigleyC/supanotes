@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_interaction_policy.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_view.dart';
 import 'package:supanotes/shared/widgets/app_navigation_bar.dart';
 import 'package:supanotes/shared/widgets/confirm_dialog.dart';
 
@@ -90,7 +91,8 @@ class NotesListView extends StatelessWidget {
   }
 }
 
-/// One note in the list: only its title, in large type.
+/// One note in the list: its icon, its title in large type, and a star when
+/// it is a favorite.
 class NoteTitleRow extends StatelessWidget {
   const NoteTitleRow({
     required this.note,
@@ -110,9 +112,10 @@ class NoteTitleRow extends StatelessWidget {
     final untitled = note.title.trim().isEmpty;
     final title = untitled ? NoteStrings.fallbackTitle : note.title;
     final sharedBy = note.sharedByEmail;
+    final favorite = note.favorite ? '. Favorita' : '';
     final semanticsLabel = sharedBy == null
-        ? title
-        : '$title. ${NoteStrings.sharedByPrefix} $sharedBy';
+        ? '$title$favorite'
+        : '$title$favorite. ${NoteStrings.sharedByPrefix} $sharedBy';
 
     return Semantics(
       button: true,
@@ -129,23 +132,39 @@ class NoteTitleRow extends StatelessWidget {
               horizontal: AppNavigationBar.contentInset,
               vertical: 10,
             ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: (theme.textTheme.titleLarge ?? const TextStyle())
-                    .copyWith(
-                      fontSize: 20,
-                      height: 1.25,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -0.2,
-                      color: untitled
-                          ? scheme.onSurfaceVariant.withValues(alpha: 0.8)
-                          : scheme.onSurface,
-                    ),
-              ),
+            child: Row(
+              children: [
+                if (note.noteIcon != null) ...[
+                  NoteIconView(icon: note.noteIcon!, size: 22),
+                  const SizedBox(width: 12),
+                ],
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: (theme.textTheme.titleLarge ?? const TextStyle())
+                        .copyWith(
+                          fontSize: 20,
+                          height: 1.25,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -0.2,
+                          color: untitled
+                              ? scheme.onSurfaceVariant.withValues(alpha: 0.8)
+                              : scheme.onSurface,
+                        ),
+                  ),
+                ),
+                if (note.favorite) ...[
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.star_rounded,
+                    key: ValueKey('note-favorite-${note.id}'),
+                    size: 18,
+                    color: scheme.tertiary,
+                  ),
+                ],
+              ],
             ),
           ),
         ),

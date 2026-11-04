@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supanotes/features/notes/catalog/model/note_icon.dart';
 import 'package:supanotes/features/notes/catalog/model/note_model.dart';
 import 'package:supanotes/features/notes/catalog/model/note_strings.dart';
+import 'package:supanotes/features/notes/catalog/presentation/widgets/note_icon_view.dart';
 import 'package:supanotes/features/notes/catalog/presentation/widgets/notes_list_view.dart';
 
 void main() {
@@ -296,5 +298,45 @@ void main() {
       await tester.longPress(find.text('Icon Note'));
       expect(editedNote?.id, '6');
     });
+  });
+
+  testWidgets('shows the note icon and marks favorites', (tester) async {
+    NoteModel note(String id, {bool favorite = false, NoteIcon? icon}) =>
+        NoteModel(
+          id: id,
+          userId: 'user1',
+          content: '',
+          title: 'Nota $id',
+          favorite: favorite,
+          archived: false,
+          createdAt: DateTime.utc(2026),
+          updatedAt: DateTime.utc(2026),
+          hasRemoteCopy: true,
+          isEmptyDraft: false,
+          noteIcon: icon,
+        );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NotesListView(
+            notes: [
+              note('a', favorite: true, icon: NoteIcon.emoji('🛒')),
+              note('b'),
+            ],
+            onTap: (_) {},
+            onDelete: (_) {},
+            onToggleFavorite: (_) {},
+            onEditIcon: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NoteIconView), findsOneWidget);
+    expect(find.byKey(const ValueKey('note-favorite-a')), findsOneWidget);
+    expect(find.byKey(const ValueKey('note-favorite-b')), findsNothing);
+    expect(find.bySemanticsLabel('Nota a. Favorita'), findsOneWidget);
   });
 }
