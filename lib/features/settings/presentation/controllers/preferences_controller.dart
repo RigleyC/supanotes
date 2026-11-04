@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:supanotes/features/auth/data/session_cache.dart';
 import 'package:supanotes/features/settings/data/settings_repository.dart';
+import 'package:supanotes/features/tasks/application/task_source_preference.dart';
 
 /// Typed, reactive access to the user's preferences.
 ///
@@ -24,27 +25,49 @@ class PreferencesController extends Notifier<void> {
   @override
   void build() {}
 
+  Map<String, dynamic> get _preferences => Map<String, dynamic>.from(
+    (ref.read(sessionCacheProvider).settings['preferences']
+            as Map<String, dynamic>?) ??
+        const {},
+  );
+
   /// Toggles the notes view mode between list and grid.
+  Future<void> toggleNotesViewMode() {
+    final currentMode = _preferences['notes_view_mode'] as String? ?? 'list';
+    return _set('notes_view_mode', currentMode == 'grid' ? 'list' : 'grid');
+  }
+
+  /// Shows or hides the tasks written inside notes in the Tasks list.
+  Future<void> setIncludeNoteTasks(bool value) =>
+      _set(includeNoteTasksPreferenceKey, value);
+
+  /// Replaces the cached preferences with the server's, so a choice made on
+  /// another device shows up here.
+  Future<void> refresh() async {
+    final remote = await ref.read(settingsRepositoryProvider).getSettings();
+    final cache = ref.read(sessionCacheProvider);
+    await ref.read(sessionCacheProvider.notifier).updateSettings({
+      ...cache.settings,
+      'preferences': remote.preferences,
+    });
+  }
+
+  /// Sets [key] to [value].
   ///
   /// Updates the local [SessionCache] optimistically *before* the HTTP call
   /// so the UI feels instant. If the server write fails, the cache is
   /// rolled back to the previous state.
-  Future<void> toggleNotesViewMode() async {
+  Future<void> _set(String key, Object value) async {
+    final currentPrefs = _preferences;
+    if (currentPrefs[key] == value) return;
+    currentPrefs[key] = value;
+
     final cache = ref.read(sessionCacheProvider);
-    final currentPrefs = Map<String, dynamic>.from(
-      (cache.settings['preferences'] as Map<String, dynamic>?) ?? {},
-    );
-    final currentMode = currentPrefs['notes_view_mode'] as String? ?? 'list';
-    final newMode = currentMode == 'grid' ? 'list' : 'grid';
-    currentPrefs['notes_view_mode'] = newMode;
-
     final oldSettings = Map<String, dynamic>.from(cache.settings);
-
-    final updatedSettings = Map<String, dynamic>.from(cache.settings);
-    updatedSettings['preferences'] = currentPrefs;
-    await ref
-        .read(sessionCacheProvider.notifier)
-        .updateSettings(updatedSettings);
+    await ref.read(sessionCacheProvider.notifier).updateSettings({
+      ...cache.settings,
+      'preferences': currentPrefs,
+    });
 
     try {
       await ref

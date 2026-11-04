@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:supanotes/core/router/app_routes.dart';
+import 'package:supanotes/features/settings/presentation/controllers/preferences_controller.dart';
 import 'package:supanotes/features/tasks/application/note_task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
@@ -30,6 +31,29 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   final Set<String> _dismissedTaskKeys = {};
 
   @override
+  void initState() {
+    super.initState();
+    // Picks up a choice made on another device. Offline, the cached
+    // preferences stay in use.
+    unawaited(
+      ref
+          .read(preferencesControllerProvider.notifier)
+          .refresh()
+          .catchError((Object _) {}),
+    );
+  }
+
+  Future<void> _setIncludeNoteTasks(bool value) async {
+    try {
+      await ref
+          .read(preferencesControllerProvider.notifier)
+          .setIncludeNoteTasks(value);
+    } catch (_) {
+      AppMessenger.showError('Não foi possível salvar a preferência');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(
       taskListProvider(includeNoteTasks: ref.watch(includeNoteTasksProvider)),
@@ -46,8 +70,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           TaskSourceFilterMenu(
             key: const ValueKey('task-source-filter-menu'),
             includeNoteTasks: ref.watch(includeNoteTasksProvider),
-            onChanged: (value) =>
-                ref.read(includeNoteTasksProvider.notifier).set(value),
+            onChanged: (value) => unawaited(_setIncludeNoteTasks(value)),
           ),
           const SizedBox(width: 12),
         ],

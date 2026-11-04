@@ -3,17 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supanotes/core/di/providers.dart';
 import 'package:supanotes/core/router/app_router.dart';
 import 'package:supanotes/features/tasks/application/task_controller.dart';
 import 'package:supanotes/features/tasks/application/task_list_providers.dart';
-import 'package:supanotes/features/tasks/application/task_source_preference.dart';
 import 'package:supanotes/features/tasks/domain/task.dart';
 import 'package:supanotes/features/tasks/domain/task_list_item.dart';
 import 'package:supanotes/features/tasks/presentation/tasks_screen.dart';
 import 'package:supanotes/features/tasks/presentation/widgets/task_list_tile.dart';
 import 'package:supanotes/shared/widgets/app_navigation_shell.dart';
+
+import '../../../helpers/user_preferences_test_helper.dart';
 
 Task _task(String id, {DateTime? dueDate, bool hasTime = false}) {
   final now = DateTime.utc(2026, 9, 15, 10);
@@ -68,7 +67,7 @@ GoRouter _router() => GoRouter(
   ],
 );
 
-late SharedPreferences _prefs;
+late FakeSettingsRepository _settings;
 
 Widget _wrap(GoRouter router, {List<TaskListItem>? standaloneItems}) {
   final standalone =
@@ -86,7 +85,7 @@ Widget _wrap(GoRouter router, {List<TaskListItem>? standaloneItems}) {
   ];
   return ProviderScope(
     overrides: [
-      sharedPreferencesProvider.overrideWithValue(_prefs),
+      ...userPreferencesOverrides(_settings),
       taskListProvider(includeNoteTasks: false).overrideWith(
         (ref) => Stream.value(standalone),
       ),
@@ -111,10 +110,7 @@ Future<void> _toggleNoteTasks(WidgetTester tester, String label) async {
 
 void main() {
   setUpAll(() => initializeDateFormatting('pt_BR'));
-  setUp(() async {
-    SharedPreferences.setMockInitialValues({});
-    _prefs = await SharedPreferences.getInstance();
-  });
+  setUp(() => _settings = FakeSettingsRepository());
 
   testWidgets('shows note tasks by default and can hide them', (
     tester,
@@ -130,14 +126,17 @@ void main() {
     expect(find.text('standalone'), findsOneWidget);
   });
 
-  testWidgets('remembers hiding note tasks across visits', (tester) async {
+  testWidgets('saves hiding note tasks in the synced preferences', (
+    tester,
+  ) async {
     await tester.pumpWidget(_wrap(_router()));
     await tester.pump();
     await _toggleNoteTasks(tester, 'Ocultar tarefas das notas');
-    expect(_prefs.getBool(IncludeNoteTasksPreference.storageKey), isFalse);
+    expect(_settings.preferences['tasks_include_note_tasks'], isFalse);
+  });
 
-    // A fresh app start reads the saved choice.
-    await tester.pumpWidget(const SizedBox());
+  testWidgets('follows a choice made on another device', (tester) async {
+    _settings.preferences['tasks_include_note_tasks'] = false;
     await tester.pumpWidget(_wrap(_router()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
