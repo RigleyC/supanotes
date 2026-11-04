@@ -207,33 +207,6 @@ void main() {
     },
   );
 
-  testWidgets('Aa swaps the keyboard for the format panel and back', (
-    tester,
-  ) async {
-    await pumpScreen(tester);
-    await _tapBelowText(tester);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.bySemanticsLabel('Formatar'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('note-format-panel')), findsOneWidget);
-    expect(find.byType(NoteToolbar), findsNothing);
-
-    await tester.tap(find.bySemanticsLabel('Título'));
-    await tester.pumpAndSettle();
-    expect(
-      controller.editorState.getNodeAtPath([0])!.type,
-      HeadingBlockKeys.type,
-    );
-
-    await tester.tap(find.bySemanticsLabel('Fechar formatação'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('note-format-panel')), findsNothing);
-    expect(find.byType(NoteToolbar), findsOneWidget);
-    // Still editing: the caret stays.
-    expect(controller.editorState.selection, isNotNull);
-  });
-
   testWidgets('the note scrolls behind the floating toolbar', (tester) async {
     await pumpScreen(tester);
     await _tapBelowText(tester);
@@ -244,35 +217,53 @@ void main() {
     expect(editorBottom, greaterThan(toolbarTop));
   });
 
-  testWidgets('the keyboard going down does not close the format panel', (
+  void useParagraphs(List<String> texts) {
+    controller.dispose();
+    controller = NoteEditorController(
+      userId: 'user-1',
+      noteId: 'note-1',
+      blocks: [
+        for (final (i, text) in texts.indexed)
+          NoteBlock(
+            id: 'p$i',
+            type: 'paragraph',
+            delta: [
+              {'insert': text},
+            ],
+          ),
+      ],
+    );
+    session = NoteEditorSession(
+      noteId: 'note-1',
+      controller: controller,
+      syncSession: _ReadySyncHandle(),
+    );
+  }
+
+  testWidgets('blocks keep their normal spacing', (tester) async {
+    useParagraphs(['Um', 'Dois']);
+    await pumpScreen(tester);
+
+    final first = tester.getRect(find.text('Um', findRichText: true));
+    final second = tester.getRect(find.text('Dois', findRichText: true));
+    // The room left for the toolbar is under the note, not under each block.
+    expect(second.top - first.bottom, lessThan(16));
+  });
+
+  testWidgets('the caret stays above the toolbar at the end of a long note', (
     tester,
   ) async {
-    addTearDown(tester.view.reset);
-    final dpr = tester.view.devicePixelRatio;
+    useParagraphs([for (var i = 0; i < 40; i++) 'Linha $i']);
     await pumpScreen(tester);
-    await _tapBelowText(tester);
-    tester.view.viewInsets = FakeViewPadding(bottom: 320 * dpr);
+
+    controller.editAt(Selection.collapsed(Position(path: [39], offset: 8)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Formatar'));
-    await tester.pump();
-    // The keyboard slides away one frame at a time.
-    for (final inset in [280.0, 200.0, 120.0, 0.0]) {
-      tester.view.viewInsets = FakeViewPadding(bottom: inset * dpr);
-      await tester.pump();
-    }
-    await tester.pumpAndSettle();
-
-    final panel = find.byKey(const ValueKey('note-format-panel'));
-    expect(panel, findsOneWidget);
-    // It takes the keyboard's full height, not a frame of its way down.
-    expect(tester.getSize(panel).height, 320);
-
-    // The keyboard coming back up replaces it.
-    tester.view.viewInsets = FakeViewPadding(bottom: 150 * dpr);
-    await tester.pump();
-    expect(panel, findsNothing);
-    await tester.pumpAndSettle();
+    final toolbarTop = tester
+        .getTopLeft(find.byKey(const ValueKey('note-toolbar-shell')))
+        .dy;
+    final caret = tester.getRect(find.text('Linha 39', findRichText: true));
+    expect(caret.bottom, lessThan(toolbarTop));
   });
 
   testWidgets('hiding the keyboard ends editing', (tester) async {
